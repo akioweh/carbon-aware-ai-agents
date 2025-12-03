@@ -1,0 +1,8 @@
+API has very basic functionality for now, I'll expand on it after Software Engineering deadline but it honestly should be alright for a first prototype.
+
+This API we can imagine is only giving the load history of one data centre which ranges from 0-50 arbitrary units with 50 being the capacity. Interval is 5 minutes.
+
+The WattTime API we were planning on using is subscription based so while I find an alternative I've made another basic one which generates a "greenness score" from 0-100.
+
+Both are pattern based thus predictable and we should be able to forecast and schedule tasks using it for the first prototype.
+
