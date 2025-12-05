@@ -1,0 +1,219 @@
+openapi: 3.0.3
+info:
+  title: Model Load API
+  description: |
+    API for tracking and retrieving data center load and greenness metrics.
+    
+    This API provides historical and current data about:
+    - **Load**: Data center load ranging from 0-50 arbitrary units (50 being capacity)
+    - **Greenness**: Energy greenness score from 0-100 (higher values indicate greener energy)
+    
+    Data is collected at 5-minute intervals and is pattern-based to enable forecasting 
+    and task scheduling.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+
+tags:
+  - name: History
+    description: Historical data endpoints
+  - name: Latest
+    description: Latest data endpoints
+
+paths:
+  /history:
+    get:
+      tags:
+        - History
+      summary: Get full history
+      description: Returns the complete history of all data points including timestamp, load, and greenness
+      operationId: getFullHistory
+      responses:
+        '200':
+          description: Successful response with full history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FullDataPoint'
+              example:
+                - timestamp: "2025-11-05T18:20:39.679404"
+                  load: 8.168924463462984
+                  greenness: 48.67735982423504
+                - timestamp: "2025-11-05T18:25:39.679404"
+                  load: 9.132001328854178
+                  greenness: 43.65320150893125
+
+  /load/history:
+    get:
+      tags:
+        - History
+      summary: Get load history
+      description: Returns historical data containing only timestamp and load values
+      operationId: getLoadHistory
+      responses:
+        '200':
+          description: Successful response with load history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoadDataPoint'
+              example:
+                - timestamp: "2025-11-05T18:20:39.679404"
+                  load: 8.168924463462984
+                - timestamp: "2025-11-05T18:25:39.679404"
+                  load: 9.132001328854178
+
+  /greenness/history:
+    get:
+      tags:
+        - History
+      summary: Get greenness history
+      description: Returns historical data containing only timestamp and greenness values
+      operationId: getGreennessHistory
+      responses:
+        '200':
+          description: Successful response with greenness history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GreennessDataPoint'
+              example:
+                - timestamp: "2025-11-05T18:20:39.679404"
+                  greenness: 48.67735982423504
+                - timestamp: "2025-11-05T18:25:39.679404"
+                  greenness: 43.65320150893125
+
+  /latest:
+    get:
+      tags:
+        - Latest
+      summary: Get latest data
+      description: Returns the most recent data point with timestamp, load, and greenness
+      operationId: getLatest
+      responses:
+        '200':
+          description: Successful response with latest data point
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FullDataPoint'
+              example:
+                timestamp: "2025-12-05T18:20:39.679404"
+                load: 25.5
+                greenness: 75.3
+
+  /load/latest:
+    get:
+      tags:
+        - Latest
+      summary: Get latest load
+      description: Returns the most recent load data point with timestamp and load value
+      operationId: getLatestLoad
+      responses:
+        '200':
+          description: Successful response with latest load data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadDataPoint'
+              example:
+                timestamp: "2025-12-05T18:20:39.679404"
+                load: 25.5
+
+  /greenness/latest:
+    get:
+      tags:
+        - Latest
+      summary: Get latest greenness
+      description: Returns the most recent greenness data point with timestamp and greenness value
+      operationId: getLatestGreenness
+      responses:
+        '200':
+          description: Successful response with latest greenness data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GreennessDataPoint'
+              example:
+                timestamp: "2025-12-05T18:20:39.679404"
+                greenness: 75.3
+
+components:
+  schemas:
+    FullDataPoint:
+      type: object
+      description: Complete data point with timestamp, load, and greenness
+      required:
+        - timestamp
+        - load
+        - greenness
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 formatted timestamp
+          example: "2025-12-05T18:20:39.679404"
+        load:
+          type: number
+          format: float
+          description: Data center load value (0-50, where 50 is max capacity)
+          minimum: 0
+          maximum: 50
+          example: 25.5
+        greenness:
+          type: number
+          format: float
+          description: Energy greenness score (0-100, higher is greener)
+          minimum: 0
+          maximum: 100
+          example: 75.3
+    
+    LoadDataPoint:
+      type: object
+      description: Data point containing timestamp and load
+      required:
+        - timestamp
+        - load
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 formatted timestamp
+          example: "2025-12-05T18:20:39.679404"
+        load:
+          type: number
+          format: float
+          description: Data center load value (0-50, where 50 is max capacity)
+          minimum: 0
+          maximum: 50
+          example: 25.5
+    
+    GreennessDataPoint:
+      type: object
+      description: Data point containing timestamp and greenness
+      required:
+        - timestamp
+        - greenness
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 formatted timestamp
+          example: "2025-12-05T18:20:39.679404"
+        greenness:
+          type: number
+          format: float
+          description: Energy greenness score (0-100, higher is greener)
+          minimum: 0
+          maximum: 100
+          example: 75.3
