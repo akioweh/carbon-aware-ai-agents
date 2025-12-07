@@ -35,6 +35,9 @@ These schemas are intentionally **simplified for prototyping**:
 ```json
 {
   "job_id": "train-model-1",
+  "job_type": "training",
+  "functional_unit": "epoch",
+  "workload_amount": 20,
   "gpu_count": 4,
   "duration_hours": 8,
   "earliest_start": "2025-12-08T00:00:00Z",
@@ -51,44 +54,71 @@ These schemas are intentionally **simplified for prototyping**:
   "start_time": "2025-12-08T02:00:00Z",
   "end_time": "2025-12-08T10:00:00Z",
   "carbon_intensity": 0.15,
-  "estimated_emissions_kg": 45.5
+  "estimated_emissions_kg": 45.5,
+  "sci_per_unit": 2.28
 }
 ```
 
-### 2. Scheduler → Stats: Context Query
+**Key Fields:**
+- `functional_unit`: The unit for SCI calculation (epoch, request, GB_processed, etc.)
+- `workload_amount`: Number of functional units to process
+- `sci_per_unit`: Software Carbon Intensity per functional unit (kg CO₂e)
 
-**Endpoint:** `GET /api/context`
+### 2. Scheduler → Stats: Data Source Queries
 
-**Purpose:** Get carbon intensity forecast and data center availability
+The Stats API is restructured with separate endpoints for different data sources:
 
-**Query Parameters:**
-- `hours` (optional) - Number of hours to forecast (default 24)
+#### `GET /carbon/forecast`
+Get grid carbon intensity forecast
 
-**Response Schema:** `ContextResponse`
 ```json
 {
-  "locations": [
-    {
-      "location_id": "dc1",
-      "current_load": 25.5,
-      "max_capacity": 50.0,
-      "carbon_forecast": [
-        {
-          "timestamp": "2025-12-08T00:00:00Z",
-          "intensity": 0.25
-        },
-        {
-          "timestamp": "2025-12-08T01:00:00Z",
-          "intensity": 0.22
-        },
-        {
-          "timestamp": "2025-12-08T02:00:00Z",
-          "intensity": 0.15
-        }
-      ]
-    }
+  "location": "dc1",
+  "forecast": [
+    {"timestamp": "2025-12-08T00:00:00Z", "intensity": 0.25},
+    {"timestamp": "2025-12-08T01:00:00Z", "intensity": 0.22},
+    {"timestamp": "2025-12-08T02:00:00Z", "intensity": 0.15}
   ]
 }
+```
+
+#### `GET /datacenter/capacity`
+Get data center capacity and load
+
+```json
+[
+  {
+    "location_id": "dc1",
+    "current_load": 25.5,
+    "max_capacity": 50.0,
+    "available_gpus": 16,
+    "total_gpus": 32
+  }
+]
+```
+
+#### `GET /weather/current`
+Get weather data (affects cooling efficiency)
+
+```json
+{
+  "location": "dc1",
+  "temperature_celsius": 22,
+  "humidity_percent": 65
+}
+```
+
+#### `GET /costs/compute`
+Get compute costs per location
+
+```json
+[
+  {
+    "location_id": "dc1",
+    "cost_per_gpu_hour": 2.50,
+    "currency": "USD"
+  }
+]
 ```
 
 ## Key Design Decisions
@@ -101,35 +131,44 @@ The schemas prioritize:
 - **No premature optimization**: Advanced features can be added later
 - **Clear examples**: JSON examples that match real use cases
 
+### SCI Metric Support
+
+Jobs now include functional units for proper SCI calculation:
+- `functional_unit`: The unit of work (epoch, request, GB_processed, etc.)
+- `workload_amount`: Number of units to process
+- Response includes `sci_per_unit`: Software Carbon Intensity per functional unit
+
+**SCI Formula:** `SCI = (Energy × Carbon Intensity) / Functional Unit`
+
+### Modular Stats API
+
+Stats API is organized by data source type:
+- `/carbon/forecast` - Grid carbon intensity (external API integration)
+- `/datacenter/capacity` - Data center load and hardware availability
+- `/weather/current` - Weather data affecting cooling
+- `/costs/compute` - Compute pricing per location
+
+This structure makes it clear:
+- Which external data sources need integration
+- What data the Scheduler can query independently
+- How to add new data sources without breaking existing endpoints
+
 ### Carbon-Aware Scheduling
 
 The core concept:
-1. Jobs specify resource needs and time flexibility
-2. Scheduler queries carbon intensity forecasts
-3. Scheduler picks the cleanest time window
-4. Returns schedule with emissions estimate
-
-### Time Flexibility
-
-Jobs can specify:
-- `earliest_start` and `latest_finish` (optional)
-- Scheduler finds the best time within that window
-- If not specified, job runs immediately
-
-### Single Data Center
-
-For prototyping, we assume:
-- One primary data center (`dc1`)
-- Load tracking on 0-50 scale
-- Hourly carbon intensity forecasts
-- Simple scheduling logic
+1. Jobs specify resource needs, workload type, and time flexibility
+2. Scheduler queries carbon forecast and capacity data
+3. Scheduler picks the cleanest time window with available capacity
+4. Returns schedule with emissions estimate and SCI per functional unit
 
 ## Schema Files
 
 Both schemas are valid OpenAPI 3.0.3:
 
-- **`webapp/openapi.yaml`** - 134 lines, 3 schemas
-- **`model-load-api/openapi.yaml`** - 315 lines, 6 schemas (includes existing history endpoints)
+- **`webapp/openapi.yaml`** - 161 lines, 3 schemas, 1 endpoint
+- **`model-load-api/openapi.yaml`** - 449 lines, 8 schemas, 10 endpoints
+  - 6 historical/latest endpoints (existing)
+  - 4 context endpoints (new: carbon, capacity, weather, costs)
 
 ## Viewing the Schemas
 

@@ -23,6 +23,9 @@ paths:
               $ref: '#/components/schemas/JobRequest'
             example:
               job_id: "train-model-1"
+              job_type: "training"
+              functional_unit: "epoch"
+              workload_amount: 20
               gpu_count: 4
               duration_hours: 8
               earliest_start: "2025-12-08T00:00:00Z"
@@ -42,6 +45,7 @@ paths:
                 end_time: "2025-12-08T10:00:00Z"
                 carbon_intensity: 0.15
                 estimated_emissions_kg: 45.5
+                sci_per_unit: 2.28
         '400':
           description: Invalid request
           content:
@@ -55,6 +59,9 @@ components:
       type: object
       required:
         - job_id
+        - job_type
+        - functional_unit
+        - workload_amount
         - gpu_count
         - duration_hours
       properties:
@@ -62,6 +69,22 @@ components:
           type: string
           description: Unique job identifier
           example: "train-model-1"
+        job_type:
+          type: string
+          description: Type of AI workload
+          enum: ["training", "inference", "batch"]
+          example: "training"
+        functional_unit:
+          type: string
+          description: |
+            Unit for SCI calculation (SCI = Energy × Carbon / Functional Unit).
+            Examples: epoch, request, GB_processed, image, token
+          example: "epoch"
+        workload_amount:
+          type: number
+          description: Expected number of functional units to process
+          minimum: 1
+          example: 20
         gpu_count:
           type: integer
           description: Number of GPUs needed
@@ -122,6 +145,10 @@ components:
           type: number
           description: Estimated total emissions in kg CO2
           example: 45.5
+        sci_per_unit:
+          type: number
+          description: Software Carbon Intensity per functional unit (kg CO2e per unit)
+          example: 2.28
     
     Error:
       type: object

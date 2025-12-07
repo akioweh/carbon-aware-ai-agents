@@ -1,20 +1,17 @@
 openapi: 3.0.3
 info:
-  title: Model Load API (Stats Component)
+  title: Stats API (Stats Component)
   description: |
-    API for tracking and retrieving data center load and greenness metrics.
+    API for environmental and operational data to support carbon-aware scheduling.
     
-    This API provides historical and current data about:
-    - **Load**: Data center load in arbitrary units. For on-premise locations, the range
-      is 0-50 where 50 represents maximum capacity. This value represents a normalized
-      metric for resource utilization tracking.
-    - **Greenness**: Energy greenness score from 0-100 (higher values indicate greener energy)
+    The Stats component integrates data from multiple external sources:
+    - **Grid Carbon Intensity**: Real-time and forecasted carbon emissions per kWh
+    - **Data Center State**: Current load, capacity, and hardware availability
+    - **Weather Data**: Temperature and humidity affecting cooling efficiency
+    - **Cost Context**: Compute costs per location
     
-    Data is collected at 5-minute intervals and is pattern-based to enable forecasting 
-    and task scheduling.
-    
-    The API also provides scheduling context to the Scheduler component, including
-    forecasted carbon intensity, facility metrics, and cost information.
+    Historical data endpoints track load and "greenness" (inverse of carbon intensity)
+    at 5-minute intervals for pattern analysis and forecasting.
   version: 1.0.0
   contact:
     name: API Support
@@ -25,11 +22,11 @@ servers:
 
 tags:
   - name: History
-    description: Historical data endpoints
+    description: Historical data endpoints (load and greenness tracking)
   - name: Latest
     description: Latest data endpoints
   - name: Context
-    description: Scheduling context endpoints for Scheduler component
+    description: Scheduling context endpoints (carbon, capacity, weather, costs)
 
 paths:
   /history:
@@ -155,13 +152,19 @@ paths:
                 timestamp: "2025-12-05T18:20:39.679404"
                 greenness: 75.3
 
-  /api/context:
+  /carbon/forecast:
     get:
       tags:
         - Context
-      summary: Get scheduling context
-      description: Returns carbon intensity forecast and data center availability
+      summary: Get carbon intensity forecast
+      description: Returns grid carbon intensity forecast for scheduling optimization
       parameters:
+        - name: location
+          in: query
+          description: Location ID (optional, default is all locations)
+          schema:
+            type: string
+          example: "dc1"
         - name: hours
           in: query
           description: Number of hours to forecast (default 24)
@@ -171,23 +174,103 @@ paths:
           example: 48
       responses:
         '200':
-          description: Context data for scheduling
+          description: Carbon intensity forecast
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContextResponse'
+                $ref: '#/components/schemas/CarbonForecast'
               example:
-                locations:
-                  - location_id: "dc1"
-                    current_load: 25.5
-                    max_capacity: 50.0
-                    carbon_forecast:
-                      - timestamp: "2025-12-08T00:00:00Z"
-                        intensity: 0.25
-                      - timestamp: "2025-12-08T01:00:00Z"
-                        intensity: 0.22
-                      - timestamp: "2025-12-08T02:00:00Z"
-                        intensity: 0.15
+                location: "dc1"
+                forecast:
+                  - timestamp: "2025-12-08T00:00:00Z"
+                    intensity: 0.25
+                  - timestamp: "2025-12-08T01:00:00Z"
+                    intensity: 0.22
+                  - timestamp: "2025-12-08T02:00:00Z"
+                    intensity: 0.15
+
+  /datacenter/capacity:
+    get:
+      tags:
+        - Context
+      summary: Get data center capacity and load
+      description: Returns current load and available capacity for data centers
+      parameters:
+        - name: location
+          in: query
+          description: Location ID (optional, default is all locations)
+          schema:
+            type: string
+          example: "dc1"
+      responses:
+        '200':
+          description: Data center capacity info
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataCenterStatus'
+              example:
+                - location_id: "dc1"
+                  current_load: 25.5
+                  max_capacity: 50.0
+                  available_gpus: 16
+                  total_gpus: 32
+                - location_id: "dc2"
+                  current_load: 35.0
+                  max_capacity: 50.0
+                  available_gpus: 8
+                  total_gpus: 24
+
+  /weather/current:
+    get:
+      tags:
+        - Context
+      summary: Get current weather data
+      description: Returns weather data that may affect data center cooling and efficiency
+      parameters:
+        - name: location
+          in: query
+          description: Location ID
+          required: true
+          schema:
+            type: string
+          example: "dc1"
+      responses:
+        '200':
+          description: Current weather data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeatherData'
+              example:
+                location: "dc1"
+                temperature_celsius: 22
+                humidity_percent: 65
+
+  /costs/compute:
+    get:
+      tags:
+        - Context
+      summary: Get compute costs
+      description: Returns cost per compute unit for different locations
+      responses:
+        '200':
+          description: Compute costs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ComputeCosts'
+              example:
+                - location_id: "dc1"
+                  cost_per_gpu_hour: 2.50
+                  currency: "USD"
+                - location_id: "dc2"
+                  cost_per_gpu_hour: 3.00
+                  currency: "USD"
 
 components:
   schemas:
@@ -259,39 +342,18 @@ components:
           maximum: 100
           example: 75.3
     
-    ContextResponse:
+    CarbonForecast:
       type: object
-      description: Scheduling context with carbon forecasts
+      description: Carbon intensity forecast for a location
       required:
-        - locations
+        - location
+        - forecast
       properties:
-        locations:
-          type: array
-          items:
-            $ref: '#/components/schemas/LocationData'
-    
-    LocationData:
-      type: object
-      description: Data for a single location
-      required:
-        - location_id
-        - current_load
-        - max_capacity
-        - carbon_forecast
-      properties:
-        location_id:
+        location:
           type: string
           description: Location identifier
           example: "dc1"
-        current_load:
-          type: number
-          description: Current load (0-50 scale)
-          example: 25.5
-        max_capacity:
-          type: number
-          description: Maximum capacity
-          example: 50.0
-        carbon_forecast:
+        forecast:
           type: array
           description: Hourly carbon intensity forecast
           items:
@@ -313,3 +375,75 @@ components:
           type: number
           description: Carbon intensity (kg CO2/kWh)
           example: 0.25
+    
+    DataCenterStatus:
+      type: object
+      description: Data center capacity and load status
+      required:
+        - location_id
+        - current_load
+        - max_capacity
+      properties:
+        location_id:
+          type: string
+          description: Location identifier
+          example: "dc1"
+        current_load:
+          type: number
+          description: Current load (0-50 scale)
+          example: 25.5
+        max_capacity:
+          type: number
+          description: Maximum capacity
+          example: 50.0
+        available_gpus:
+          type: integer
+          description: Number of available GPUs
+          example: 16
+        total_gpus:
+          type: integer
+          description: Total number of GPUs
+          example: 32
+    
+    WeatherData:
+      type: object
+      description: Weather data affecting data center efficiency
+      required:
+        - location
+        - temperature_celsius
+      properties:
+        location:
+          type: string
+          description: Location identifier
+          example: "dc1"
+        temperature_celsius:
+          type: number
+          description: Outside temperature in Celsius
+          example: 22
+        humidity_percent:
+          type: number
+          description: Relative humidity percentage
+          minimum: 0
+          maximum: 100
+          example: 65
+    
+    ComputeCosts:
+      type: object
+      description: Compute costs for a location
+      required:
+        - location_id
+        - cost_per_gpu_hour
+        - currency
+      properties:
+        location_id:
+          type: string
+          description: Location identifier
+          example: "dc1"
+        cost_per_gpu_hour:
+          type: number
+          description: Cost per GPU hour
+          example: 2.50
+        currency:
+          type: string
+          description: Currency code
+          example: "USD"
