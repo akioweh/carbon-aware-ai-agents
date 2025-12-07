@@ -1,15 +1,20 @@
 openapi: 3.0.3
 info:
-  title: Model Load API
+  title: Model Load API (Stats Component)
   description: |
     API for tracking and retrieving data center load and greenness metrics.
     
     This API provides historical and current data about:
-    - **Load**: Data center load ranging from 0-50 arbitrary units (50 being capacity)
+    - **Load**: Data center load in arbitrary units. For on-premise locations, the range
+      is 0-50 where 50 represents maximum capacity. This value represents a normalized
+      metric for resource utilization tracking.
     - **Greenness**: Energy greenness score from 0-100 (higher values indicate greener energy)
     
     Data is collected at 5-minute intervals and is pattern-based to enable forecasting 
     and task scheduling.
+    
+    The API also provides scheduling context to the Scheduler component, including
+    forecasted carbon intensity, facility metrics, and cost information.
   version: 1.0.0
   contact:
     name: API Support
@@ -406,21 +411,30 @@ components:
         current_load:
           type: number
           format: float
-          description: Current load (0-50 for on-prem, null for cloud with elastic capacity)
+          description: |
+            Current load in arbitrary units for on-premise locations.
+            Range: 0-50 (where 50 represents max capacity).
+            For cloud locations with elastic capacity, this is null.
           minimum: 0
-          maximum: 50
           example: 25.5
           nullable: true
         max_capacity:
           type: number
           format: float
-          description: Maximum capacity (50 for on-prem, null for cloud with elastic capacity)
+          description: |
+            Maximum capacity in arbitrary units for on-premise locations.
+            Typically 50 for on-premise data centers.
+            For cloud locations with elastic capacity, this is null.
+          minimum: 0
           example: 50.0
           nullable: true
         available_capacity:
           type: number
           format: float
-          description: Available capacity (max - current for on-prem, null for cloud)
+          description: |
+            Available capacity (max_capacity - current_load) for on-premise locations.
+            For cloud locations with elastic capacity, this is null.
+          minimum: 0
           example: 24.5
           nullable: true
         grid_carbon_intensity_forecast:

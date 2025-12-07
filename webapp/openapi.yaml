@@ -302,7 +302,8 @@ components:
       type: object
       description: |
         Weights for multi-objective optimization.
-        All weights should sum to 1.0.
+        All weights should ideally sum to 1.0 for normalized scoring, but this is not strictly enforced.
+        The scheduler will normalize weights if they don't sum to 1.0.
       properties:
         weight_sci:
           type: number
