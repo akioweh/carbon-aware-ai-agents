@@ -1,6 +1,6 @@
-# API Schemas Documentation
+# API Schemas Documentation (Prototype)
 
-This document provides an overview of the OpenAPI schemas that define the REST APIs for the Carbon-Aware AI Agents system.
+This document provides an overview of the simplified OpenAPI schemas for prototyping the Carbon-Aware AI Agents system.
 
 ## Overview
 
@@ -12,8 +12,16 @@ The system comprises three main components that communicate via RESTful HTTP API
 
 Two OpenAPI 3.0 schemas define these interactions:
 
-- **`webapp/openapi.yaml`** - UI ↔ Scheduler API
+- **`webapp/openapi.yaml`** - UI ↔ Scheduler API (simplified for prototyping)
 - **`model-load-api/openapi.yaml`** - Stats API (including Scheduler ↔ Stats endpoint)
+
+## Design Philosophy
+
+These schemas are intentionally **simplified for prototyping**:
+- Minimal required fields
+- Flat structure (minimal nesting)
+- Focus on core functionality only
+- Easy to implement and iterate
 
 ## API Interactions
 
@@ -23,67 +31,27 @@ Two OpenAPI 3.0 schemas define these interactions:
 
 **Purpose:** Submit an AI workload for carbon-aware scheduling
 
-**Request Schema:** `JobSpecification`
-```yaml
+**Request Schema:** `JobRequest`
+```json
 {
-  "workload_id": "train-llm-v3",
-  "type": "training",                    # training, inference, batch_job, fine_tuning
-  "functional_unit": "epoch",            # epoch, request, gb_processed
-  "estimated_workload": 20,              # Number of functional units
-  "resources": {
-    "gpu_type": "A100",
-    "gpu_count": 8,
-    "memory_gb": 512,
-    "storage_gb": 2000
-  },
-  "temporal_flexibility": {
-    "earliest_start": "2025-12-08T00:00:00Z",
-    "latest_finish": "2025-12-10T23:59:59Z"
-  },
-  "policy": {
-    "allowed_providers": ["aws", "azure", "on-prem-dc1"],
-    "compliance_requirements": ["gdpr", "soc2"]
-  },
-  "budget": {
-    "max_cost_usd": 5000
-  },
-  "objective_profile": {
-    "weight_sci": 0.5,        # Carbon emissions weight
-    "weight_water": 0.2,      # Water usage weight
-    "weight_materials": 0.1,  # Hardware wear weight
-    "weight_cost": 0.15,      # Cost weight
-    "weight_latency": 0.05    # Latency weight
-  }
+  "job_id": "train-model-1",
+  "gpu_count": 4,
+  "duration_hours": 8,
+  "earliest_start": "2025-12-08T00:00:00Z",
+  "latest_finish": "2025-12-10T00:00:00Z"
 }
 ```
 
 **Response Schema:** `ScheduleResponse`
-```yaml
+```json
 {
-  "schedule_id": "sched-abc123",
-  "workload_id": "train-llm-v3",
-  "placement": {
-    "location": "on-prem-dc1",
-    "location_type": "on-premise",
-    "start_time": "2025-12-08T03:00:00Z",
-    "end_time": "2025-12-08T15:00:00Z",
-    "duration_hours": 12
-  },
-  "expected_metrics": {
-    "sci_per_unit": 18.5,          # kg CO₂e per functional unit
-    "total_co2e_kg": 370,           # Total emissions
-    "total_energy_kwh": 2468,       # Total energy consumption
-    "total_water_liters": 1850,     # Total water usage
-    "estimated_cost_usd": 3200
-  },
-  "compliance_proof": {
-    "meets_slos": true,
-    "meets_policy": true,
-    "meets_budget": true
-  },
-  "explanation": {
-    "reasoning": "Selected on-premise DC1 during low grid carbon intensity window..."
-  }
+  "schedule_id": "sched-123",
+  "job_id": "train-model-1",
+  "location": "dc1",
+  "start_time": "2025-12-08T02:00:00Z",
+  "end_time": "2025-12-08T10:00:00Z",
+  "carbon_intensity": 0.15,
+  "estimated_emissions_kg": 45.5
 }
 ```
 
@@ -91,53 +59,31 @@ Two OpenAPI 3.0 schemas define these interactions:
 
 **Endpoint:** `GET /api/context`
 
-**Purpose:** Retrieve environmental and operational context for scheduling decisions
+**Purpose:** Get carbon intensity forecast and data center availability
 
 **Query Parameters:**
-- `start_time` (optional) - Beginning of time window (ISO 8601)
-- `end_time` (optional) - End of time window (ISO 8601)
-- `locations` (optional) - Comma-separated list of locations
+- `hours` (optional) - Number of hours to forecast (default 24)
 
-**Response Schema:** `SchedulingContext`
-```yaml
+**Response Schema:** `ContextResponse`
+```json
 {
-  "timestamp": "2025-12-07T22:47:00Z",
-  "time_window": {
-    "start": "2025-12-08T00:00:00Z",
-    "end": "2025-12-10T23:59:59Z"
-  },
   "locations": [
     {
-      "location_id": "on-prem-dc1",
-      "location_type": "on-premise",
-      "current_load": 25.5,              # 0-50 scale (50 = max capacity)
+      "location_id": "dc1",
+      "current_load": 25.5,
       "max_capacity": 50.0,
-      "available_capacity": 24.5,
-      "grid_carbon_intensity_forecast": [
+      "carbon_forecast": [
         {
           "timestamp": "2025-12-08T00:00:00Z",
-          "intensity_kg_per_kwh": 0.25   # kg CO₂e per kWh
+          "intensity": 0.25
         },
         {
-          "timestamp": "2025-12-08T03:00:00Z",
-          "intensity_kg_per_kwh": 0.15   # Lower = cleaner grid
-        }
-      ],
-      "facility_metrics": {
-        "pue": 1.2,                      # Power Usage Effectiveness
-        "wue": 1.8,                      # Water Usage Effectiveness (L/kWh)
-        "renewable_percentage": 45       # % renewable energy
-      },
-      "cost_context": {
-        "cost_per_gpu_hour": 3.50,
-        "cost_per_cpu_hour": 0.25,
-        "currency": "USD"
-      },
-      "hardware_availability": [
+          "timestamp": "2025-12-08T01:00:00Z",
+          "intensity": 0.22
+        },
         {
-          "gpu_type": "A100",
-          "available_count": 16,
-          "total_count": 32
+          "timestamp": "2025-12-08T02:00:00Z",
+          "intensity": 0.15
         }
       ]
     }
@@ -147,69 +93,43 @@ Two OpenAPI 3.0 schemas define these interactions:
 
 ## Key Design Decisions
 
-### Software Carbon Intensity (SCI) Metric
+### Simplicity for Prototyping
 
-The APIs are designed around the [Green Software Foundation's SCI metric](https://greensoftware.foundation/):
+The schemas prioritize:
+- **Minimal fields**: Only essential data for core functionality
+- **Flat structures**: Easy to implement and debug
+- **No premature optimization**: Advanced features can be added later
+- **Clear examples**: JSON examples that match real use cases
 
-```
-SCI = (Energy × Carbon Intensity) / Functional Unit
-```
+### Carbon-Aware Scheduling
 
-This allows workload-specific carbon accounting (e.g., kg CO₂e per epoch, per request, etc.).
+The core concept:
+1. Jobs specify resource needs and time flexibility
+2. Scheduler queries carbon intensity forecasts
+3. Scheduler picks the cleanest time window
+4. Returns schedule with emissions estimate
 
-### Temporal Flexibility
+### Time Flexibility
 
-Workloads specify a time window (`earliest_start` to `latest_finish`), enabling the scheduler to:
-- Shift execution to cleaner grid windows
-- Optimize across time zones
-- Balance load across data centers
+Jobs can specify:
+- `earliest_start` and `latest_finish` (optional)
+- Scheduler finds the best time within that window
+- If not specified, job runs immediately
 
-### Hybrid Cloud + On-Premise Support
+### Single Data Center
 
-The schemas distinguish between:
-- **Cloud locations** - Elastic capacity (null for load/capacity fields)
-- **On-premise locations** - Fixed capacity (0-50 scale for load tracking)
-- **Edge locations** - Future support
+For prototyping, we assume:
+- One primary data center (`dc1`)
+- Load tracking on 0-50 scale
+- Hourly carbon intensity forecasts
+- Simple scheduling logic
 
-### Multi-Objective Optimization
+## Schema Files
 
-The `objective_profile` allows users to configure trade-offs:
-- **Carbon-first**: High `weight_sci`, low others
-- **Cost-conscious**: Balance `weight_sci` and `weight_cost`
-- **Balanced**: Even distribution across all weights
+Both schemas are valid OpenAPI 3.0.3:
 
-Weights don't need to sum to 1.0; the scheduler normalizes them automatically.
-
-### Explainable AI
-
-All schedule decisions include:
-- Human-readable reasoning
-- Expected metrics with transparency
-- Alternative schedules considered
-- Compliance proof for auditability
-
-## Schema Validation
-
-Both schemas are validated against OpenAPI 3.0.3 specification:
-
-```bash
-# Install validator
-pip install openapi-spec-validator
-
-# Validate schemas
-python -c "
-from openapi_spec_validator import validate_spec
-from openapi_spec_validator.readers import read_from_filename
-
-spec_dict, spec_url = read_from_filename('webapp/openapi.yaml')
-validate_spec(spec_dict)
-print('✓ webapp/openapi.yaml is valid')
-
-spec_dict, spec_url = read_from_filename('model-load-api/openapi.yaml')
-validate_spec(spec_dict)
-print('✓ model-load-api/openapi.yaml is valid')
-"
-```
+- **`webapp/openapi.yaml`** - 134 lines, 3 schemas
+- **`model-load-api/openapi.yaml`** - 315 lines, 6 schemas (includes existing history endpoints)
 
 ## Viewing the Schemas
 
@@ -241,30 +161,24 @@ redoc-cli bundle webapp/openapi.yaml -o webapp-api-docs.html
 redoc-cli bundle model-load-api/openapi.yaml -o stats-api-docs.html
 ```
 
-## Implementation Status
+## Implementation Roadmap
 
-| Component | Schema | Implementation |
-|-----------|--------|----------------|
-| UI (webapp) | ✅ Complete | 🟡 In Progress |
-| Scheduler | ✅ Complete | ⚪ Not Started |
-| Stats (model-load-api) | ✅ Complete | 🟡 Partial (history endpoints exist) |
+### Phase 1: Prototype Core (Current)
+- ✅ Simple API schemas defined
+- ⚪ Mock scheduler endpoint
+- ⚪ Mock context endpoint with static data
+- ⚪ Basic UI to submit jobs
 
-### Next Steps
+### Phase 2: Add Real Data
+- Integrate with carbon intensity API (e.g., ElectricityMaps)
+- Add actual data center load tracking
+- Simple scheduling algorithm (pick lowest carbon time)
 
-1. **Scheduler Implementation**
-   - Implement `POST /api/schedule` endpoint
-   - Integrate constraint solver
-   - Add SCI calculations
-
-2. **Stats Enhancement**
-   - Implement `GET /api/context` endpoint
-   - Add forecasting engine
-   - Integrate with external data sources (grid carbon APIs)
-
-3. **UI Enhancement**
-   - Build job submission form
-   - Create schedule visualization dashboard
-   - Add real-time carbon intensity displays
+### Phase 3: Enhance
+- Add more data centers
+- Improve forecasting
+- Add cost considerations
+- Better UI visualization
 
 ## Related Documentation
 

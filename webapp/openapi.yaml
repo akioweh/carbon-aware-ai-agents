@@ -1,570 +1,134 @@
 openapi: 3.0.3
 info:
-  title: Scheduler API
+  title: Scheduler API (Prototype)
   description: |
-    API for the Carbon-Aware AI Agents Scheduler component.
-    
-    This API enables the UI to submit AI workload job specifications and receive
-    optimized deployment schedules that minimize environmental impact.
-    
-    The Scheduler evaluates:
-    - **Carbon emissions**: Grid carbon intensity by location and time
-    - **Energy consumption**: kWh with PUE/WUE considerations
-    - **Water usage**: Data center water consumption
-    - **Hardware wear**: Critical materials impact
-    - **Cost**: TCO for on-prem and cloud rates
-    - **SLOs**: Latency, throughput, and compliance requirements
-    
-    The scheduler uses the Software Carbon Intensity (SCI) metric from the
-    Green Software Foundation to make placement and timing decisions across
-    hybrid cloud and on-premise environments.
-  version: 1.0.0
-  contact:
-    name: API Support
+    Simple API for carbon-aware AI workload scheduling.
+    Submit a job specification and receive an optimized schedule.
+  version: 0.1.0
 
 servers:
   - url: http://localhost:8000
     description: Local development server
 
-tags:
-  - name: Schedule
-    description: Job scheduling endpoints
-
 paths:
   /api/schedule:
     post:
-      tags:
-        - Schedule
-      summary: Submit job for scheduling
-      description: |
-        Submit an AI workload job specification to receive an optimized
-        deployment schedule that minimizes environmental impact while
-        respecting constraints and SLOs.
-      operationId: scheduleJob
+      summary: Schedule a job
+      description: Submit a job and get back an optimized schedule
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/JobSpecification'
+              $ref: '#/components/schemas/JobRequest'
             example:
-              workload_id: "train-llm-v3"
-              type: "training"
-              functional_unit: "epoch"
-              estimated_workload: 20
-              resources:
-                gpu_type: "A100"
-                gpu_count: 8
-                memory_gb: 512
-                storage_gb: 2000
-              temporal_flexibility:
-                earliest_start: "2025-12-08T00:00:00Z"
-                latest_finish: "2025-12-10T23:59:59Z"
-              policy:
-                allowed_providers: ["aws", "azure", "on-prem-dc1"]
-                prohibited_regions: ["us-west-1"]
-                compliance_requirements: ["gdpr", "soc2"]
-              budget:
-                max_cost_usd: 5000
-                currency: "USD"
-              objective_profile:
-                weight_sci: 0.5
-                weight_water: 0.2
-                weight_materials: 0.1
-                weight_cost: 0.15
-                weight_latency: 0.05
+              job_id: "train-model-1"
+              gpu_count: 4
+              duration_hours: 8
+              earliest_start: "2025-12-08T00:00:00Z"
+              latest_finish: "2025-12-10T00:00:00Z"
       responses:
         '200':
-          description: Successful schedule generation
+          description: Schedule created successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScheduleResponse'
               example:
-                schedule_id: "sched-abc123"
-                workload_id: "train-llm-v3"
-                placement:
-                  location: "on-prem-dc1"
-                  location_type: "on-premise"
-                  region: null
-                  start_time: "2025-12-08T03:00:00Z"
-                  end_time: "2025-12-08T15:00:00Z"
-                  duration_hours: 12
-                  resource_shape:
-                    gpu_type: "A100"
-                    gpu_count: 8
-                    memory_gb: 512
-                    storage_gb: 2000
-                expected_metrics:
-                  sci_per_unit: 18.5
-                  total_co2e_kg: 370
-                  total_energy_kwh: 2468
-                  total_water_liters: 1850
-                  materials_wear_score: 0.08
-                  estimated_cost_usd: 3200
-                compliance_proof:
-                  meets_slos: true
-                  meets_policy: true
-                  meets_budget: true
-                  constraints_satisfied: ["gdpr", "soc2"]
-                explanation:
-                  reasoning: "Selected on-premise DC1 during low grid carbon intensity window (0.15 kg/kWh). Existing hardware utilization maximizes efficiency and minimizes embodied carbon impact."
-                  alternative_schedules: []
-                timestamp: "2025-12-07T22:47:00Z"
+                schedule_id: "sched-123"
+                job_id: "train-model-1"
+                location: "dc1"
+                start_time: "2025-12-08T02:00:00Z"
+                end_time: "2025-12-08T10:00:00Z"
+                carbon_intensity: 0.15
+                estimated_emissions_kg: 45.5
         '400':
-          description: Invalid job specification
+          description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-              example:
-                error: "Invalid job specification"
-                message: "temporal_flexibility.latest_finish must be after earliest_start"
-                code: "INVALID_TIME_WINDOW"
-        '422':
-          description: Infeasible job - no valid schedule found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: "No feasible schedule found"
-                message: "No available resources meet the specified policy constraints and SLOs within the given time window"
-                code: "INFEASIBLE_SCHEDULE"
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: "Internal server error"
-                message: "Failed to communicate with Stats component"
-                code: "INTERNAL_ERROR"
 
 components:
   schemas:
-    JobSpecification:
+    JobRequest:
       type: object
-      description: |
-        Specification for an AI workload job to be scheduled.
-        Based on the Workload Contract defined in the project brief.
       required:
-        - workload_id
-        - type
-        - functional_unit
-        - estimated_workload
-        - resources
-        - temporal_flexibility
-      properties:
-        workload_id:
-          type: string
-          description: Unique identifier for this workload
-          example: "train-llm-v3"
-        type:
-          type: string
-          description: Type of AI workload
-          enum: ["training", "inference", "batch_job", "fine_tuning"]
-          example: "training"
-        functional_unit:
-          type: string
-          description: |
-            The functional unit for SCI calculation.
-            Common units: epoch, request, gb_processed, inference_call
-          example: "epoch"
-        estimated_workload:
-          type: number
-          format: float
-          description: Estimated quantity of functional units for this job
-          minimum: 0
-          example: 20
-        resources:
-          $ref: '#/components/schemas/ResourceRequirements'
-        temporal_flexibility:
-          $ref: '#/components/schemas/TemporalFlexibility'
-        policy:
-          $ref: '#/components/schemas/PolicyConstraints'
-        budget:
-          $ref: '#/components/schemas/Budget'
-        objective_profile:
-          $ref: '#/components/schemas/ObjectiveProfile'
-    
-    ResourceRequirements:
-      type: object
-      description: Hardware and compute resource requirements
-      required:
+        - job_id
         - gpu_count
-        - memory_gb
+        - duration_hours
       properties:
-        gpu_type:
+        job_id:
           type: string
-          description: Specific GPU model required (null for CPU-only)
-          example: "A100"
-          nullable: true
+          description: Unique job identifier
+          example: "train-model-1"
         gpu_count:
           type: integer
-          description: Number of GPUs required (0 for CPU-only)
-          minimum: 0
-          example: 8
-        cpu_cores:
-          type: integer
-          description: Number of CPU cores required
+          description: Number of GPUs needed
           minimum: 1
-          example: 32
-        memory_gb:
+          example: 4
+        duration_hours:
           type: number
-          format: float
-          description: Required memory in gigabytes
-          minimum: 0
-          example: 512
-        storage_gb:
-          type: number
-          format: float
-          description: Required storage in gigabytes
-          minimum: 0
-          example: 2000
-        network_bandwidth_gbps:
-          type: number
-          format: float
-          description: Required network bandwidth in Gbps
-          minimum: 0
-          example: 10
-    
-    TemporalFlexibility:
-      type: object
-      description: Time window constraints for job execution
-      required:
-        - earliest_start
-        - latest_finish
-      properties:
+          description: Expected job duration in hours
+          minimum: 0.1
+          example: 8
         earliest_start:
           type: string
           format: date-time
-          description: Earliest time the job can start (ISO 8601)
+          description: Earliest time to start (optional)
           example: "2025-12-08T00:00:00Z"
         latest_finish:
           type: string
           format: date-time
-          description: Latest time the job must finish (ISO 8601)
-          example: "2025-12-10T23:59:59Z"
-        preferred_start:
-          type: string
-          format: date-time
-          description: Preferred start time (optional hint)
-          example: "2025-12-08T06:00:00Z"
-          nullable: true
-    
-    PolicyConstraints:
-      type: object
-      description: Policy and compliance constraints
-      properties:
-        allowed_providers:
-          type: array
-          description: List of allowed cloud providers or on-prem sites
-          items:
-            type: string
-          example: ["aws", "azure", "on-prem-dc1"]
-        prohibited_regions:
-          type: array
-          description: List of prohibited geographic regions
-          items:
-            type: string
-          example: ["us-west-1"]
-        compliance_requirements:
-          type: array
-          description: Required compliance standards
-          items:
-            type: string
-          example: ["gdpr", "soc2", "hipaa"]
-        data_residency:
-          type: string
-          description: Required data residency location
-          example: "EU"
-          nullable: true
-    
-    Budget:
-      type: object
-      description: Cost budget constraints
-      properties:
-        max_cost_usd:
-          type: number
-          format: float
-          description: Maximum allowed cost in USD
-          minimum: 0
-          example: 5000
-        currency:
-          type: string
-          description: Currency code
-          example: "USD"
-          default: "USD"
-    
-    ObjectiveProfile:
-      type: object
-      description: |
-        Weights for multi-objective optimization.
-        All weights should ideally sum to 1.0 for normalized scoring, but this is not strictly enforced.
-        The scheduler will normalize weights if they don't sum to 1.0.
-      properties:
-        weight_sci:
-          type: number
-          format: float
-          description: Weight for SCI (carbon emissions) objective
-          minimum: 0
-          maximum: 1
-          example: 0.5
-          default: 0.5
-        weight_water:
-          type: number
-          format: float
-          description: Weight for water consumption objective
-          minimum: 0
-          maximum: 1
-          example: 0.2
-          default: 0.2
-        weight_materials:
-          type: number
-          format: float
-          description: Weight for critical materials wear objective
-          minimum: 0
-          maximum: 1
-          example: 0.1
-          default: 0.1
-        weight_cost:
-          type: number
-          format: float
-          description: Weight for cost objective
-          minimum: 0
-          maximum: 1
-          example: 0.15
-          default: 0.15
-        weight_latency:
-          type: number
-          format: float
-          description: Weight for latency objective
-          minimum: 0
-          maximum: 1
-          example: 0.05
-          default: 0.05
+          description: Latest time to finish (optional)
+          example: "2025-12-10T00:00:00Z"
     
     ScheduleResponse:
       type: object
-      description: Optimized deployment schedule for the submitted job
       required:
         - schedule_id
-        - workload_id
-        - placement
-        - expected_metrics
-        - compliance_proof
-        - timestamp
+        - job_id
+        - location
+        - start_time
+        - end_time
       properties:
         schedule_id:
           type: string
-          description: Unique identifier for this schedule
-          example: "sched-abc123"
-        workload_id:
+          description: Generated schedule ID
+          example: "sched-123"
+        job_id:
           type: string
-          description: Original workload identifier
-          example: "train-llm-v3"
-        placement:
-          $ref: '#/components/schemas/PlacementDecision'
-        expected_metrics:
-          $ref: '#/components/schemas/ExpectedMetrics'
-        compliance_proof:
-          $ref: '#/components/schemas/ComplianceProof'
-        explanation:
-          $ref: '#/components/schemas/ScheduleExplanation'
-        timestamp:
-          type: string
-          format: date-time
-          description: When this schedule was generated
-          example: "2025-12-07T22:47:00Z"
-    
-    PlacementDecision:
-      type: object
-      description: Where and when to run the workload
-      required:
-        - location
-        - location_type
-        - start_time
-        - end_time
-        - duration_hours
-        - resource_shape
-      properties:
+          description: Original job ID
+          example: "train-model-1"
         location:
           type: string
-          description: Selected location (cloud region or on-prem site identifier)
-          example: "on-prem-dc1"
-        location_type:
-          type: string
-          description: Type of location
-          enum: ["cloud", "on-premise", "edge"]
-          example: "on-premise"
-        provider:
-          type: string
-          description: Cloud provider (if location_type is cloud)
-          example: "aws"
-          nullable: true
-        region:
-          type: string
-          description: Cloud region (if location_type is cloud)
-          example: "us-east-1"
-          nullable: true
+          description: Assigned data center
+          example: "dc1"
         start_time:
           type: string
           format: date-time
-          description: Scheduled start time (ISO 8601)
-          example: "2025-12-08T03:00:00Z"
+          description: Scheduled start time
+          example: "2025-12-08T02:00:00Z"
         end_time:
           type: string
           format: date-time
-          description: Expected end time (ISO 8601)
-          example: "2025-12-08T15:00:00Z"
-        duration_hours:
+          description: Scheduled end time
+          example: "2025-12-08T10:00:00Z"
+        carbon_intensity:
           type: number
-          format: float
-          description: Expected duration in hours
-          example: 12
-        resource_shape:
-          $ref: '#/components/schemas/ResourceRequirements'
-    
-    ExpectedMetrics:
-      type: object
-      description: Expected environmental and cost metrics for this schedule
-      required:
-        - sci_per_unit
-        - total_co2e_kg
-        - total_energy_kwh
-      properties:
-        sci_per_unit:
-          type: number
-          format: float
-          description: Software Carbon Intensity per functional unit (kgCO₂e)
-          example: 18.5
-        total_co2e_kg:
-          type: number
-          format: float
-          description: Total carbon emissions in kg CO₂e
-          example: 370
-        total_energy_kwh:
-          type: number
-          format: float
-          description: Total energy consumption in kWh
-          example: 2468
-        total_water_liters:
-          type: number
-          format: float
-          description: Total water consumption in liters
-          example: 1850
-        materials_wear_score:
-          type: number
-          format: float
-          description: Normalized critical materials wear score (0-1)
-          minimum: 0
-          maximum: 1
-          example: 0.08
-        estimated_cost_usd:
-          type: number
-          format: float
-          description: Estimated total cost in USD
-          example: 3200
-        avg_grid_carbon_intensity:
-          type: number
-          format: float
-          description: Average grid carbon intensity during execution (kgCO₂e/kWh)
+          description: Average carbon intensity (kg CO2/kWh)
           example: 0.15
-        pue:
+        estimated_emissions_kg:
           type: number
-          format: float
-          description: Power Usage Effectiveness at selected location
-          example: 1.2
-    
-    ComplianceProof:
-      type: object
-      description: Verification that schedule meets all constraints
-      required:
-        - meets_slos
-        - meets_policy
-        - meets_budget
-      properties:
-        meets_slos:
-          type: boolean
-          description: Whether SLOs are satisfied
-          example: true
-        meets_policy:
-          type: boolean
-          description: Whether policy constraints are satisfied
-          example: true
-        meets_budget:
-          type: boolean
-          description: Whether budget constraints are satisfied
-          example: true
-        constraints_satisfied:
-          type: array
-          description: List of satisfied compliance requirements
-          items:
-            type: string
-          example: ["gdpr", "soc2"]
-        warnings:
-          type: array
-          description: Any warnings or notes about the schedule
-          items:
-            type: string
-          example: []
-    
-    ScheduleExplanation:
-      type: object
-      description: Human-readable explanation of scheduling decision
-      properties:
-        reasoning:
-          type: string
-          description: Explanation of why this schedule was chosen
-          example: "Selected on-premise DC1 during low grid carbon intensity window (0.15 kg/kWh). Existing hardware utilization maximizes efficiency and minimizes embodied carbon impact."
-        alternative_schedules:
-          type: array
-          description: List of alternative schedule options considered
-          items:
-            $ref: '#/components/schemas/AlternativeSchedule'
-          example: []
-    
-    AlternativeSchedule:
-      type: object
-      description: An alternative schedule that was considered but not selected
-      properties:
-        location:
-          type: string
-          example: "aws-us-east-1"
-        start_time:
-          type: string
-          format: date-time
-          example: "2025-12-08T06:00:00Z"
-        sci_per_unit:
-          type: number
-          format: float
-          example: 25.3
-        estimated_cost_usd:
-          type: number
-          format: float
-          example: 4500
-        reason_not_selected:
-          type: string
-          example: "Higher carbon intensity compared to selected schedule"
+          description: Estimated total emissions in kg CO2
+          example: 45.5
     
     Error:
       type: object
-      description: Error response
       required:
         - error
-        - message
       properties:
         error:
           type: string
-          description: Error category
+          description: Error message
           example: "Invalid job specification"
-        message:
-          type: string
-          description: Detailed error message
-          example: "temporal_flexibility.latest_finish must be after earliest_start"
-        code:
-          type: string
-          description: Machine-readable error code
-          example: "INVALID_TIME_WINDOW"
