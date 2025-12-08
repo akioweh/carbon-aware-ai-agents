@@ -64,60 +64,97 @@ These schemas are intentionally **simplified for prototyping**:
 - `workload_amount`: Number of functional units to process
 - `sci_per_unit`: Software Carbon Intensity per functional unit (kg CO₂e)
 
-### 2. Scheduler → Stats: Data Source Queries
+### 2. Scheduler → Stats: Unified Metrics API
 
-The Stats API is restructured with separate endpoints for different data sources:
+The Stats API uses a **unified, location-based structure** for all metrics:
 
-#### `GET /carbon/forecast`
-Get grid carbon intensity forecast
+**Pattern:** `/locations/{location}/metrics/{metric}`
+
+All metrics follow the same time-series structure and query parameters, making the API coherent and easy to use.
+
+#### `GET /locations/{location}/metrics/carbon`
+Get grid carbon intensity time-series with forecasts
+
+**Query params:** `start`, `end`, `include_forecast`
 
 ```json
 {
-  "location": "dc1",
-  "forecast": [
-    {"timestamp": "2025-12-08T00:00:00Z", "intensity": 0.25},
-    {"timestamp": "2025-12-08T01:00:00Z", "intensity": 0.22},
-    {"timestamp": "2025-12-08T02:00:00Z", "intensity": 0.15}
+  "location_id": "dc1",
+  "metric": "carbon_intensity",
+  "unit": "kg_co2_per_kwh",
+  "data": [
+    {"timestamp": "2025-12-08T00:00:00Z", "value": 0.25, "is_forecast": false},
+    {"timestamp": "2025-12-08T01:00:00Z", "value": 0.22, "is_forecast": true},
+    {"timestamp": "2025-12-08T02:00:00Z", "value": 0.15, "is_forecast": true}
   ]
 }
 ```
 
-#### `GET /datacenter/capacity`
-Get data center capacity and load
+#### `GET /locations/{location}/metrics/load`
+Get data center load time-series with capacity info
 
-```json
-[
-  {
-    "location_id": "dc1",
-    "current_load": 25.5,
-    "max_capacity": 50.0,
-    "available_gpus": 16,
-    "total_gpus": 32
-  }
-]
-```
-
-#### `GET /weather/current`
-Get weather data (affects cooling efficiency)
+**Query params:** `start`, `end`
 
 ```json
 {
-  "location": "dc1",
-  "temperature_celsius": 22,
-  "humidity_percent": 65
+  "location_id": "dc1",
+  "metric": "load",
+  "unit": "utilization_units",
+  "capacity": {
+    "max_load": 50.0,
+    "total_gpus": 32
+  },
+  "data": [
+    {"timestamp": "2025-12-08T00:00:00Z", "value": 25.5, "available_gpus": 16},
+    {"timestamp": "2025-12-08T01:00:00Z", "value": 28.0, "available_gpus": 14}
+  ]
 }
 ```
 
-#### `GET /costs/compute`
-Get compute costs per location
+#### `GET /locations/{location}/metrics/weather`
+Get weather time-series
+
+**Query params:** `start`, `end`, `include_forecast`
+
+```json
+{
+  "location_id": "dc1",
+  "metric": "weather",
+  "data": [
+    {
+      "timestamp": "2025-12-08T00:00:00Z",
+      "temperature_celsius": 22,
+      "humidity_percent": 65,
+      "is_forecast": false
+    }
+  ]
+}
+```
+
+#### `GET /locations/{location}/metrics/cost`
+Get compute cost information
+
+```json
+{
+  "location_id": "dc1",
+  "metric": "cost",
+  "currency": "USD",
+  "effective_date": "2025-12-01T00:00:00Z",
+  "rates": {
+    "cost_per_gpu_hour": 2.50,
+    "cost_per_cpu_hour": 0.10,
+    "cost_per_gb_hour": 0.01
+  }
+}
+```
+
+#### `GET /locations`
+List all available locations
 
 ```json
 [
-  {
-    "location_id": "dc1",
-    "cost_per_gpu_hour": 2.50,
-    "currency": "USD"
-  }
+  {"location_id": "dc1", "name": "Data Center 1", "region": "us-east"},
+  {"location_id": "dc2", "name": "Data Center 2", "region": "us-west"}
 ]
 ```
 
@@ -140,18 +177,34 @@ Jobs now include functional units for proper SCI calculation:
 
 **SCI Formula:** `SCI = (Energy × Carbon Intensity) / Functional Unit`
 
-### Modular Stats API
+### Unified Stats API Design
 
-Stats API is organized by data source type:
-- `/carbon/forecast` - Grid carbon intensity (external API integration)
-- `/datacenter/capacity` - Data center load and hardware availability
-- `/weather/current` - Weather data affecting cooling
-- `/costs/compute` - Compute pricing per location
+Stats API uses a **normalized, location-based structure**:
 
-This structure makes it clear:
-- Which external data sources need integration
-- What data the Scheduler can query independently
-- How to add new data sources without breaking existing endpoints
+**Path Pattern:** `/locations/{location}/metrics/{metric}`
+
+**Unified Query Parameters:**
+- `start` / `end` - Time range for historical data
+- `include_forecast` - Include future predictions
+
+**Normalized Response Structure:**
+```json
+{
+  "location_id": "dc1",
+  "metric": "metric_name",
+  "unit": "measurement_unit",
+  "data": [
+    {"timestamp": "...", "value": 0.0, "is_forecast": false}
+  ]
+}
+```
+
+**Benefits:**
+- **Consistent interface** - Same query pattern for all metrics
+- **Clear hierarchy** - Location → Metric is natural and REST-compliant
+- **Time-series native** - All data properly structured as time-series
+- **Forecast support** - Built-in via `is_forecast` flag
+- **Easy to extend** - New metrics follow the same pattern
 
 ### Carbon-Aware Scheduling
 
@@ -166,9 +219,9 @@ The core concept:
 Both schemas are valid OpenAPI 3.0.3:
 
 - **`webapp/openapi.yaml`** - 161 lines, 3 schemas, 1 endpoint
-- **`model-load-api/openapi.yaml`** - 449 lines, 8 schemas, 10 endpoints
-  - 6 historical/latest endpoints (existing)
-  - 4 context endpoints (new: carbon, capacity, weather, costs)
+- **`model-load-api/openapi.yaml`** - 667 lines, 13 schemas, 11 endpoints
+  - 6 legacy endpoints (`/history`, `/latest` - backward compatibility)
+  - 5 unified endpoints (`/locations`, `/locations/{location}/metrics/*`)
 
 ## Viewing the Schemas
 
