@@ -10,6 +10,8 @@
 class Scheduler
 {
   private:
+    static const unsigned int KWH = 1000 * 60 * 60 ;
+
     PredictionApi predictionApi; /// I assume we will need some constructor later, otherwise this
                                  /// can be static
 
@@ -21,7 +23,7 @@ class Scheduler
     double schedule(PredictedDatacenterInformation &interval, JobRequest &job);
 
   public:
-    void calculateSchedule(JobRequest job);
+    double calculateSchedule(JobRequest job);
     void show();
 };
 

@@ -39,11 +39,13 @@ double Scheduler::schedule(PredictedDatacenterInformation &interval, JobRequest 
     }
 }
 
-void Scheduler::calculateSchedule(JobRequest job)
+double Scheduler::calculateSchedule(JobRequest job)
 {
     auto data = predictionApi.getData();
 
     auto intervals = getCombinedIntervals(data);
+
+    double co2emissions = 0 ;
 
     fullSchedule = map<int, ScheduleForDatacenter>();
 
@@ -55,6 +57,7 @@ void Scheduler::calculateSchedule(JobRequest job)
         if (interval.timestamp > job.deadline) continue;
 
         double additionalLoad = schedule(interval, job);
+        co2emissions += (interval.currentGreenness * additionalLoad * interval.lengthOfInterval)/KWH; 
 
         if (fullSchedule.count(interval.datacenterInfo.datacenterId) == 0)
         {
@@ -67,6 +70,8 @@ void Scheduler::calculateSchedule(JobRequest job)
 
         fullSchedule[interval.datacenterInfo.datacenterId].addInterval(scheduledInterval);
     }
+
+    return co2emissions;
 }
 
 void Scheduler::show()
@@ -81,6 +86,6 @@ int main()
 {
     JobRequest job = JobRequest(127, "NORMAL", 1500.0, 1);
     Scheduler scheduler;
-    scheduler.calculateSchedule(job);
+    cout << scheduler.calculateSchedule(job) << endl;
     scheduler.show();
 }
