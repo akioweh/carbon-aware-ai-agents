@@ -5,3 +5,4 @@ PredictedDatacenterInformation::PredictedDatacenterInformation(
     DatacenterSpecificInformation datacenterSpecificInformation)
     : timestamp(timestamp), currentLoad(currentLoad),
       datacenterSpecificInformation(datacenterSpecificInformation) {};
+
