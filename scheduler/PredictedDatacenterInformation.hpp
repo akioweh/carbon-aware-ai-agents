@@ -7,9 +7,15 @@ class PredictedDatacenterInformation
 {
   public:
     long long timestamp;
+    long long lengthOfInterval;
     double currentLoad;
     double currentGreenness;
-    DatacenterSpecificInformation datacenterSpecificInformation;
+    DatacenterSpecificInformation datacenterInfo;
+
+    bool operator<(const PredictedDatacenterInformation &other) const
+    {
+        return currentGreenness < other.currentGreenness;
+    }
 };
 
 #endif
