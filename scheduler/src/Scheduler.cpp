@@ -2,13 +2,14 @@
 #include <PredictionApi.hpp>
 #include <ScheduleForDatacenter.hpp>
 #include <Scheduler.hpp>
+#include <iostream>
 
 using namespace std;
 
-set<PredictedDatacenterInformation>
+multiset<PredictedDatacenterInformation>
 Scheduler::getCombinedIntervals(map<int, vector<PredictedDatacenterInformation>> &data)
 {
-    set<PredictedDatacenterInformation> intervals;
+    multiset<PredictedDatacenterInformation> intervals;
 
     for (auto [datacenterId, predictions] : data)
     {
@@ -17,7 +18,6 @@ Scheduler::getCombinedIntervals(map<int, vector<PredictedDatacenterInformation>>
             intervals.insert(prediction);
         }
     }
-
     return intervals;
 }
 
@@ -28,13 +28,14 @@ double Scheduler::schedule(PredictedDatacenterInformation &interval, JobRequest 
 
     if (maxWorkInInterval >= job.work)
     {
+        double temp = job.work;
         job.work = 0;
-        return job.work / interval.lengthOfInterval; /// this is the additional load
+        return temp / interval.lengthOfInterval; /// this is the additional load
     }
     else
     {
         job.work -= maxWorkInInterval;
-        return maxWorkInInterval;
+        return maxWorkInInterval / interval.lengthOfInterval;
     }
 }
 
@@ -44,21 +45,25 @@ void Scheduler::calculateSchedule(JobRequest job)
 
     auto intervals = getCombinedIntervals(data);
 
-    fullSchedule = map<int,ScheduleForDatacenter>() ;
+    fullSchedule = map<int, ScheduleForDatacenter>();
 
     while (intervals.size() > 0 && job.work > 0)
     {
         auto interval = *intervals.begin();
+        intervals.erase(intervals.begin());
+
+        if (interval.timestamp > job.deadline) continue;
+
         double additionalLoad = schedule(interval, job);
 
         if (fullSchedule.count(interval.datacenterInfo.datacenterId) == 0)
         {
             auto scheduleForDC = ScheduleForDatacenter(interval.datacenterInfo);
-            fullSchedule.emplace(interval.datacenterInfo.datacenterId,scheduleForDC);
+            fullSchedule.emplace(interval.datacenterInfo.datacenterId, scheduleForDC);
         }
 
-        auto scheduledInterval =
-            ScheduledInterval(interval.timestamp, job.jobId, additionalLoad, interval.currentLoad);
+        auto scheduledInterval = ScheduledInterval(interval.timestamp, job.jobId, additionalLoad,
+                                                   additionalLoad + interval.currentLoad);
 
         fullSchedule[interval.datacenterInfo.datacenterId].addInterval(scheduledInterval);
     }
@@ -66,16 +71,16 @@ void Scheduler::calculateSchedule(JobRequest job)
 
 void Scheduler::show()
 {
-    for(auto [datacenterId,scheduleForDC] : fullSchedule)
+    for (auto [datacenterId, scheduleForDC] : fullSchedule)
     {
-        scheduleForDC.show() ;
+        scheduleForDC.show();
     }
 }
 
 int main()
 {
     JobRequest job = JobRequest(127, "NORMAL", 1500.0, 1);
-    Scheduler scheduler; 
+    Scheduler scheduler;
     scheduler.calculateSchedule(job);
-    scheduler.show() ;
+    scheduler.show();
 }

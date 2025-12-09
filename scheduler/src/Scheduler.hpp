@@ -15,7 +15,7 @@ class Scheduler
 
     std::map<int,ScheduleForDatacenter>fullSchedule;
 
-    std::set<PredictedDatacenterInformation>
+    std::multiset<PredictedDatacenterInformation>
     getCombinedIntervals(std::map<int, std::vector<PredictedDatacenterInformation>> &data);
 
     double schedule(PredictedDatacenterInformation &interval, JobRequest &job);
