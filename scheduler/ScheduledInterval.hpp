@@ -13,6 +13,8 @@ class ScheduledInterval
     {
         return timestamp<other.timestamp;
     }
+
+    void show(); 
 };
 
 #endif

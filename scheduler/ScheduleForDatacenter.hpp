@@ -14,6 +14,7 @@ class ScheduleForDatacenter
 
     ScheduleForDatacenter(DatacenterSpecificInformation dataInfo) ;
     void addInterval(ScheduledInterval newInterval);
+    void show();
 };
 
 #endif

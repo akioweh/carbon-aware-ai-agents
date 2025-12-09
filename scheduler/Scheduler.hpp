@@ -13,13 +13,16 @@ class Scheduler
     PredictionApi predictionApi; /// I assume we will need some constructor later, otherwise this
                                  /// can be static
 
+    std::map<int,ScheduleForDatacenter>fullSchedule;
+
     std::set<PredictedDatacenterInformation>
     getCombinedIntervals(std::map<int, std::vector<PredictedDatacenterInformation>> &data);
 
     double schedule(PredictedDatacenterInformation &interval, JobRequest &job);
 
   public:
-    std::map<int, ScheduleForDatacenter> calculateSchedule(JobRequest job);
+    void calculateSchedule(JobRequest job);
+    void show();
 };
 
 #endif

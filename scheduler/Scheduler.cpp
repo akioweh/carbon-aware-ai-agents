@@ -38,13 +38,13 @@ double Scheduler::schedule(PredictedDatacenterInformation &interval, JobRequest 
     }
 }
 
-map<int, ScheduleForDatacenter> Scheduler::calculateSchedule(JobRequest job)
+void Scheduler::calculateSchedule(JobRequest job)
 {
     auto data = predictionApi.getData();
 
     auto intervals = getCombinedIntervals(data);
 
-    map<int, ScheduleForDatacenter> fullSchedule;
+    fullSchedule = map<int,ScheduleForDatacenter>() ;
 
     while (intervals.size() > 0 && job.work > 0)
     {
@@ -62,13 +62,20 @@ map<int, ScheduleForDatacenter> Scheduler::calculateSchedule(JobRequest job)
 
         fullSchedule[interval.datacenterInfo.datacenterId].addInterval(scheduledInterval);
     }
+}
 
-    return fullSchedule;
+void Scheduler::show()
+{
+    for(auto [datacenterId,scheduleForDC] : fullSchedule)
+    {
+        scheduleForDC.show() ;
+    }
 }
 
 int main()
 {
     JobRequest job = JobRequest(127, "NORMAL", 1500.0, 1);
     Scheduler scheduler; 
-    auto idk = scheduler.calculateSchedule(job);
+    scheduler.calculateSchedule(job);
+    scheduler.show() ;
 }
