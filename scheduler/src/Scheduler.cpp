@@ -54,7 +54,7 @@ void Scheduler::calculateSchedule(JobRequest job)
         if (fullSchedule.count(interval.datacenterInfo.datacenterId) == 0)
         {
             auto scheduleForDC = ScheduleForDatacenter(interval.datacenterInfo);
-            fullSchedule[interval.datacenterInfo.datacenterId] = scheduleForDC;
+            fullSchedule.emplace(interval.datacenterInfo.datacenterId,scheduleForDC);
         }
 
         auto scheduledInterval =

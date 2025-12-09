@@ -12,6 +12,9 @@ class ScheduleForDatacenter
     DatacenterSpecificInformation datacenterInfo;
     std::set<ScheduledInterval> schedule;
 
+    ScheduleForDatacenter(DatacenterSpecificInformation datacenterInfo)
+    : datacenterInfo(datacenterInfo), schedule(set<ScheduledInterval>()) {} ;
+
     ScheduleForDatacenter(DatacenterSpecificInformation dataInfo) ;
     void addInterval(ScheduledInterval newInterval);
     void show();

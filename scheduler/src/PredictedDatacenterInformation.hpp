@@ -12,6 +12,12 @@ class PredictedDatacenterInformation
     double currentGreenness;
     DatacenterSpecificInformation datacenterInfo;
 
+    PredictedDatacenterInformation(long long timestamp, long long lengthOfInterval,
+                                   double currentLoad, double currentGreenness,
+                                   DatacenterSpecificInformation datacenterInfo)
+        : timestamp(timestamp), lengthOfInterval(lengthOfInterval), currentLoad(currentLoad),
+          currentGreenness(currentGreenness), datacenterInfo(datacenterInfo) {};
+
     bool operator<(const PredictedDatacenterInformation &other) const
     {
         return currentGreenness < other.currentGreenness;

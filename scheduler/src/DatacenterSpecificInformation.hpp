@@ -5,12 +5,16 @@
 
 class DatacenterSpecificInformation
 {
-    public:
+  public:
     double maxLoad;
     std::string locationId;
     std::string name;
     std::string region;
     int datacenterId;
+
+    DatacenterSpecificInformation(double maxLoad, std::string locationId, std::string name,
+                                  std::string region, int datacenterId)
+        : maxLoad(maxLoad), locationId(locationId), name(name), region(region) {};
 };
 
 #endif
