@@ -1,0 +1,5 @@
+{
+  "name": "python3",
+  "version": "100.0.0",
+  "description": "Empty overlay to use system python on MinGW"
+}
