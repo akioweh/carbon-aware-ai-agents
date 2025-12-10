@@ -5,6 +5,6 @@
 using namespace drogon;
 
 auto main() -> int {
-  std::println("hi");
-  return 0;
+    std::println("hi");
+    return 0;
 }
