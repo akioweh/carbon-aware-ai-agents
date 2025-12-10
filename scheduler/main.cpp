@@ -1,4 +1,10 @@
+#include <boost/range.hpp>
+#include <drogon/drogon.h>
+#include <print>
 
-int main() {
-    return 0;
+using namespace drogon;
+
+auto main() -> int {
+  std::println("hi");
+  return 0;
 }
