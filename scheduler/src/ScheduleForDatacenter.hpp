@@ -1,21 +1,21 @@
 #ifndef SCHEDULE
 #define SCHEDULE
 
-#include<DatacenterSpecificInformation.hpp>
-#include<ScheduledInterval.hpp>
+#include <DatacenterSpecificInformation.hpp>
+#include <ScheduledInterval.hpp>
 
-#include<set>
+#include <set>
+#include <utility>
 
-class ScheduleForDatacenter
-{   
-    public:
+class ScheduleForDatacenter {
+  public:
     DatacenterSpecificInformation datacenterInfo;
     std::set<ScheduledInterval> schedule;
 
     ScheduleForDatacenter(DatacenterSpecificInformation datacenterInfo)
-    : datacenterInfo(datacenterInfo), schedule(std::set<ScheduledInterval>()) {} ;
+        : datacenterInfo(std::move(datacenterInfo)) {};
 
-    ScheduleForDatacenter() {} ;
+    ScheduleForDatacenter() = default;
 
     void addInterval(ScheduledInterval newInterval);
     void show();

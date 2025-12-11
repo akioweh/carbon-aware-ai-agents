@@ -1,9 +1,9 @@
-#include<ScheduledInterval.hpp>
+#include <ScheduledInterval.hpp>
 
-#include<iostream>
+#include <iostream>
 using namespace std;
 
-void ScheduledInterval::show()
-{
-    cout << timestamp << " " << jobId << " " << additionalLoad << " " << totalLoad <<  ",\n";
+void ScheduledInterval::show() const {
+    cout << timestamp << " " << jobId << " " << additionalLoad << " "
+         << totalLoad << ",\n";
 }

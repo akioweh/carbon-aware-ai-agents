@@ -2,17 +2,19 @@
 #define JOB_REQUEST
 
 #include <string>
+#include <utility>
 
-class JobRequest
-{
-    public:
+class JobRequest {
+  public:
     long long deadline;
-    std::string type; /// this will later be some sort of specific job type, given by enum.
-    double work; /// given in units of computation.
+    std::string type; /// this will later be some sort of specific job type,
+                      /// given by enum.
+    double work;      /// given in units of computation.
     int jobId;
 
     JobRequest(long long deadline, std::string type, double work, int jobId)
-    : deadline(deadline), type(type), work(work), jobId(jobId) {} ;
+        : deadline(deadline), type(std::move(type)), work(work),
+          jobId(jobId) {};
 };
 
 #endif

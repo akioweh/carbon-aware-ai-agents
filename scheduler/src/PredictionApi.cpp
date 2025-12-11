@@ -2,25 +2,25 @@
 
 using namespace std;
 
-vector<PredictedDatacenterInformation>
-makeUpPredictionData(DatacenterSpecificInformation datacenterSpecificInformation)
-{
+auto makeUpPredictionData(
+    const DatacenterSpecificInformation &datacenterSpecificInformation)
+    -> vector<PredictedDatacenterInformation> {
     long long greennees = 90;
     int load = 13;
     vector<PredictedDatacenterInformation> predictions;
-    for (int i = 0; i < 100; i++)
-    {
-        predictions.push_back(PredictedDatacenterInformation(i * 5, 5, (load + i * 17) % 100,
-                                                             (greennees + i * 13) % 400,
-                                                             datacenterSpecificInformation));
+    predictions.reserve(100);
+    for (int i = 0; i < 100; i++) {
+        predictions.emplace_back(i * 5, 5, (load + i * 17) % 100,
+                                 (greennees + i * 13) % 400,
+                                 datacenterSpecificInformation);
     }
     return predictions;
 }
 
-map<int, vector<PredictedDatacenterInformation>> PredictionApi::getData()
-{
-    DatacenterSpecificInformation datacenterA =
-        DatacenterSpecificInformation(100, "Amsterdam", "AmsterdamDC", "Europe", 1);
+auto PredictionApi::getData()
+    -> map<int, vector<PredictedDatacenterInformation>> {
+    DatacenterSpecificInformation datacenterA = DatacenterSpecificInformation(
+        100, "Amsterdam", "AmsterdamDC", "Europe", 1);
 
     DatacenterSpecificInformation datacenterB =
         DatacenterSpecificInformation(100, "Hamburg", "HamburgDC", "Europe", 2);
