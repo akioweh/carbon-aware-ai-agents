@@ -1,5 +1,6 @@
 from flask import Flask, jsonify
 import json
+from predictor import generate_next_week_load_prediction, generate_next_week_greenness_prediction
 
 app = Flask(__name__)
 
@@ -76,6 +77,24 @@ def latest_for_dc(dc):
     if dc not in data:
         return jsonify({"error": f"Data centre '{dc}' not found"}), 404
     return jsonify(data[dc][-1])
+
+@app.get("/locations/<location>/metrics/load")
+def get_load_forecast(location):
+    """Get load predictions for next week following unified API schema."""
+    try:
+        result = generate_next_week_load_prediction(location)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/locations/<location>/metrics/greenness")
+def get_carbon_forecast(location):
+    """Get carbon/greenness predictions for next week following unified API schema."""
+    try:
+        result = generate_next_week_greenness_prediction(location)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
