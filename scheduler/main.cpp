@@ -1,10 +1,12 @@
-#include <boost/range.hpp>
 #include <drogon/drogon.h>
-#include <print>
 
 using namespace drogon;
 
 auto main() -> int {
-    std::println("hi");
-    return 0;
+    app()
+        .setLogPath("./")
+        .setLogLevel(trantor::Logger::kWarn)
+        .addListener("0.0.0.0", 80)
+        .setThreadNum(16)
+        .run();
 }
