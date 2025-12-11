@@ -19,9 +19,10 @@ target_link_libraries(scheduler PRIVATE Drogon::Drogon)
 
 # copy compile_commands.json to root for clangd
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
-  set(COMPILE_COMMANDS_SRC "${CMAKE_BINARY_DIR}/compile_commands.json")
-  set(COMPILE_COMMANDS_DST "${CMAKE_SOURCE_DIR}/compile_commands.json")
-
-  file(COPY "${COMPILE_COMMANDS_SRC}" DESTINATION "${CMAKE_SOURCE_DIR}")
+  add_custom_target(CopyCompileCommands ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_BINARY_DIR}/compile_commands.json"
+    "${CMAKE_SOURCE_DIR}/compile_commands.json"
+    VERBATIM
+  )
 endif()
-
