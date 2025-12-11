@@ -186,7 +186,7 @@ paths:
                   name: "Data Center 2"
                   region: "us-west"
 
-  /locations/{location}/metrics/carbon:
+  /locations/{location}/metrics/greenness:
     get:
       tags:
         - Context
