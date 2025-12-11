@@ -1,0 +1,9 @@
+CompileFlags:
+  Compiler: g++
+  Add: [-std=c++23]
+  Remove: # ignore some gcc only flags
+    - -fmodules-ts
+    - -fmodule-mapper=*
+    - -fdeps-format=*
+Index:
+  Background: Build
