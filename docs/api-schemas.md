@@ -72,10 +72,10 @@ The Stats API uses a **unified, location-based structure** for all metrics:
 
 All metrics follow the same time-series structure and query parameters, making the API coherent and easy to use.
 
-#### `GET /locations/{location}/metrics/carbon`
+#### `GET /locations/{location}/metrics/greeness`
 Get grid carbon intensity time-series with forecasts
 
-**Query params:** `start`, `end`, `include_forecast`
+**Query params:** `start`, `end`
 
 ```json
 {
@@ -83,9 +83,9 @@ Get grid carbon intensity time-series with forecasts
   "metric": "carbon_intensity",
   "unit": "kg_co2_per_kwh",
   "data": [
-    {"timestamp": "2025-12-08T00:00:00Z", "value": 0.25, "is_forecast": false},
-    {"timestamp": "2025-12-08T01:00:00Z", "value": 0.22, "is_forecast": true},
-    {"timestamp": "2025-12-08T02:00:00Z", "value": 0.15, "is_forecast": true}
+    {"timestamp": "2025-12-08T00:00:00Z", "value": 0.25},
+    {"timestamp": "2025-12-08T01:00:00Z", "value": 0.22},
+    {"timestamp": "2025-12-08T02:00:00Z", "value": 0.15}
   ]
 }
 ```
@@ -114,7 +114,7 @@ Get data center load time-series with capacity info
 #### `GET /locations/{location}/metrics/weather`
 Get weather time-series
 
-**Query params:** `start`, `end`, `include_forecast`
+**Query params:** `start`, `end`
 
 ```json
 {

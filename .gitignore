@@ -1,5 +1,6 @@
 # Generated data files
-model-load-api/history.json
+history.json
+prediction.json
 
 # Python
 __pycache__/
