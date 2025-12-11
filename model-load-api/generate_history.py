@@ -4,6 +4,7 @@ import random
 from datetime import datetime, timedelta
 
 MAX_CAPACITY = 50
+DATA_CENTRES = ["Data-Centre-1", "Data-Centre-2", "Data-Centre-3", "Data-Centre-4", "Data-Centre-5"]
 
 def generate_load(timestamp):
     hour = timestamp.hour + timestamp.minute / 60
@@ -46,22 +47,24 @@ def generate_greenness(timestamp):
     return value
 
 def generate_history():
-    data = []
     now = datetime.now()
     start = now - timedelta(days=30)
-
     current = start
 
+    # dictionary keyed by data centre name
+    histories = {dc: [] for dc in DATA_CENTRES}
+
     while current <= now:
-        data.append({
-            "timestamp": current.isoformat(),
-            "load": generate_load(current),
-            "greenness": generate_greenness(current)
-        })
+        for dc in DATA_CENTRES:
+            histories[dc].append({
+                "timestamp": current.isoformat(),
+                "load": generate_load(current),
+                "greenness": generate_greenness(current)
+            })
         current += timedelta(minutes=5)
 
     with open("history.json", "w") as f:
-        json.dump(data, f, indent=2)
+        json.dump(histories, f, indent=2)
 
     print("history.json generated.")
 
