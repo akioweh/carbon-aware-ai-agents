@@ -1,5 +1,6 @@
 from flask import Flask, jsonify
 import json
+from predictor import generate_next_week_load_prediction, generate_next_week_greenness_prediction
 
 app = Flask(__name__)
 
@@ -37,6 +38,24 @@ def latest_load():
 def latest_green():
     data = get_history()
     return jsonify({"timestamp": data[-1]["timestamp"], "greenness": data[-1]["greenness"]})
+
+@app.get("/locations/<location>/metrics/load")
+def get_load_forecast(location):
+    """Get load predictions for next week following unified API schema."""
+    try:
+        result = generate_next_week_load_prediction(location)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/locations/<location>/metrics/greenness")
+def get_carbon_forecast(location):
+    """Get carbon/greenness predictions for next week following unified API schema."""
+    try:
+        result = generate_next_week_greenness_prediction(location)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
