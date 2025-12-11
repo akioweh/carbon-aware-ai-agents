@@ -2,20 +2,26 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "base",
+      "name": "ci-base",
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "vcpkg-base",
+      "hidden": true,
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
     },
     {
       "name": "windows-mingw",
       "displayName": "Windows (MinGW/MSYS2)",
-      "description": "Shared config for any MinGW user",
-      "inherits": "base",
+      "inherits": "vcpkg-base",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic",
         "CMAKE_BUILD_TYPE": "Debug"
@@ -27,11 +33,14 @@
       }
     },
     {
-      "name": "linux-gcc",
-      "displayName": "Linux (GCC)",
-      "inherits": "base",
+      "name": "arch",
+      "displayName": "Linux (System GCC)",
+      "description": "Uses system pacman libraries, no vcpkg",
+      "inherits": "ci-base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_C_COMPILER": "gcc"
       },
       "condition": {
         "type": "equals",
