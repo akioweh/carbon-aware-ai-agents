@@ -1,6 +1,7 @@
 # Generated data files
 history.json
 prediction.json
+predictions.json
 
 # Python
 __pycache__/
