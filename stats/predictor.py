@@ -5,15 +5,18 @@ import pandas as pd
 
 def generate_next_week_load_prediction(location):
     """Generate load predictions for the next week at a specific location."""
-    with open("../history.json", "r") as f:
+    with open("history.json", "r") as f:
         history_json = json.load(f)
+
+    # Get history for specific location
+    location_history = history_json.get(location, [])
     
     historical_load = pd.DataFrame([
         {
             "timestamp": datetime.fromisoformat(entry["timestamp"]),
             "load": entry["load"]
         }
-        for entry in history_json
+        for entry in location_history
     ])
     next_week_load_df = get_next_week_load(historical_load)
     
@@ -39,15 +42,18 @@ def generate_next_week_load_prediction(location):
 
 def generate_next_week_greenness_prediction(location):
     """Generate greenness/carbon predictions for the next week at a specific location."""
-    with open("../history.json", "r") as f:
+    with open("history.json", "r") as f:
         history_json = json.load(f)
+
+    # Get history for specific location
+    location_history = history_json.get(location, [])
     
     historical_greenness = pd.DataFrame([
         {
             "timestamp": datetime.fromisoformat(entry["timestamp"]),
             "greenness": entry["greenness"]
         }
-        for entry in history_json
+        for entry in location_history
     ])
     
     next_week_greenness_df = get_next_week_greenness(historical_greenness)
@@ -92,21 +98,25 @@ def get_next_week_greenness(historical_greenness):
 
     
 if __name__ == "__main__":
-    # Test the prediction functions
-    load_pred = generate_next_week_load_prediction("dc1")
-    print(f"Generated {len(load_pred['data'])} load predictions")
+    all_predictions = {}
     
-    greenness_pred = generate_next_week_greenness_prediction("dc1")
-    print(f"Generated {len(greenness_pred['data'])} greenness predictions")
+    for dc in [f"Data Centre {i}" for i in range(1,6)]:
+        # Test the prediction functions
+        load_pred = generate_next_week_load_prediction(dc)
+        print(f"Generated {len(load_pred['data'])} load predictions for {dc}")
+        
+        greenness_pred = generate_next_week_greenness_prediction(dc)
+        print(f"Generated {len(greenness_pred['data'])} greenness predictions for {dc}")
 
-    # Save predictions to combined JSON file
-    combined_predictions = {
-        "load_prediction": load_pred,
-        "greenness_prediction": greenness_pred
-    }
+        # Store predictions for this data centre
+        all_predictions[dc] = {
+            "load_prediction": load_pred,
+            "greenness_prediction": greenness_pred
+        }
 
+    # Save all predictions to JSON file
     with open("predictions.json", "w") as f:
-        json.dump(combined_predictions, f, indent=2)
+        json.dump(all_predictions, f, indent=2)
 
     print("Predictions saved to predictions.json")
     

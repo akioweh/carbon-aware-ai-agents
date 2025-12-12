@@ -5,41 +5,55 @@ import matplotlib.pyplot as plt
 with open('history.json', 'r') as f:
     history_data = json.load(f)
 
-with open('prediction.json', 'r') as f:
+with open('predictions.json', 'r') as f:
     prediction_data = json.load(f)
 
-# Extract load values
-history_load = [item['load'] for item in history_data]
-prediction_load = [item['predicted_load'] for item in prediction_data]
+# Create figure with 2 subplots
+plt.figure(figsize=(14, 10))
 
-# Extract greenness values
-history_greenness = [item['greenness'] for item in history_data]
-prediction_greenness = [item['predicted_greenness'] for item in prediction_data]
+# Define colors for each data centre
+colors = ['blue', 'red', 'green', 'orange', 'purple']
 
-# Create indices for x-axis
-history_indices = range(len(history_load))
-prediction_indices = range(len(prediction_load))
-
-# Plot load data
-plt.figure(figsize=(12, 10))
-
+# Plot 1: Load comparison
 plt.subplot(2, 1, 1)
-plt.plot(history_indices, history_load, label='Historical Load', linestyle='-', alpha=0.7)
-plt.plot(prediction_indices, prediction_load, label='Predicted Load', linestyle='--', alpha=0.7)
+for idx, dc in enumerate([f"Data Centre {i}" for i in range(1, 6)]):
+    if dc in history_data:
+        history_load = [item['load'] for item in history_data[dc]]
+        history_indices = range(len(history_load))
+        plt.plot(history_indices, history_load, label=f'{dc} History', 
+                linestyle='-', alpha=0.6, color=colors[idx])
+    
+    if dc in prediction_data:
+        prediction_load = [item['value'] for item in prediction_data[dc]['load_prediction']['data']]
+        prediction_indices = range(len(prediction_load))
+        plt.plot(prediction_indices, prediction_load, label=f'{dc} Prediction', 
+                linestyle='--', alpha=0.8, color=colors[idx])
+
 plt.xlabel('Index (5-minute intervals)')
 plt.ylabel('Load')
-plt.title('Load: History vs Prediction')
-plt.legend()
+plt.title('Load: History vs Prediction (All Data Centres)')
+plt.legend(loc='upper left', fontsize=8)
 plt.grid(True, alpha=0.3)
 
-# Plot greenness data
+# Plot 2: Greenness comparison
 plt.subplot(2, 1, 2)
-plt.plot(history_indices, history_greenness, label='Historical Greenness', linestyle='-', alpha=0.7, color='green')
-plt.plot(prediction_indices, prediction_greenness, label='Predicted Greenness', linestyle='--', alpha=0.7, color='lightgreen')
+for idx, dc in enumerate([f"Data Centre {i}" for i in range(1, 6)]):
+    if dc in history_data:
+        history_greenness = [item['greenness'] for item in history_data[dc]]
+        history_indices = range(len(history_greenness))
+        plt.plot(history_indices, history_greenness, label=f'{dc} History', 
+                linestyle='-', alpha=0.6, color=colors[idx])
+    
+    if dc in prediction_data:
+        prediction_greenness = [item['value'] for item in prediction_data[dc]['greenness_prediction']['data']]
+        prediction_indices = range(len(prediction_greenness))
+        plt.plot(prediction_indices, prediction_greenness, label=f'{dc} Prediction', 
+                linestyle='--', alpha=0.8, color=colors[idx])
+
 plt.xlabel('Index (5-minute intervals)')
 plt.ylabel('Greenness')
-plt.title('Greenness: History vs Prediction')
-plt.legend()
+plt.title('Greenness: History vs Prediction (All Data Centres)')
+plt.legend(loc='upper left', fontsize=8)
 plt.grid(True, alpha=0.3)
 
 plt.tight_layout()
