@@ -23,7 +23,7 @@ def generate_next_week_load_prediction(location):
     # Format as unified metric time-series
     return {
         "location_id": location,
-        "metric": "load",
+        "metric": "forecast_load",
         "unit": "utilization_units",
         "capacity": {
             "max_load": 50.0,
@@ -62,7 +62,7 @@ def generate_next_week_greenness_prediction(location):
     # Note: greenness is inverse of carbon intensity for this prototype
     return {
         "location_id": location,
-        "metric": "carbon_intensity",
+        "metric": "forecast_greenness",
         "unit": "greenness_score",
         "data": [
             {
