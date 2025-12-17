@@ -78,7 +78,7 @@ def latest_for_dc(dc):
         return jsonify({"error": f"Data centre '{dc}' not found"}), 404
     return jsonify(data[dc][-1])
 
-@app.get("/locations/<location>/metrics/load")
+@app.get("/locations/<location>/metrics/forecast_load")
 def get_load_forecast(location):
     """Get load predictions for next week following unified API schema."""
     try:
@@ -87,7 +87,7 @@ def get_load_forecast(location):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.get("/locations/<location>/metrics/greenness")
+@app.get("/locations/<location>/metrics/forecast_greenness")
 def get_carbon_forecast(location):
     """Get carbon/greenness predictions for next week following unified API schema."""
     try:
