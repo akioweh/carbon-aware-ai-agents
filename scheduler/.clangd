@@ -5,5 +5,3 @@ CompileFlags:
     - -fmodules-ts
     - -fmodule-mapper=*
     - -fdeps-format=*
-Index:
-  Background: Build
