@@ -8,7 +8,8 @@ add_compile_options(-Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(scheduler main.cpp)
+file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "src/*.cpp")
+add_executable(scheduler main.cpp ${SRC_FILES})
 target_include_directories(scheduler PRIVATE src)
 
 target_link_libraries(scheduler PRIVATE stdc++exp) # g++ std23 stuff
