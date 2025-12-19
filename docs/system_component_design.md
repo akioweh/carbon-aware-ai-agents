@@ -171,6 +171,6 @@ sequenceDiagram
 
 ## Rendered Diagrams
 
-![](./system_block_diag.svg)
+![System architecture block diagram](./system_block_diag.svg)
 
-![](./sequence_diag.svg)
+![Sequence diagram for one scheduling user request](./sequence_diag.svg)

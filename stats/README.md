@@ -1,10 +1,11 @@
-# Model Load API
+# Stats Component
 
-A Flask-based API for tracking and retrieving data center load and greenness metrics.
+A Flask-based API for tracking and retrieving data center load and grid energy greenness metrics.
 
 ## Overview
 
 This API provides historical and current data about:
+
 - **Load**: Data center load ranging from 0-50 arbitrary units (50 being capacity)
 - **Greenness**: Energy greenness score from 0-100 (higher values indicate greener energy)
 
@@ -62,6 +63,7 @@ The API is fully documented using OpenAPI 3.0 specification. See `openapi.yaml` 
 ### Example Responses
 
 #### Full Data Point
+
 ```json
 {
   "timestamp": "2025-12-05T18:20:39.679404",
@@ -71,6 +73,7 @@ The API is fully documented using OpenAPI 3.0 specification. See `openapi.yaml` 
 ```
 
 #### Load Data Point
+
 ```json
 {
   "timestamp": "2025-12-05T18:20:39.679404",
@@ -79,6 +82,7 @@ The API is fully documented using OpenAPI 3.0 specification. See `openapi.yaml` 
 ```
 
 #### Greenness Data Point
+
 ```json
 {
   "timestamp": "2025-12-05T18:20:39.679404",
