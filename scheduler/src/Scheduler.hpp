@@ -24,7 +24,7 @@ class Scheduler {
         -> double;
 
   public:
-    auto calculateSchedule(JobRequest job) -> double;
+    auto calculateSchedule(JobRequest job) -> drogon::Task<double>;
     void show() const;
 };
 

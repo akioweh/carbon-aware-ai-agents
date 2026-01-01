@@ -5,6 +5,7 @@
 #include <iostream>
 
 using namespace std;
+using namespace drogon;
 
 auto Scheduler::getCombinedIntervals(
     map<int, vector<PredictedDatacenterInformation>> &data)
@@ -34,8 +35,9 @@ auto Scheduler::schedule(PredictedDatacenterInformation &interval,
     return maxWorkInInterval / interval.lengthOfInterval;
 }
 
-auto Scheduler::calculateSchedule(JobRequest job) -> double {
-    auto data = predictionApi.getData();
+auto Scheduler::calculateSchedule(JobRequest job) -> Task<double> {
+
+    auto data = co_await predictionApi.getData();
 
     auto intervals = getCombinedIntervals(data);
 
@@ -69,19 +71,11 @@ auto Scheduler::calculateSchedule(JobRequest job) -> double {
         fullSchedule[interval.datacenterInfo.datacenterId].addInterval(
             scheduledInterval);
     }
-
-    return co2emissions;
+    co_return co2emissions;
 }
 
 void Scheduler::show() const {
     for (auto [datacenterId, scheduleForDC] : fullSchedule) {
         scheduleForDC.show();
     }
-}
-
-int main() {
-    JobRequest job = JobRequest(127, "NORMAL", 1500.0, 1);
-    Scheduler scheduler;
-    cout << scheduler.calculateSchedule(job) << '\n';
-    scheduler.show();
 }
