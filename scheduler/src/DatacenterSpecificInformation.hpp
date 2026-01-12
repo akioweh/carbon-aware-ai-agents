@@ -3,6 +3,7 @@
 
 #include <string>
 #include <utility>
+#include <json/value.h>
 
 class DatacenterSpecificInformation {
   public:
@@ -20,6 +21,10 @@ class DatacenterSpecificInformation {
           datacenterId(datacenterId) {};
 
     DatacenterSpecificInformation() = default;
+
+    static auto parseJsonForDCSpecificInfo(const std::string &datacenterName,
+                                                   const Json::Value &respJson)
+        -> DatacenterSpecificInformation ;
 };
 
 #endif
