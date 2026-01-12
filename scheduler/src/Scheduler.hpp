@@ -15,7 +15,8 @@ class Scheduler {
     PredictionApi predictionApi; /// I assume we will need some constructor
                                  /// later, otherwise this can be static
 
-    std::map<int, ScheduleForDatacenter> fullSchedule;
+    std::map<long long, ScheduleForDatacenter>
+        fullSchedule; // datacenterId -> schedule
 
     auto getCombinedIntervals(
         std::map<long long, std::vector<PredictedDatacenterInformation>> &data)
