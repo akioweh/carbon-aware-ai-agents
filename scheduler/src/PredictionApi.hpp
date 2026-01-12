@@ -15,22 +15,24 @@ class PredictionApi {
 
   private:
     const std::string host = "http://127.0.0.1:5000";
+
     auto parseJsonForLoad(const Json::Value &respJson)
         -> std::vector<std::pair<long long, double>>;
-    auto parseJsonForGreeness(const Json::Value &respJson)
+    auto parseJsonForGreenness(const Json::Value &respJson)
         -> std::vector<std::pair<long long, double>>;
-    auto parseJsonForDCSpecificInfo(const std::string &datacenterName,
-                                    const Json::Value &respJson)
-        -> DatacenterSpecificInformation;
     auto getDataSingleDatacenter(const std::string &datacenterName)
         -> drogon::Task<std::vector<PredictedDatacenterInformation>>;
-
-    auto makeGetRequest(const std::string &path)
-        -> drogon::Task<std::shared_ptr<Json::Value>>;
+    auto getLoadPath(const std::string &datacenterName) -> std::string;
+    auto getGreennessPath(const std::string &datacenterName) -> std::string;
+    auto constructDCPredictions(
+        std::vector<std::pair<long long, double>> &loadData,
+        std::vector<std::pair<long long, double>> &greennessData,
+        DatacenterSpecificInformation &datacenterSpecificInfo)
+        -> std::vector<PredictedDatacenterInformation>;
 
   public:
-    auto getData()
-        -> drogon::Task<std::map<int, std::vector<PredictedDatacenterInformation>>>;
+    auto getData() -> drogon::Task<
+        std::map<int, std::vector<PredictedDatacenterInformation>>>;
 };
 
 #endif
