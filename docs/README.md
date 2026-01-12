@@ -11,6 +11,6 @@ the entire project.
 
 ## Developer Information
 
-Please add to and amend existing documentation as appropriate throughout development.
+Please amend existing and add new documentation as appropriate throughout development.
 
 Further information regarding each component (e.g. software stack & toolchain information) resides in the readmes in their respective directories.
