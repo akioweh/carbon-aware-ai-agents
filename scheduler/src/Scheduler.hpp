@@ -1,5 +1,6 @@
 #ifndef SCHEDULER
 #define SCHEDULER
+#pragma once
 
 #include <JobRequest.hpp>
 #include <PredictionApi.hpp>
