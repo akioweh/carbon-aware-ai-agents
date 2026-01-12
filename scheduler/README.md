@@ -36,5 +36,5 @@ Their configuration files are tracked for consistent linting and formatting
 1. Find your appropriate preset in [`CMakePresets.json`](./CMakePresets.json) or add what's missing
 2. Run `cmake --preset <preset name>` (in this directory) to generate build files
 3. Your editor should detect project settings now from [`compile_commands.json`](./compile_commands.json)
-4. Build anytime using `cmake --build buld/<preset name>`
+4. Build anytime using `cmake --build build/<preset name>`
 5. Output binary is at `./build/<preset name>/scheduler(.exe)`
