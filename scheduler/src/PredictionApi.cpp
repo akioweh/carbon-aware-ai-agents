@@ -43,16 +43,16 @@ auto PredictionApi::getDataSingleDatacenter(const string &datacenterName)
     }
 
     auto loadData = parseJsonForLoad(*loadJsonPtr);
-    auto greenessData = parseJsonForGreenness(*greenneesJsonPtr);
+    auto greennessData = parseJsonForGreenness(*greenneesJsonPtr);
     auto datacenterSpecificInfo =
         DatacenterSpecificInformation::parseJsonForDCSpecificInfo(
             datacenterName, *loadJsonPtr);
 
     std::ranges::sort(loadData);
-    std::ranges::sort(greenessData);
+    std::ranges::sort(greennessData);
     // sorting after timestamps
 
-    co_return constructDCPredictions(loadData, greenessData,
+    co_return constructDCPredictions(loadData, greennessData,
                                      datacenterSpecificInfo);
 }
 
