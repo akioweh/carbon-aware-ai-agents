@@ -28,6 +28,10 @@ class Scheduler {
   public:
     auto calculateSchedule(JobRequest job) -> drogon::Task<double>;
     void show() const;
+    [[nodiscard]] auto getSchedule() const
+        -> const std::map<long long, ScheduleForDatacenter> & {
+        return fullSchedule;
+    }
 };
 
 #endif
