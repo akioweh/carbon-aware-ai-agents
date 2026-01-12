@@ -4,7 +4,7 @@ import random
 from datetime import datetime, timedelta
 
 MAX_CAPACITY = 50
-DATA_CENTRES = ["Data-Centre-1", "Data-Centre-2", "Data-Centre-3", "Data-Centre-4", "Data-Centre-5"]
+DATA_CENTRES = ["Data-Center-1", "Data-Center-2", "Data-Center-3", "Data-Center-4", "Data-Center-5"]
 
 def generate_load(timestamp):
     hour = timestamp.hour + timestamp.minute / 60

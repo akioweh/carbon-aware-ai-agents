@@ -1,5 +1,6 @@
 #ifndef SCHEDULED_INTERVAL
 #define SCHEDULED_INTERVAL
+#pragma once
 
 class ScheduledInterval {
   public:

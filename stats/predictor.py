@@ -78,8 +78,14 @@ def get_next_week_load(historical_load):
     historical_load = historical_load.rename(columns={'timestamp': 'ds', 'load': 'y'})
     model = p(daily_seasonality=True, weekly_seasonality=True)
     model.fit(historical_load)
+
     future = model.make_future_dataframe(periods=288*7, freq="5min")
     prediction = model.predict(future)
+
+    # actually keep only future not the history
+    now = datetime.now()
+    prediction = prediction[prediction['ds'] > now]
+
     prediction['yhat'] = prediction['yhat'].clip(0, 100)
     prediction['yhat_lower'] = prediction['yhat_lower'].clip(0, 100)
     prediction['yhat_upper'] = prediction['yhat_upper'].clip(0, 100)
@@ -89,8 +95,14 @@ def get_next_week_greenness(historical_greenness):
     historical_greenness = historical_greenness.rename(columns={'timestamp': 'ds', 'greenness': 'y'})
     model = p(daily_seasonality=True, weekly_seasonality=True)
     model.fit(historical_greenness)
+
     future = model.make_future_dataframe(periods=288*7, freq="5min")
     prediction = model.predict(future)
+
+    # actually keep only future not the history
+    now = datetime.now()
+    prediction = prediction[prediction['ds'] > now]
+
     prediction['yhat'] = prediction['yhat'].clip(0, 100)
     prediction['yhat_lower'] = prediction['yhat_lower'].clip(0, 100)
     prediction['yhat_upper'] = prediction['yhat_upper'].clip(0, 100)

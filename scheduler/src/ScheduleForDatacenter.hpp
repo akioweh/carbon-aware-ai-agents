@@ -1,5 +1,6 @@
 #ifndef SCHEDULE
 #define SCHEDULE
+#pragma once
 
 #include <DatacenterSpecificInformation.hpp>
 #include <ScheduledInterval.hpp>

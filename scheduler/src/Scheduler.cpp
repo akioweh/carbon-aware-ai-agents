@@ -2,19 +2,18 @@
 #include <PredictionApi.hpp>
 #include <ScheduleForDatacenter.hpp>
 #include <Scheduler.hpp>
-#include <iostream>
 
 using namespace std;
+using namespace drogon;
 
 auto Scheduler::getCombinedIntervals(
-    map<int, vector<PredictedDatacenterInformation>> &data)
+    map<long long, vector<PredictedDatacenterInformation>> &data)
     -> multiset<PredictedDatacenterInformation> {
     multiset<PredictedDatacenterInformation> intervals;
 
-    for (const auto &[datacenterId, predictions] : data) {
-        for (const auto &prediction : predictions) {
+    for (const auto &predictions : views::values(data)) {
+        for (const auto &prediction : predictions)
             intervals.insert(prediction);
-        }
     }
     return intervals;
 }
@@ -34,14 +33,15 @@ auto Scheduler::schedule(PredictedDatacenterInformation &interval,
     return maxWorkInInterval / interval.lengthOfInterval;
 }
 
-auto Scheduler::calculateSchedule(JobRequest job) -> double {
-    auto data = predictionApi.getData();
+auto Scheduler::calculateSchedule(JobRequest job) -> Task<double> {
+
+    auto data = co_await predictionApi.getData();
 
     auto intervals = getCombinedIntervals(data);
 
     double co2emissions = 0;
 
-    fullSchedule = map<int, ScheduleForDatacenter>();
+    fullSchedule.clear();
 
     while (intervals.size() > 0 && job.work > 0) {
         auto interval = *intervals.begin();
@@ -56,7 +56,7 @@ auto Scheduler::calculateSchedule(JobRequest job) -> double {
                          interval.lengthOfInterval) /
                         KWH;
 
-        if (fullSchedule.count(interval.datacenterInfo.datacenterId) == 0) {
+        if (!fullSchedule.contains(interval.datacenterInfo.datacenterId)) {
             auto scheduleForDC = ScheduleForDatacenter(interval.datacenterInfo);
             fullSchedule.emplace(interval.datacenterInfo.datacenterId,
                                  scheduleForDC);
@@ -69,19 +69,11 @@ auto Scheduler::calculateSchedule(JobRequest job) -> double {
         fullSchedule[interval.datacenterInfo.datacenterId].addInterval(
             scheduledInterval);
     }
-
-    return co2emissions;
+    co_return co2emissions;
 }
 
 void Scheduler::show() const {
     for (auto [datacenterId, scheduleForDC] : fullSchedule) {
         scheduleForDC.show();
     }
-}
-
-int main() {
-    JobRequest job = JobRequest(127, "NORMAL", 1500.0, 1);
-    Scheduler scheduler;
-    cout << scheduler.calculateSchedule(job) << '\n';
-    scheduler.show();
 }

@@ -1,5 +1,6 @@
 #ifndef PREDICTED_DATACENTER_INFORMATION
 #define PREDICTED_DATACENTER_INFORMATION
+#pragma once
 
 #include <DatacenterSpecificInformation.hpp>
 #include <utility>
