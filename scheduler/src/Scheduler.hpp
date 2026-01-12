@@ -17,7 +17,7 @@ class Scheduler {
     std::map<int, ScheduleForDatacenter> fullSchedule;
 
     auto getCombinedIntervals(
-        std::map<int, std::vector<PredictedDatacenterInformation>> &data)
+        std::map<long long, std::vector<PredictedDatacenterInformation>> &data)
         -> std::multiset<PredictedDatacenterInformation>;
 
     auto schedule(PredictedDatacenterInformation &interval, JobRequest &job)

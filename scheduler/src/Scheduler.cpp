@@ -8,14 +8,13 @@ using namespace std;
 using namespace drogon;
 
 auto Scheduler::getCombinedIntervals(
-    map<int, vector<PredictedDatacenterInformation>> &data)
+    map<long long, vector<PredictedDatacenterInformation>> &data)
     -> multiset<PredictedDatacenterInformation> {
     multiset<PredictedDatacenterInformation> intervals;
 
-    for (const auto &[datacenterId, predictions] : data) {
-        for (const auto &prediction : predictions) {
+    for (const auto &predictions : views::values(data)) {
+        for (const auto &prediction : predictions)
             intervals.insert(prediction);
-        }
     }
     return intervals;
 }

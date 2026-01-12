@@ -82,7 +82,7 @@ auto PredictionApi::constructDCPredictions(
 }
 
 auto PredictionApi::getData()
-    -> Task<map<int, vector<PredictedDatacenterInformation>>> {
+    -> Task<map<long long, vector<PredictedDatacenterInformation>>> {
     vector<string> datacenterNamesList = {"Data-Center-1", "Data-Center-2",
                                           "Data-Center-3", "Data-Center-4",
                                           "Data-Center-5"};
@@ -90,10 +90,11 @@ auto PredictionApi::getData()
     // yet.
 
     vector<Task<vector<PredictedDatacenterInformation>>> promisedData;
+    promisedData.reserve(datacenterNamesList.size());
     for (auto &name : datacenterNamesList)
         promisedData.push_back(getDataSingleDatacenter(name));
 
-    map<int, vector<PredictedDatacenterInformation>> data;
+    map<long long, vector<PredictedDatacenterInformation>> data;
     for (auto &tasks : promisedData) {
         auto dcData = co_await tasks;
         if (dcData.empty())

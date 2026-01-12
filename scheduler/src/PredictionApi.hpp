@@ -1,5 +1,6 @@
 #ifndef PREDICTION_API
 #define PREDICTION_API
+#pragma once
 
 #include <DatacenterSpecificInformation.hpp>
 #include <PredictedDatacenterInformation.hpp>
@@ -7,7 +8,6 @@
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
 #include <map>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,7 +32,7 @@ class PredictionApi {
 
   public:
     auto getData() -> drogon::Task<
-        std::map<int, std::vector<PredictedDatacenterInformation>>>;
+        std::map<long long, std::vector<PredictedDatacenterInformation>>>;
 };
 
 #endif
