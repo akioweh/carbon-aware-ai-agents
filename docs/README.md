@@ -1,0 +1,16 @@
+# Project Documentation
+
+Here lives semantic overviews and formal documents detailing
+the entire project.
+
+**Key Documents**:
+
+- [Project Brief](./project-brief.md): initial requirements document provided by the client. Note that this only serves a very rough guide; not all details may make sense or will be followed through.
+- [System Architectural Design](./system_component_design.md): semi-formal document describing the project structure from a technical perspective.
+- [API Schemas](./api-schemas.md): highly-tentative document summarizing the current inter-component APIs. This will definitely evolve as we add more features to the end product.
+
+## Developer Information
+
+Please amend existing and add new documentation as appropriate throughout development.
+
+Further information regarding each component (e.g. software stack & toolchain information) resides in the readmes in their respective directories.

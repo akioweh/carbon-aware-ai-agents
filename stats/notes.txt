@@ -6,3 +6,7 @@ The WattTime API we were planning on using is subscription based so while I find
 
 Both are pattern based thus predictable and we should be able to forecast and schedule tasks using it for the first prototype.
 
+
+**TODO**:
+
+- dev environment formalities, like a `requirements.txt`
