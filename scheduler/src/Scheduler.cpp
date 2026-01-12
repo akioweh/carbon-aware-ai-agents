@@ -2,20 +2,18 @@
 #include <PredictionApi.hpp>
 #include <ScheduleForDatacenter.hpp>
 #include <Scheduler.hpp>
-#include <iostream>
 
 using namespace std;
 using namespace drogon;
 
 auto Scheduler::getCombinedIntervals(
-    map<int, vector<PredictedDatacenterInformation>> &data)
+    map<long long, vector<PredictedDatacenterInformation>> &data)
     -> multiset<PredictedDatacenterInformation> {
     multiset<PredictedDatacenterInformation> intervals;
 
-    for (const auto &[datacenterId, predictions] : data) {
-        for (const auto &prediction : predictions) {
+    for (const auto &predictions : views::values(data)) {
+        for (const auto &prediction : predictions)
             intervals.insert(prediction);
-        }
     }
     return intervals;
 }
@@ -43,7 +41,7 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<double> {
 
     double co2emissions = 0;
 
-    fullSchedule = map<int, ScheduleForDatacenter>();
+    fullSchedule.clear();
 
     while (intervals.size() > 0 && job.work > 0) {
         auto interval = *intervals.begin();
@@ -58,7 +56,7 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<double> {
                          interval.lengthOfInterval) /
                         KWH;
 
-        if (fullSchedule.count(interval.datacenterInfo.datacenterId) == 0) {
+        if (!fullSchedule.contains(interval.datacenterInfo.datacenterId)) {
             auto scheduleForDC = ScheduleForDatacenter(interval.datacenterInfo);
             fullSchedule.emplace(interval.datacenterInfo.datacenterId,
                                  scheduleForDC);

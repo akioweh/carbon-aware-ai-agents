@@ -1,17 +1,16 @@
 #include "Utils.hpp"
 
 using namespace std;
-using namespace drogon; 
+using namespace drogon;
 
-auto Utils::parseTimestampSeconds(const string &timestamp) -> long long 
-{
+auto Utils::parseTimestampSeconds(const string &timestamp) -> long long {
     // chatgpted - later i can try importing Howard Hinnant’s date library
     // also i will probably move this to a utils package
     string datetime = timestamp.substr(0, 19);
     tm tm = {};
     istringstream ss(datetime);
     ss >> get_time(&tm, "%Y-%m-%dT%H:%M:%S");
-    time_t tt = timegm(&tm); 
+    time_t tt = timegm(&tm);
     return static_cast<long long>(tt);
 }
 
@@ -29,19 +28,19 @@ auto Utils::makeGetRequest(const string &host, const string &path)
     } catch (const exception &e) {
         LOG_ERROR << "something is not yes, maybe run python API? XD "
                   << e.what();
-        co_return NULL;
+        co_return nullptr;
     }
 
     if (!response || response->getStatusCode() != drogon::k200OK) {
-        LOG_ERROR << "response is null or has a code different than 200" ;
-        co_return NULL;
+        LOG_ERROR << "response is null or has a code different than 200";
+        co_return nullptr;
     }
 
     auto jsonResponsePtr = response->jsonObject();
     if (!jsonResponsePtr) {
-        LOG_ERROR << "couldnt transform to JSON the response" ;
-        co_return NULL;
+        LOG_ERROR << "couldnt transform to JSON the response";
+        co_return nullptr;
     }
-    
+
     co_return make_shared<Json::Value>(*jsonResponsePtr);
 }
