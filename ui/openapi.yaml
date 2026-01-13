@@ -20,35 +20,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/JobRequest'
-            example:
-              job_id: "train-model-1"
-              job_type: "training"
-              workload_amount: 200
-              data_centre: "No Preference"
-              latest_finish: "2025-12-10T00:00:00Z"
+              $ref: "#/components/schemas/JobRequest"
       responses:
-        '200':
+        "200":
           description: Schedule created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ScheduleResponse'
-              example:
-                schedule_id: "sched-123"
-                job_id: "train-model-1"
-                location: "dc1"
-                start_time: "2025-12-08T02:00:00Z"
-                end_time: "2025-12-08T10:00:00Z"
-                carbon_intensity: 0.15
-                estimated_emissions_kg: 45.5
-                sci_per_unit: 2.28
-        '400':
+                $ref: "#/components/schemas/ScheduleResponse"
+        "400":
           description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -84,7 +69,7 @@ components:
           format: date-time
           description: Latest time to finish (optional)
           example: "2025-12-10T00:00:00Z"
-    
+
     ScheduleResponse:
       type: object
       required:
@@ -128,7 +113,7 @@ components:
           type: number
           description: Software Carbon Intensity per functional unit (kg CO2e per unit)
           example: 2.28
-    
+
     Error:
       type: object
       required:
