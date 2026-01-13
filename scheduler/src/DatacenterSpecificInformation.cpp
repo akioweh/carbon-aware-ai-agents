@@ -15,7 +15,7 @@ auto DatacenterSpecificInformation::parseJsonForDCSpecificInfo(
 }
 
 auto DatacenterSpecificInformation::toJson() const -> Json::Value {
-    Json::Value infoJson;
+    auto infoJson = Json::Value{};
     infoJson["maxLoad"] = maxLoad;
     infoJson["locationId"] = locationId;
     infoJson["name"] = name;

@@ -19,9 +19,9 @@ void ScheduleForDatacenter::show() {
 }
 
 auto ScheduleForDatacenter::toJson() const -> Json::Value {
-    Json::Value dcJson;
+    auto dcJson = Json::Value{};
     dcJson["datacenterInfo"] = datacenterInfo.toJson();
-    Json::Value intervalsJson(Json::arrayValue);
+    auto intervalsJson = Json::Value(Json::arrayValue);
     for (const auto &interval : schedule) {
         intervalsJson.append(interval.toJson());
     }

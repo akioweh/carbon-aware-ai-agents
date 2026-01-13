@@ -9,8 +9,8 @@ void ScheduledInterval::show() const {
 }
 
 auto ScheduledInterval::toJson() const -> Json::Value {
-    Json::Value intervalJson;
-    intervalJson["timestamp"] = (Json::Int64)timestamp;
+    auto intervalJson = Json::Value{};
+    intervalJson["timestamp"] = static_cast<Json::Int64>(timestamp);
     intervalJson["jobId"] = jobId;
     intervalJson["additionalLoad"] = additionalLoad;
     intervalJson["totalLoad"] = totalLoad;
