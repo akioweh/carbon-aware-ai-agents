@@ -5,15 +5,34 @@
 #include <JobRequest.hpp>
 #include <PredictionApi.hpp>
 #include <ScheduleForDatacenter.hpp>
+#include <Serializable.hpp>
 #include <map>
 #include <set>
+
+struct SchedulingImpact : public Serializable {
+    double carbon_intensity;
+    double total_emissions;
+    double sci;
+
+    SchedulingImpact(double carbon_intensity, double total_emissions,
+                     double sci)
+        : carbon_intensity(carbon_intensity), total_emissions(total_emissions),
+          sci(sci) {}
+
+    [[nodiscard]] auto toJson() const -> Json::Value override {
+        auto json = Json::Value{};
+        json["carbon_intensity"] = carbon_intensity;
+        json["total_emissions"] = total_emissions;
+        json["sci"] = sci;
+        return json;
+    }
+};
 
 class Scheduler {
   private:
     static const unsigned int KWH = 1000 * 60 * 60;
 
-    PredictionApi predictionApi; /// I assume we will need some constructor
-                                 /// later, otherwise this can be static
+    PredictionApi predictionApi;
 
     std::map<long long, ScheduleForDatacenter>
         fullSchedule; // datacenterId -> schedule
@@ -26,7 +45,7 @@ class Scheduler {
         -> double;
 
   public:
-    auto calculateSchedule(JobRequest job) -> drogon::Task<double>;
+    auto calculateSchedule(JobRequest job) -> drogon::Task<SchedulingImpact>;
     void show() const;
     [[nodiscard]] auto getSchedule() const
         -> const std::map<long long, ScheduleForDatacenter> & {

@@ -5,16 +5,15 @@
 
 using namespace std;
 
-void ScheduleForDatacenter::addInterval(ScheduledInterval newInterval) {
+void ScheduleForDatacenter::addInterval(const ScheduledInterval &newInterval) {
     schedule.insert(newInterval);
 }
 
 void ScheduleForDatacenter::show() {
     cout << datacenterInfo.maxLoad << " " << datacenterInfo.name << ":" << '\n';
     cout << "[" << '\n';
-    for (auto interval : schedule) {
+    for (const auto &interval : schedule)
         interval.show();
-    }
     cout << "]" << '\n' << '\n';
 }
 

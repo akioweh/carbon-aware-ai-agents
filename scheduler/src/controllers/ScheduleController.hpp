@@ -11,11 +11,18 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
     METHOD_LIST_BEGIN
     ADD_METHOD_TO(ScheduleController::calculateSchedule, "/api/schedule",
                   drogon::Post);
+    ADD_METHOD_TO(ScheduleController::getSchedule, "/api/schedule",
+                  drogon::Get);
     METHOD_LIST_END
 
-    static auto calculateSchedule(
+    auto calculateSchedule(
         drogon::HttpRequestPtr req,
         std::function<void(const drogon::HttpResponsePtr &)> callback)
+        -> drogon::Task<void>;
+
+    auto
+    getSchedule(drogon::HttpRequestPtr req,
+                std::function<void(const drogon::HttpResponsePtr &)> callback)
         -> drogon::Task<void>;
 };
 

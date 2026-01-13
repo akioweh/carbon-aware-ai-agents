@@ -19,7 +19,7 @@ class ScheduleForDatacenter : public Serializable {
 
     ScheduleForDatacenter() = default;
 
-    void addInterval(ScheduledInterval newInterval);
+    void addInterval(const ScheduledInterval &newInterval);
     void show();
     [[nodiscard]] auto toJson() const -> Json::Value override;
 };
