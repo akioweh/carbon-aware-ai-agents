@@ -2,7 +2,9 @@
 #define SCHEDULED_INTERVAL
 #pragma once
 
-class ScheduledInterval {
+#include <Serializable.hpp>
+
+class ScheduledInterval : public Serializable {
   public:
     long long timestamp;
     int jobId;
@@ -19,6 +21,7 @@ class ScheduledInterval {
     }
 
     void show() const;
+    [[nodiscard]] auto toJson() const -> Json::Value override;
 };
 
 #endif

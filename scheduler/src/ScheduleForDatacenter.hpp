@@ -4,11 +4,12 @@
 
 #include <DatacenterSpecificInformation.hpp>
 #include <ScheduledInterval.hpp>
+#include <Serializable.hpp>
 
 #include <set>
 #include <utility>
 
-class ScheduleForDatacenter {
+class ScheduleForDatacenter : public Serializable {
   public:
     DatacenterSpecificInformation datacenterInfo;
     std::set<ScheduledInterval> schedule;
@@ -20,6 +21,7 @@ class ScheduleForDatacenter {
 
     void addInterval(ScheduledInterval newInterval);
     void show();
+    [[nodiscard]] auto toJson() const -> Json::Value override;
 };
 
 #endif
