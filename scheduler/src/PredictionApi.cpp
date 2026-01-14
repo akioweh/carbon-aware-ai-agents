@@ -9,6 +9,7 @@
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
 #include <trantor/utils/Logger.h>
+#include <utils/Coro.hpp>
 #include <utils/Utils.hpp>
 
 using namespace std;
@@ -30,12 +31,14 @@ auto PredictionApi::getDataSingleDatacenter(const string &datacenterName)
     auto loadJsonPromise = Utils::makeGetRequest(host, loadPath);
     auto greenneesJsonPromise = Utils::makeGetRequest(host, greenneesPath);
 
-    // auto [loadJsonPtr, greenneesJsonPtr] = co_await when_all(loadJsonPromise,
-    // greenneesJsonPromise) ; later I will write my own when_all to make this
-    // sexy pretty
+    vector<Task<shared_ptr<Json::Value>>> Promises;
+    Promises.push_back(std::move(loadJsonPromise));
+    Promises.push_back(std::move(greenneesJsonPromise));
+    // tasks are move only so i cannot do initilizer list
 
+    auto requestPtrs = co_await scheduler::coro::when_all(std::move(Promises));
     auto [loadJsonPtr, greenneesJsonPtr] =
-        tuple{co_await loadJsonPromise, co_await greenneesJsonPromise};
+        tuple{requestPtrs[0], requestPtrs[1]};
 
     if (!loadJsonPtr || !greenneesJsonPtr) {
         LOG_ERROR << "Failed to get data from stats API";
@@ -94,9 +97,11 @@ auto PredictionApi::getData()
     for (auto &name : datacenterNamesList)
         promisedData.push_back(getDataSingleDatacenter(name));
 
+    auto resolvedData =
+        co_await scheduler::coro::when_all(std::move(promisedData));
+
     map<long long, vector<PredictedDatacenterInformation>> data;
-    for (auto &tasks : promisedData) {
-        auto dcData = co_await tasks;
+    for (auto &dcData : resolvedData) {
         if (dcData.empty())
             continue;
         data[dcData.front().datacenterInfo.datacenterId] = dcData;
