@@ -1,6 +1,6 @@
 # Project Documentation
 
-Here lives semantic overviews and formal documents detailing
+This directory hosts semantic overviews and formal documents detailing
 the entire project.
 
 **Key Documents**:

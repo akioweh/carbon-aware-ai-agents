@@ -59,10 +59,24 @@ The Scheduler's API exposes all user-facing functionality, primarily focused on 
    - **Schedule Info**: Specific time allocations at designated locations with associated loads.
    - **Impact Metrics**: Projected environmental impact data, including unit and total carbon emissions and the SCI score.
 
-### 2. Scheduler → Stats: Data Retrieval
+### 2. Scheduler → Stats: Data Retrieval & State Management
 
-The Scheduler requires various data (e.g. environmental, data center state) from external sources.
-The Stats component exposes a unified API for the Scheduler to retrieve this information and abstracts away the actual work of ingesting the external data sources.
+The Stats component serves two critical roles:
+1.  **Context Provider**: Aggregates and forecasts environmental data (Carbon Intensity, Weather) and Baseline Load.
+2.  **State Manager**: Persists the "Global Schedule" by storing the Workload Blocks committed by the Scheduler.
 
-> [!NOTE]
-> currently the Stats API Schema is completely inaccurate and along this section, requires significant rework
+**Key Endpoints:**
+
+*   **`GET /locations/{location}/schedule`**:
+    *   **Purpose**: Retrieves the unified state of the datacenter.
+    *   **Returns**: A list of **Workload Blocks**. This includes both `BASELINE` blocks (derived from historical load patterns) and `SCHEDULED` blocks (jobs previously committed by the Scheduler).
+    *   **Usage**: Called by the Scheduler during the optimization phase to understand availability and by the UI (via Scheduler) to visualize the timeline.
+
+*   **`POST /locations/{location}/schedule`**:
+    *   **Purpose**: Commits a new job to the global state.
+    *   **Input**: A list of **Workload Blocks** representing the new job's placement.
+    *   **Usage**: Called by the Scheduler after it has successfully computed an optimal plan.
+
+*   **`GET /locations/{location}/metrics/{metric}`**:
+    *   **Purpose**: Retained from the original design to fetch specific time-series forecasts (e.g., `carbon_intensity`, `weather`) independent of the workload schedule.
+    *   **Usage**: Used by the Scheduler to cost function calculations (e.g., minimizing Carbon Intensity).
