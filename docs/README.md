@@ -13,6 +13,8 @@ entire project.
   perspective.
 - [API Schemas](./api-schemas.md): highly-tentative document summarizing the
   current inter-component APIs. This will evolve as the feature set expands.
+- [Functional Design Specs](./functional_design.md): in-depth reference to how
+  select features are implemented.
 
 ## Developer Information
 
