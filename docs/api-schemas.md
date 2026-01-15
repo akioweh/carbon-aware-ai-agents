@@ -107,6 +107,12 @@ optimization.
 - **`POST /api/schedule`**: The optimization operation. Accepts a job
   specification and returns an optimized placement plan (without persisting it).
 
+> [!TODO]  
+> we still need two more endpoints for:
+>
+> 1. committing a proposed schedule
+> 2. viewing details of a previously scheduled job.
+
 **Unit Interaction Sequence:**
 
 1. **Job Request (Preview)**: The user submits a description of a job along its
