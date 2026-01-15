@@ -1,71 +1,73 @@
 # Functional Design Specification
 
-This document outlines the core features, functional requirements, and logical design of the Carbon-Aware AI Agent system.
+Some stuff on how specific features are achieved (technical implementation and
+data flow).
 
-## 1. Core Concepts
+## Core Concepts
 
-### 1.1. Workload Blocks
-The fundamental unit of state in the system is a **Workload Block**. A block represents a discrete unit of compute load at a specific location for a specific duration.
+### Workload Blocks
 
-**Structure:**
-- **ID**: Unique identifier.
-- **Source**: `BASELINE` (external/pre-existing load) or `SCHEDULED` (user-submitted job).
-- **Location**: Data center identifier (e.g., `us-west-1`).
-- **Time Interval**: Start time and Duration (or End time).
-- **Magnitude**: The amount of load (e.g., kW, GPU utilization).
-- **Job Metadata**: (Optional) Reference to the parent Job ID if applicable.
+See the [API Schemas](./api-schemas.md) for details.  
+The fundamental unit of state in the system is a **Workload Block**. A block
+represents a discrete unit of compute load at a specific location for a specific
+duration.
 
-### 1.2. The Global Schedule
-The **Global Schedule** is the aggregation of all Workload Blocks across all locations. It represents the complete state of the system:
-$$ \text{Total Load}(t, \text{location}) = \sum \text{Block}_{\text{load}}(t, \text{location}) $$
-*Where the sum includes both Baseline blocks and Scheduled blocks.*
+### The Global Schedule
 
-## 2. Component Responsibilities
+The **Global Schedule** is the aggregation of all Workload Blocks consisting of
+both the background "baseline load" at data centers and the jobs scheduled by
+users. It represents the complete picture of compute load across all data
+centers.
 
-To achieve a persistent and stateful system, the responsibilities are divided as follows:
+When optimizing a placement for a new job at any moment, the Scheduler inspects
+the global schedule to determine the available capacity at data centers.
 
-### 2.1. Stats Component (State Manager)
-The Stats component is expanded from a simple data provider to the **Persistence Layer** and **State Manager** of the system.
+## Feature Workflows
 
-*   **Responsibilities:**
-    *   **Ingestion:** Continues to ingest external data (Weather, Grid Carbon, Baseline Load).
-    *   **Block Registry:** Maintains the database of all `SCHEDULED` workload blocks committed by the Scheduler.
-    *   **Aggregation:** dynamic calculation of "Total Load" by combining stored `SCHEDULED` blocks with ingested `BASELINE` forecasts.
-    *   **API Extensions:**
-        *   `GET /schedule`: Retrieve active blocks.
-        *   `POST /schedule`: Commit new blocks (persist a scheduled job).
-        *   `DELETE /schedule`: Remove blocks.
+### Job Scheduling
 
-### 2.2. Scheduler Component (Logic Core)
-The Scheduler remains the stateless brain of the operation. It does not store the schedule locally but queries the Stats component to rebuild the state when needed.
+The core user interaction follows a two-phase "Preview-Commit" workflow. This
+ensures users can review the computed schedule and environmental impact of a job
+before approving it for deployment.
 
-*   **Responsibilities:**
-    *   **Optimization:** Calculates optimal placement of new jobs based on data retrieved from Stats.
-    *   **Transaction Coordinator:** Ensures that once a schedule is computed, it is "committed" to the Stats component.
+#### Phase 1: Optimization (Preview)
 
-## 3. Feature Workflows
+1. **Submission**: Client `POST`s a Job Spec to the Scheduler.
+2. **Calculation**:
+   - Scheduler fetches _Context_ (grid carbon, already-scheduled jobs, data
+     center load) from Stats.
+   - Scheduler computes the optimal placement to minimize carbon impact.
+   - _Crucially, the Scheduler does **not** persist this result yet._
+3. **Response**: Scheduler returns the **Proposed Schedule** (Workload Blocks +
+   Impact Metrics) to the Client.
 
-### 3.1. Job Scheduling (The "Write" Path)
-This feature allows a client to submit a job specification and receive a confirmed, carbon-optimized schedule.
+#### Phase 2: Commitment (Persist)
 
-1.  **Submission**: Client `POST`s a Job Spec (Type, Load, Window) to the Scheduler.
-2.  **Context Assembly**:
-    *   Scheduler requests **Carbon Forecasts** from Stats.
-    *   Scheduler requests **Current Schedule/Load** from Stats (Baseline + Scheduled).
-3.  **Optimization**:
-    *   Scheduler identifies time slots where $\text{Carbon Intensity} \times \text{Load}$ is minimized.
-    *   It ensures $\text{Total Load} + \text{New Job} \le \text{Capacity}$.
-4.  **Commit**:
-    *   Scheduler generates a set of new **Workload Blocks** representing the job.
-    *   Scheduler `POST`s these blocks to the Stats component to persist them.
-5.  **Response**: Scheduler returns the plan to the client.
+1. **User Decision**: The user reviews the proposal in the UI.
+   - **Discard**: User cancels; no further action is taken.
+   - **Accept**: User confirms the schedule.
+2. **Commit**: Client `POST`s the accepted **Workload Blocks** (and Job
+   Metadata) to the "Commit" endpoint.
+3. **Persistence**:
+   - Validation (done either by the Scheduler or Stats)
+   - Write to DB
 
-### 3.2. Schedule Visualization (The "Read" Path)
-This feature allows the client to view the global state of the data centers, seeing both the background "baseline" load and the jobs they have scheduled.
+### Schedule Visualization
 
-1.  **Request**: Client `GET`s the schedule from the Scheduler.
-2.  **Retrieval**: Scheduler queries the Stats component for all active blocks within the requested window.
-3.  **Presentation**: Scheduler formats the blocks (distinguishing between Baseline and Scheduled) and returns them to the UI.
+This feature allows the client to view the global state of the data centers,
+seeing both the background "baseline" load and the jobs they have scheduled.
 
-### 3.3. Conflict Resolution (Implicit)
-By treating the Stats component as the "Ledger", race conditions (e.g., two schedulers running at once) can be managed. If the Stats component receives a new block that pushes load over capacity (because another job was just scheduled), it can reject the `POST`, forcing the Scheduler to re-optimize. *(Note: This is a future resiliency feature, but the design supports it).*
+1. **Request**: Client `GET`s the schedule from the Scheduler.
+2. **Retrieval**: Scheduler queries the Stats component for all active blocks
+   within the requested window.
+3. **Presentation**: The UI displays the data in some nice calendar format or
+   something :).
+
+### Scheduled Job Details View
+
+This feature allows users to inspect the details of a previously scheduled job.
+The viewable information is the same as the "Proposed Schedule" from the
+optimization phase (i.e., the environmental impact metrics).
+
+> [!TODO]  
+> we need a new api endpoint for this
