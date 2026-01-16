@@ -1,15 +1,20 @@
 #include "Scheduler.hpp"
 #include <JobRequest.hpp>
 #include <PredictionApi.hpp>
-#include <Scheduler.hpp>
+#include <chrono>
 #include <drogon/drogon.h>
+#include <iostream>
+
 using namespace drogon;
 
 constexpr auto PORT = 80;
 constexpr auto N_THREADS = 8;
 
 auto generateJobRequest(int seed) -> JobRequest {
-    return JobRequest(1967344654, "NOT DEFINED", 1469000.0, seed);
+    // using arbitrary timestamps
+    auto now = std::chrono::system_clock::now();
+    auto later = now + std::chrono::hours(24);
+    return {"training", 1469000.0, now, later, "job-" + std::to_string(seed)};
 }
 
 auto main() -> int {
@@ -18,9 +23,14 @@ auto main() -> int {
     Scheduler scheduler;
 
     drogon::async_run([&]() -> drogon::Task<> {
-        std::cout << "Expected carbon emmissions: "
-                  << co_await scheduler.calculateSchedule(generateJobRequest(1))
-                  << std::endl;
+        auto impact =
+            co_await scheduler.calculateSchedule(generateJobRequest(1));
+        std::cout << "Expected carbon emmissions: " << impact.total_emissions
+                  << '\n';
+        std::cout << "Expected carbon intensity: " << impact.carbon_intensity
+                  << '\n';
+        std::cout << "SCI: " << impact.sci << '\n';
+
         scheduler.show();
         drogon::app().quit();
         co_return;

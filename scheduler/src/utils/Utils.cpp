@@ -1,17 +1,36 @@
 #include "Utils.hpp"
+#include <expected>
+#include <sstream>
 
 namespace scheduler::utils {
 using namespace std;
 using namespace drogon;
-auto parseTimestampSeconds(const string &timestamp) -> long long {
-    // chatgpted - later i can try importing Howard Hinnant’s date library
-    // also i will probably move this to a utils package
-    string datetime = timestamp.substr(0, 19);
-    tm tm = {};
-    istringstream ss(datetime);
-    ss >> get_time(&tm, "%Y-%m-%dT%H:%M:%S");
-    time_t tt = timegm(&tm);
-    return static_cast<long long>(tt);
+
+using SysTime = chrono::system_clock::time_point;
+
+auto toIso8601(const SysTime &timePoint) -> string {
+    // remove sub-second precision
+    auto tp_sec = chrono::floor<chrono::seconds>(timePoint);
+    // %F = YYYY-MM-DD
+    // %T = HH:MM:SS
+    // Z  = Literal Z suffix
+    return format("{:%FT%TZ}", tp_sec);
+}
+
+auto parseIso8601(const string &timestamp) -> expected<SysTime, string> {
+
+    chrono::sys_seconds tp;
+    istringstream ss(timestamp);
+
+    if (ss >> chrono::parse("%FT%TZ", tp))
+        return tp;
+    // try without the Z suffix
+    ss.clear();
+    ss.str(timestamp);
+    if (ss >> chrono::parse("%FT%T", tp))
+        return tp;
+
+    return unexpected("Failed to parse ISO8601 string: " + timestamp);
 }
 
 auto makeGetRequest(const string &host, const string &path)

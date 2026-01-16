@@ -20,41 +20,50 @@ auto Scheduler::getCombinedIntervals(
 
 auto Scheduler::schedule(PredictedDatacenterInformation &interval,
                          JobRequest &job) -> double {
+
+    auto durationSeconds =
+        static_cast<double>(interval.lengthOfInterval.count());
+
     double maxWorkInInterval =
         (interval.datacenterInfo.maxLoad - interval.currentLoad) *
-        interval.lengthOfInterval;
+        durationSeconds;
 
-    if (maxWorkInInterval >= job.work) {
-        double temp = job.work;
-        job.work = 0;
-        return temp / interval.lengthOfInterval; /// this is the additional load
+    if (maxWorkInInterval >= job.workload_amount) {
+        double temp = job.workload_amount;
+        job.workload_amount = 0;
+        return temp / durationSeconds; /// this is the additional load
     }
-    job.work -= maxWorkInInterval;
-    return maxWorkInInterval / interval.lengthOfInterval;
+    job.workload_amount -= maxWorkInInterval;
+    return maxWorkInInterval / durationSeconds;
 }
 
-auto Scheduler::calculateSchedule(JobRequest job) -> Task<double> {
+auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
 
     auto data = co_await predictionApi.getData();
 
     auto intervals = getCombinedIntervals(data);
 
     double co2emissions = 0;
+    double totalEnergy = 0;
 
     fullSchedule.clear();
 
-    while (intervals.size() > 0 && job.work > 0) {
+    while (intervals.size() > 0 && job.workload_amount > 0) {
         auto interval = *intervals.begin();
         intervals.erase(intervals.begin());
 
-        if (interval.timestamp > job.deadline) {
+        if (interval.timestamp > job.latest_finish ||
+            interval.timestamp < job.earliest_start) {
             continue;
         }
 
         double additionalLoad = schedule(interval, job);
-        co2emissions += (interval.currentGreenness * additionalLoad *
-                         interval.lengthOfInterval) /
-                        KWH;
+        auto durationSeconds =
+            static_cast<double>(interval.lengthOfInterval.count());
+        double energy = additionalLoad * durationSeconds;
+        totalEnergy += energy;
+
+        co2emissions += (interval.currentGreenness * energy) / KWH;
 
         if (!fullSchedule.contains(interval.datacenterInfo.datacenterId)) {
             auto scheduleForDC = ScheduleForDatacenter(interval.datacenterInfo);
@@ -62,14 +71,22 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<double> {
                                  scheduleForDC);
         }
 
-        auto scheduledInterval =
+        const auto scheduledInterval =
             ScheduledInterval(interval.timestamp, job.jobId, additionalLoad,
                               additionalLoad + interval.currentLoad);
 
         fullSchedule[interval.datacenterInfo.datacenterId].addInterval(
             scheduledInterval);
     }
-    co_return co2emissions;
+
+    const auto carbon_intensity =
+        (totalEnergy > 0) ? (co2emissions * KWH / totalEnergy) : 0;
+    const auto impact = SchedulingImpact{
+        co2emissions,
+        carbon_intensity,
+        carbon_intensity, // for now they're the same
+    };
+    co_return impact;
 }
 
 void Scheduler::show() const {

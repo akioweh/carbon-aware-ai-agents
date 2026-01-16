@@ -1,11 +1,11 @@
 #ifndef DATACENTER_SPECIFIC_INFORMATION
 #define DATACENTER_SPECIFIC_INFORMATION
 
+#include <Serializable.hpp>
 #include <string>
 #include <utility>
-#include <json/value.h>
 
-class DatacenterSpecificInformation {
+class DatacenterSpecificInformation : public Serializable {
   public:
     double maxLoad;
     std::string locationId;
@@ -23,8 +23,10 @@ class DatacenterSpecificInformation {
     DatacenterSpecificInformation() = default;
 
     static auto parseJsonForDCSpecificInfo(const std::string &datacenterName,
-                                                   const Json::Value &respJson)
-        -> DatacenterSpecificInformation ;
+                                           const Json::Value &respJson)
+        -> DatacenterSpecificInformation;
+
+    [[nodiscard]] auto toJson() const -> Json::Value override;
 };
 
 #endif
