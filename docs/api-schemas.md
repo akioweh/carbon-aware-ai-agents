@@ -123,15 +123,14 @@ optimization.
    and locations that minimize carbon impact while satisfying all constraints.
    (This involves querying the Stats component for necessary data.)
 
-3. **Schedule Response (Proposal)**: On success, the API returns:
+3. **Schedule Response**: On success, the API returns:
    - **Schedule Info**: Specific time allocations at designated locations with
      associated loads.
    - **Impact Metrics**: Projected environmental impact data, including unit and
      total carbon emissions and the SCI score.
 
 4. **Commitment**: The user accepts the proposal. The client sends the selected
-   Workload Blocks back to the Scheduler/Stats (?). **Note**: API TBD (could
-   directly go to Stats or pass through Scheduler).
+   Workload id back to the Scheduler.
 
 ### 2. Scheduler → Stats: Data Retrieval & State Management
 
