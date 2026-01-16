@@ -26,28 +26,28 @@ auto PredictionApi::getGreennessPath(const string &datacenterName) -> string {
 auto PredictionApi::getDataSingleDatacenter(const string &datacenterName)
     -> Task<vector<PredictedDatacenterInformation>> {
     const string loadPath = getLoadPath(datacenterName);
-    const string greenneesPath = getGreennessPath(datacenterName);
+    const string greennessPath = getGreennessPath(datacenterName);
 
     auto loadJsonPromise = scheduler::utils::makeGetRequest(host, loadPath);
-    auto greenneesJsonPromise =
-        scheduler::utils::makeGetRequest(host, greenneesPath);
+    auto greennessJsonPromise =
+        scheduler::utils::makeGetRequest(host, greennessPath);
 
     vector<Task<shared_ptr<Json::Value>>> Promises;
     Promises.push_back(std::move(loadJsonPromise));
-    Promises.push_back(std::move(greenneesJsonPromise));
+    Promises.push_back(std::move(greennessJsonPromise));
     // tasks are move only so i cannot do initilizer list
 
     auto requestPtrs = co_await scheduler::coro::when_all(std::move(Promises));
-    auto [loadJsonPtr, greenneesJsonPtr] =
+    auto [loadJsonPtr, greennessJsonPtr] =
         tuple{requestPtrs[0], requestPtrs[1]};
 
-    if (!loadJsonPtr || !greenneesJsonPtr) {
+    if (!loadJsonPtr || !greennessJsonPtr) {
         LOG_ERROR << "Failed to get data from stats API";
         co_return {};
     }
 
     auto loadData = parseJsonForLoad(*loadJsonPtr);
-    auto greennessData = parseJsonForGreenness(*greenneesJsonPtr);
+    auto greennessData = parseJsonForGreenness(*greennessJsonPtr);
     auto datacenterSpecificInfo =
         DatacenterSpecificInformation::parseJsonForDCSpecificInfo(
             datacenterName, *loadJsonPtr);
@@ -79,9 +79,9 @@ auto PredictionApi::constructDCPredictions(
     for (unsigned long long i = 0;
          i < min(greennessData.size(), loadData.size()); i++) {
         auto [timestamp, predictedLoad] = loadData[i];
-        auto [dummy, predictedGreeness] = greennessData[i];
+        auto [dummy, predictedGreenness] = greennessData[i];
         DCInfo.emplace_back(timestamp, lengthOfInterval, predictedLoad,
-                            predictedGreeness, datacenterSpecificInfo);
+                            predictedGreenness, datacenterSpecificInfo);
     }
 
     return DCInfo;
@@ -131,7 +131,7 @@ auto PredictionApi::parseJsonForLoad(const Json::Value &respJson)
 
 auto PredictionApi::parseJsonForGreenness(const Json::Value &respJson)
     -> vector<pair<chrono::system_clock::time_point, double>> {
-    vector<pair<chrono::system_clock::time_point, double>> greenessData;
+    vector<pair<chrono::system_clock::time_point, double>> greennessData;
     for (auto obj : respJson["data"]) {
         auto time_res =
             scheduler::utils::parseIso8601(obj["timestamp"].asString());
@@ -141,7 +141,7 @@ auto PredictionApi::parseJsonForGreenness(const Json::Value &respJson)
             continue;
         }
         double load = obj["value"].asDouble();
-        greenessData.emplace_back(time_res.value(), load);
+        greennessData.emplace_back(time_res.value(), load);
     }
-    return greenessData;
+    return greennessData;
 }
