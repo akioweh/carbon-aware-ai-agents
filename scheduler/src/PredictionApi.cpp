@@ -27,8 +27,8 @@ auto PredictionApi::getDataSingleDatacenter(const string &datacenterName)
     const string loadPath = getLoadPath(datacenterName);
     const string greenneesPath = getGreennessPath(datacenterName);
 
-    auto loadJsonPromise = Utils::makeGetRequest(host, loadPath);
-    auto greenneesJsonPromise = Utils::makeGetRequest(host, greenneesPath);
+    auto loadJsonPromise = scheduler::utils::makeGetRequest(host, loadPath);
+    auto greenneesJsonPromise = scheduler::utils::makeGetRequest(host, greenneesPath);
 
     // auto [loadJsonPtr, greenneesJsonPtr] = co_await when_all(loadJsonPromise,
     // greenneesJsonPromise) ; later I will write my own when_all to make this
@@ -109,7 +109,7 @@ auto PredictionApi::parseJsonForLoad(const Json::Value &respJson)
     vector<pair<long long, double>> loadData;
     for (auto obj : respJson["data"]) {
         long long timestamp =
-            Utils::parseTimestampSeconds(obj["timestamp"].asString());
+            scheduler::utils::parseTimestampSeconds(obj["timestamp"].asString());
         double load = obj["value"].asDouble();
         loadData.emplace_back(timestamp, load);
     }
@@ -121,7 +121,7 @@ auto PredictionApi::parseJsonForGreenness(const Json::Value &respJson)
     vector<pair<long long, double>> greenessData;
     for (auto obj : respJson["data"]) {
         long long timestamp =
-            Utils::parseTimestampSeconds(obj["timestamp"].asString());
+            scheduler::utils::parseTimestampSeconds(obj["timestamp"].asString());
         double load = obj["value"].asDouble();
         greenessData.emplace_back(timestamp, load);
     }

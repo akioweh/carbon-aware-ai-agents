@@ -1,9 +1,9 @@
 #include "Utils.hpp"
 
+namespace scheduler::utils {
 using namespace std;
 using namespace drogon;
-
-auto Utils::parseTimestampSeconds(const string &timestamp) -> long long {
+auto parseTimestampSeconds(const string &timestamp) -> long long {
     // chatgpted - later i can try importing Howard Hinnant’s date library
     // also i will probably move this to a utils package
     string datetime = timestamp.substr(0, 19);
@@ -14,7 +14,7 @@ auto Utils::parseTimestampSeconds(const string &timestamp) -> long long {
     return static_cast<long long>(tt);
 }
 
-auto Utils::makeGetRequest(const string &host, const string &path)
+auto makeGetRequest(const string &host, const string &path)
     -> Task<shared_ptr<Json::Value>> {
     auto client = HttpClient::newHttpClient(host);
     auto request = HttpRequest::newHttpRequest();
@@ -44,3 +44,4 @@ auto Utils::makeGetRequest(const string &host, const string &path)
 
     co_return make_shared<Json::Value>(*jsonResponsePtr);
 }
+} // namespace scheduler::utils
