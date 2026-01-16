@@ -102,17 +102,12 @@ optimization.
 **Endpoints:**
 
 - **`GET /api/schedule`**: Retrieves all currently planned jobs in the provided time interval. Time interval is optional, so providing neither gives back the complete schedule. This allows the UI to visualize the global state of workloads. 
+- **`GET /api/schedule/{schedule_id}`**: Retrieves specific job which was already persisted. This will allow users to view how real efficiency and schedule varies from the predicted one.
 - **`POST /api/schedule`**: The optimization operation. Accepts a job
   specification and returns an optimized placement plan (without persisting it).
 - **`POST /api/schedule/persist`**: Persistence operation. Accepts a schedule ID
   of a previous schedule to persists. Returns Error message if the ID was not found
   or scheduling happend too long ago.
-
-
-> [!TODO]  
-> we still need two more endpoints for:
->
-> 1. viewing details of a previously scheduled job.
 
 **Unit Interaction Sequence:**
 
