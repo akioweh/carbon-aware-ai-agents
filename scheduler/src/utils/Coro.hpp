@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <drogon/drogon.h>
 #include <drogon/utils/coroutine.h>
-#include <iostream>
 #include <vector>
 
 namespace scheduler::coro {
