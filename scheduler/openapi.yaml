@@ -65,10 +65,6 @@ paths:
       responses:
         "200":
           description: Schedule persisted successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Success"
         "400":
           description: Failed to persist
           content:
@@ -187,14 +183,6 @@ components:
           type: string
           desciption: Id of a schedule returned by POST /api/schedule.
           example: "Sche_123"
-
-    Success:
-      type: object
-      properties:
-        message:
-          type: string
-          description: Success message
-          example: "Operation completed successfully."
 
     Error:
       type: object

@@ -106,6 +106,10 @@ optimization.
   state of workloads.
 - **`POST /api/schedule`**: The optimization operation. Accepts a job
   specification and returns an optimized placement plan (without persisting it).
+- **`POST /api/schedule/persist`**: Persistence operation. Accepts a schedule ID
+  of a previous schedule to persists. Returns Error message if the ID was not found
+  or scheduling happend too long ago.
+
 
 > [!TODO]  
 > we still need two more endpoints for:
