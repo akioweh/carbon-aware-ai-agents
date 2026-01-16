@@ -52,6 +52,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/schedule/persist:
+    post:
+      summary: Persist a schedule.
+      description: Persists a schedule which was approved by a user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersistSchedule"
+      responses:
+        "200":
+          description: Schedule persisted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        "400":
+          description: Failed to persist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+
+
+
 components:
   schemas:
     JobRequest:
@@ -152,6 +179,22 @@ components:
               type: number
               description: the sci bruh
               example: 20
+
+    PersistSchedule:
+      type: object
+      properties:
+        schedule_id:
+          type: string
+          desciption: Id of a schedule returned by POST /api/schedule.
+          example: "Sche_123"
+
+    Success:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Success message
+          example: "Operation completed successfully."
 
     Error:
       type: object
