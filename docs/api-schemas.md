@@ -1,287 +1,153 @@
-# API Schemas Documentation (Prototype)
+# Inter-Component APIs
 
-This document provides an overview of the simplified OpenAPI schemas for prototyping the Carbon-Aware AI Agents system.
+This document briefs the design and realization of the communication interfaces
+used between the three components.
 
 ## Overview
 
-The system comprises three main components that communicate via RESTful HTTP APIs:
+The system comprises three components that communicate via RESTful HTTP APIs:
 
-1. **UI (webapp)** - User interface for job submission and visualization
-2. **Scheduler** - Core optimization logic for workload placement
-3. **Stats (model-load-api)** - Environmental and operational data provider
+1. **Scheduler** - Core optimization logic for workload placement
+2. **Stats** - Environmental and operational data provider
+3. **UI** - User interface for job submission and visualization
 
-Two OpenAPI 3.0 schemas define these interactions:
+> [!TIP]  
+> See the [systems component design document](./system_component_design.md) for
+> more details on this architecture
 
-- **`webapp/openapi.yaml`** - UI ↔ Scheduler API (simplified for prototyping)
-- **`model-load-api/openapi.yaml`** - Stats API (including Scheduler ↔ Stats endpoint)
+Two OpenAPI v3 schemas define the HTTP APIs that power the interactions:
+
+- **[scheduler/openapi.yaml](../scheduler/openapi.yaml)** - the programmatic
+  interface to the scheduling system; exposed by the Scheduler for the UI to
+  call
+- **[stats/openapi.yaml](../stats/openapi.yaml)** - the unified data platform
+  interface; exposed by the Stats for the Scheduler to call
+
+Naturally, the interconnection APIs and the overall system weakly follow a
+RESTful design (e.g. a request-response pipeline).
 
 ## Design Philosophy
 
-These schemas are intentionally **simplified for prototyping**:
-- Minimal required fields
-- Flat structure (minimal nesting)
-- Focus on core functionality only
-- Easy to implement and iterate
+The schemas should give way to effective, clean implementations in software.
+E.g. in-memory data layout and serialized structures should align well to
+minimize translation overheads.
+
+- Design-first: prioritize objective, optimal systems design over _existing_
+  implementation details; implementation iteratively improves as needed
+- Pragmatic: consider the content, size, and timings of data flow to structure
+  endpoints that lend themselves to their use cases
+- Simplicity: capture only the necessary information, but using natural model
+  structures to avoid over-terseness
+- Extensibility: apply a decent level of abstraction in model design and avoid
+  over-fitting to current implementation details
+- Standardization: consider standardized encodings and definitions before
+  inventing proprietary ones
+
+## Common Models
+
+### Workload Block
+
+A **Workload Block** is the fundamental unit of state in the system. It
+represents a discrete unit of compute load at a specific location for a specific
+duration. **Currently, each block represents a 5-minute interval.**
+
+Workload Blocks can represent compute load both "owned" by us (i.e. scheduled
+jobs) and of external origin (i.e. baseline load at data centers).
+
+> [!NOTE]  
+> this is the current model used in the Scheduler API; more fields may be needed
+> to implement later features
+
+| Field             | Type     | Description                                 |
+| ----------------- | -------- | ------------------------------------------- |
+| `timestamp`       | `string` | (Start) time of the block (ISO 8601 format) |
+| `location`        | `string` | Datacenter GUID (name)                      |
+| `job_id`          | `string` | Job GUID                                    |
+| `additional_load` | `number` | Amount of compute                           |
+
+> [!TIP]  
+> The formal schema definition is in
+> [scheduler/openapi.yaml](../scheduler/openapi.yaml), called `ScheduledBlock`.
+
+### Job Specification
+
+A **Job Specification** describes the requirements and constraints of a job. As
+the Scheduler always and only outputs the optimal placement, the specification
+is the only way to influence the scheduling outcome.
+
+| Field                    | Type     | Description                                              |
+| ------------------------ | -------- | -------------------------------------------------------- |
+| `job_type`               | `string` | Nature of the workload (e.g., training, inference)       |
+| `workload_amount`        | `number` | Quantitative measure of compute (wrt. job type)          |
+| `earliest_start`         | `string` | Earliest permissible start time (ISO 8601 format)        |
+| `latest_finish`          | `string` | Latest permissible finish time (ISO 8601 format)         |
+| `additional_constraints` | `object` | Key-value pairs for extra constraints (currently unused) |
+
+> [!TIP]  
+> The formal schema definition is in
+> [scheduler/openapi.yaml](../scheduler/openapi.yaml), called `JobRequest`.
 
 ## API Interactions
 
-### 1. UI → Scheduler: Job Submission
+> [!NOTE]  
+> "A -> B" means a call dispatched by A to B; A sends the request, and B
+> responds with information.
 
-**Endpoint:** `POST /api/schedule`
+### 1. UI → Scheduler: Job Submission & Management
 
-**Purpose:** Submit an AI workload for carbon-aware scheduling
+The Scheduler's API exposes all user-facing functionality, primarily focused on
+viewing the current schedule and submitting new jobs for carbon-aware
+optimization.
 
-**Request Schema:** `JobRequest`
-```json
-{
-  "job_id": "train-model-1",
-  "job_type": "training",
-  "functional_unit": "epoch",
-  "workload_amount": 20,
-  "gpu_count": 4,
-  "duration_hours": 8,
-  "earliest_start": "2025-12-08T00:00:00Z",
-  "latest_finish": "2025-12-10T00:00:00Z"
-}
-```
+**Endpoints:**
 
-**Response Schema:** `ScheduleResponse`
-```json
-{
-  "schedule_id": "sched-123",
-  "job_id": "train-model-1",
-  "location": "dc1",
-  "start_time": "2025-12-08T02:00:00Z",
-  "end_time": "2025-12-08T10:00:00Z",
-  "carbon_intensity": 0.15,
-  "estimated_emissions_kg": 45.5,
-  "sci_per_unit": 2.28
-}
-```
+- **`GET /api/schedule`**: Retrieves the complete schedule of all currently
+  planned jobs across data centers. This allows the UI to visualize the global
+  state of workloads.
+- **`POST /api/schedule`**: The optimization operation. Accepts a job
+  specification and returns an optimized placement plan (without persisting it).
 
-**Key Fields:**
-- `functional_unit`: The unit for SCI calculation (epoch, request, GB_processed, etc.)
-- `workload_amount`: Number of functional units to process
-- `sci_per_unit`: Software Carbon Intensity per functional unit (kg CO₂e)
+> [!TODO]  
+> we still need two more endpoints for:
+>
+> 1. committing a proposed schedule
+> 2. viewing details of a previously scheduled job.
 
-### 2. Scheduler → Stats: Unified Metrics API
+**Unit Interaction Sequence:**
 
-The Stats API uses a **unified, location-based structure** for all metrics:
+1. **Job Request (Preview)**: The user submits a description of a job along its
+   execution requirements:
+   - **Type**: The nature of the workload (used in normalizing the amount of
+     work).
+   - **Workload Amount**: A quantitative measure of the compute required.
+   - **Time Window**: temporal constraint on the schedule placement.
+   - **Constraints**: additional parameters to refine placement.
 
-**Pattern:** `/locations/{location}/metrics/{metric}`
+2. **Optimization**: The scheduler processes this request by finding time slots
+   and locations that minimize carbon impact while satisfying all constraints.
+   (This involves querying the Stats component for necessary data.)
 
-All metrics follow the same time-series structure and query parameters, making the API coherent and easy to use.
+3. **Schedule Response (Proposal)**: On success, the API returns:
+   - **Schedule Info**: Specific time allocations at designated locations with
+     associated loads.
+   - **Impact Metrics**: Projected environmental impact data, including unit and
+     total carbon emissions and the SCI score.
 
-#### `GET /locations/{location}/metrics/greeness`
-Get grid carbon intensity time-series with forecasts
+4. **Commitment**: The user accepts the proposal. The client sends the selected
+   Workload Blocks back to the Scheduler/Stats (?). **Note**: API TBD (could
+   directly go to Stats or pass through Scheduler).
 
-**Query params:** `start`, `end`
+### 2. Scheduler → Stats: Data Retrieval & State Management
 
-```json
-{
-  "location_id": "dc1",
-  "metric": "carbon_intensity",
-  "unit": "kg_co2_per_kwh",
-  "data": [
-    {"timestamp": "2025-12-08T00:00:00Z", "value": 0.25},
-    {"timestamp": "2025-12-08T01:00:00Z", "value": 0.22},
-    {"timestamp": "2025-12-08T02:00:00Z", "value": 0.15}
-  ]
-}
-```
+The Stats component serves two critical roles:
 
-#### `GET /locations/{location}/metrics/load`
-Get data center load time-series with capacity info
+1. **Context Provider**: Aggregates and forecasts environmental data (Carbon
+   Intensity, Weather) and Baseline Load.
+2. **State Manager**: Persists the "Global Schedule" by storing the Workload
+   Blocks committed by the Scheduler.
 
-**Query params:** `start`, `end`
+**Endpoints:**
 
-```json
-{
-  "location_id": "dc1",
-  "metric": "load",
-  "unit": "utilization_units",
-  "capacity": {
-    "max_load": 50.0,
-    "total_gpus": 32
-  },
-  "data": [
-    {"timestamp": "2025-12-08T00:00:00Z", "value": 25.5, "available_gpus": 16},
-    {"timestamp": "2025-12-08T01:00:00Z", "value": 28.0, "available_gpus": 14}
-  ]
-}
-```
-
-#### `GET /locations/{location}/metrics/weather`
-Get weather time-series
-
-**Query params:** `start`, `end`
-
-```json
-{
-  "location_id": "dc1",
-  "metric": "weather",
-  "data": [
-    {
-      "timestamp": "2025-12-08T00:00:00Z",
-      "temperature_celsius": 22,
-      "humidity_percent": 65,
-      "is_forecast": false
-    }
-  ]
-}
-```
-
-#### `GET /locations/{location}/metrics/cost`
-Get compute cost information
-
-```json
-{
-  "location_id": "dc1",
-  "metric": "cost",
-  "currency": "USD",
-  "effective_date": "2025-12-01T00:00:00Z",
-  "rates": {
-    "cost_per_gpu_hour": 2.50,
-    "cost_per_cpu_hour": 0.10,
-    "cost_per_gb_hour": 0.01
-  }
-}
-```
-
-#### `GET /locations`
-List all available locations
-
-```json
-[
-  {"location_id": "dc1", "name": "Data Center 1", "region": "us-east"},
-  {"location_id": "dc2", "name": "Data Center 2", "region": "us-west"}
-]
-```
-
-## Key Design Decisions
-
-### Simplicity for Prototyping
-
-The schemas prioritize:
-- **Minimal fields**: Only essential data for core functionality
-- **Flat structures**: Easy to implement and debug
-- **No premature optimization**: Advanced features can be added later
-- **Clear examples**: JSON examples that match real use cases
-
-### SCI Metric Support
-
-Jobs now include functional units for proper SCI calculation:
-- `functional_unit`: The unit of work (epoch, request, GB_processed, etc.)
-- `workload_amount`: Number of units to process
-- Response includes `sci_per_unit`: Software Carbon Intensity per functional unit
-
-**SCI Formula:** `SCI = (Energy × Carbon Intensity) / Functional Unit`
-
-### Unified Stats API Design
-
-Stats API uses a **normalized, location-based structure**:
-
-**Path Pattern:** `/locations/{location}/metrics/{metric}`
-
-**Unified Query Parameters:**
-- `start` / `end` - Time range for historical data
-- `include_forecast` - Include future predictions
-
-**Normalized Response Structure:**
-```json
-{
-  "location_id": "dc1",
-  "metric": "metric_name",
-  "unit": "measurement_unit",
-  "data": [
-    {"timestamp": "...", "value": 0.0, "is_forecast": false}
-  ]
-}
-```
-
-**Benefits:**
-- **Consistent interface** - Same query pattern for all metrics
-- **Clear hierarchy** - Location → Metric is natural and REST-compliant
-- **Time-series native** - All data properly structured as time-series
-- **Forecast support** - Built-in via `is_forecast` flag
-- **Easy to extend** - New metrics follow the same pattern
-
-### Carbon-Aware Scheduling
-
-The core concept:
-1. Jobs specify resource needs, workload type, and time flexibility
-2. Scheduler queries carbon forecast and capacity data
-3. Scheduler picks the cleanest time window with available capacity
-4. Returns schedule with emissions estimate and SCI per functional unit
-
-## Schema Files
-
-Both schemas are valid OpenAPI 3.0.3:
-
-- **`webapp/openapi.yaml`** - 161 lines, 3 schemas, 1 endpoint
-- **`model-load-api/openapi.yaml`** - 667 lines, 13 schemas, 11 endpoints
-  - 6 legacy endpoints (`/history`, `/latest` - backward compatibility)
-  - 5 unified endpoints (`/locations`, `/locations/{location}/metrics/*`)
-
-## Viewing the Schemas
-
-### Swagger UI
-
-You can view interactive API documentation using Swagger UI:
-
-```bash
-# Install Swagger UI tools
-npm install -g swagger-ui-watcher
-
-# View UI schema
-swagger-ui-watcher webapp/openapi.yaml
-
-# View Stats schema
-swagger-ui-watcher model-load-api/openapi.yaml
-```
-
-### Redoc
-
-For beautiful static documentation:
-
-```bash
-# Install Redoc CLI
-npm install -g redoc-cli
-
-# Generate HTML documentation
-redoc-cli bundle webapp/openapi.yaml -o webapp-api-docs.html
-redoc-cli bundle model-load-api/openapi.yaml -o stats-api-docs.html
-```
-
-## Implementation Roadmap
-
-### Phase 1: Prototype Core (Current)
-- ✅ Simple API schemas defined
-- ⚪ Mock scheduler endpoint
-- ⚪ Mock context endpoint with static data
-- ⚪ Basic UI to submit jobs
-
-### Phase 2: Add Real Data
-- Integrate with carbon intensity API (e.g., ElectricityMaps)
-- Add actual data center load tracking
-- Simple scheduling algorithm (pick lowest carbon time)
-
-### Phase 3: Enhance
-- Add more data centers
-- Improve forecasting
-- Add cost considerations
-- Better UI visualization
-
-## Related Documentation
-
-- [Project Brief](./project-brief.md) - High-level goals and concepts
-- [System Component Design](./system_component_design.md) - Architecture overview
-- [Sequence Diagram](./sequence_diag.svg) - Component interaction flow
-- [System Block Diagram](./system_block_diag.svg) - Component relationships
-
-## References
-
-- [OpenAPI 3.0 Specification](https://spec.openapis.org/oas/v3.0.3)
-- [Green Software Foundation - SCI](https://greensoftware.foundation/sci)
-- [Electricity Maps API](https://www.electricitymaps.com/) - Grid carbon intensity data
-- [Cloud Carbon Footprint](https://www.cloudcarbonfootprint.org/) - Cloud emissions tracking
+> [!WARNING]  
+> currently the Stats API Schema is completely inaccurate and problematic; it
+> requires significant rework before this section can be meaningfully populated

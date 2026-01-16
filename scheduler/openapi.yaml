@@ -1,0 +1,164 @@
+openapi: 3.0.3
+info:
+  title: Scheduler API (Prototype)
+  description: |
+    Simple API for carbon-aware AI workload scheduling.
+    Submit a job specification and receive an optimized schedule.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /api/schedule:
+    get:
+      summary: Fetch entire datacenter work schedule
+      description: gets all already-scheduled jobs (gets all blocks)
+      responses:
+        "200":
+          description: Successful response with schedule data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: Schedule a job
+      description: Submit a job and get back an optimized schedule placement (only blocks of this new job)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobRequest"
+      responses:
+        "200":
+          description: Schedule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleCreationResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    JobRequest:
+      type: object
+      required:
+        - job_type
+        - workload_amount
+        - earliest_start
+        - latest_finish
+      properties:
+        job_type:
+          type: string
+          description: Type of AI workload
+          enum: ["training", "inference", "batch"]
+          example: "training"
+        workload_amount:
+          type: number
+          description: Amount of workload in the specified functional unit
+          minimum: 0
+          example: 20
+        earliest_start:
+          type: string
+          format: date-time
+          description: Earliest time to start
+          example: "2025-12-08T00:00:00Z"
+        latest_finish:
+          type: string
+          format: date-time
+          description: Latest time to finish
+          example: "2025-12-10T00:00:00Z"
+        additional_constraints:
+          type: object
+          additionalProperties: true
+
+    ScheduleResponse:
+      type: array
+      items:
+        $ref: "#/components/schemas/ScheduleBlock"
+
+    ScheduleBlock:
+      type: object
+      required:
+        - timestamp
+        - location
+        - job_id
+        - additional_load
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Start time of the scheduled block
+          example: "2025-12-08T02:00:00Z"
+        location:
+          type: string
+          description: Data center location
+          example: "us-west-1"
+        job_id:
+          type: string
+          description: Identifier for the scheduled job
+          example: "job-123"
+        additional_load:
+          type: number
+          description: Additional load in kWh during this block
+          example: 5.0
+
+    ScheduleCreationResponse:
+      type: object
+      description: Response after scheduling a job, indicating success and server-assigned schedule ID
+      required:
+        - schedule_id
+        - scheduled_blocks
+        - impact
+      properties:
+        schedule_id:
+          type: string
+          description: assigned id for the job
+          example: "sched-456"
+        message:
+          type: string
+          nullable: true
+          description: optional message from the server
+        scheduled_blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleBlock"
+        impact:
+          type: object
+          properties:
+            carbon_intensity:
+              type: number
+              description: average carbon intensity during the scheduled period in kg CO2/kWh
+              example: 50.0
+            total_emissions:
+              type: number
+              description: total predicted emissions in kg CO2
+              example: 0.14
+            sci:
+              type: number
+              description: the sci bruh
+              example: 20
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid job specification"
