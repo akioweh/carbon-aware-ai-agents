@@ -19,16 +19,20 @@ auto toIso8601(const SysTime &timePoint) -> string {
 
 auto parseIso8601(const string &timestamp) -> expected<SysTime, string> {
 
-    chrono::sys_seconds tp;
-    istringstream ss(timestamp);
+    chrono::sys_seconds res;
+    istringstream iss(timestamp);
 
-    if (ss >> chrono::parse("%FT%TZ", tp))
-        return tp;
-    // try without the Z suffix
-    ss.clear();
-    ss.str(timestamp);
-    if (ss >> chrono::parse("%FT%T", tp))
-        return tp;
+    if (iss >> chrono::parse("%FT%TZ", res))
+        return res;
+    // try with explicit offset
+    iss.clear();
+    iss.str(timestamp);
+    if (iss >> chrono::parse("%FT%T%Ez", res))
+        return res;
+    iss.clear();
+    iss.str(timestamp);
+    if (iss >> chrono::parse("%FT%T%z", res))
+        return res;
 
     return unexpected("Failed to parse ISO8601 string: " + timestamp);
 }
