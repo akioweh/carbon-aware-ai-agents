@@ -46,10 +46,9 @@ before approving it for deployment.
 1. **User Decision**: The user reviews the proposal in the UI.
    - **Discard**: User cancels; no further action is taken.
    - **Accept**: User confirms the schedule.
-2. **Commit**: Client `POST`s the accepted **Workload Blocks** (and Job
-   Metadata) to the "Commit" endpoint.
+2. **Commit**: Client `POST`s the accepted **Workload ID** to the "Commit" endpoint.
 3. **Persistence**:
-   - Validation (done either by the Scheduler or Stats)
+   - Validation (done by the Scheduler)
    - Write to DB
 
 ### Schedule Visualization
@@ -57,10 +56,8 @@ before approving it for deployment.
 This feature allows the client to view the global state of the data centers,
 seeing both the background "baseline" load and the jobs they have scheduled.
 
-1. **Request**: Client `GET`s the schedule from the Scheduler.
-2. **Retrieval**: Scheduler queries the Stats component for all active blocks
-   within the requested window.
-3. **Presentation**: The UI displays the data in some nice calendar format or
+1. **Request**: Client `GET`s the schedule from the Scheduler, in any time interval.
+2. **Presentation**: The UI displays the data in some nice calendar format or
    something :).
 
 ### Scheduled Job Details View
