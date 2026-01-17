@@ -28,7 +28,8 @@ the global schedule to determine the available capacity at data centers.
 
 The core user interaction follows a two-phase "Preview-Commit" workflow. This
 ensures users can review the computed schedule and environmental impact of a job
-before approving it for deployment.
+before approving it for deployment. (Even though we persist it immediately, it will be 
+deleted if user decides to reject it.)
 
 #### Phase 1: Optimization (Preview)
 
@@ -37,19 +38,20 @@ before approving it for deployment.
    - Scheduler fetches _Context_ (grid carbon, already-scheduled jobs, data
      center load) from Stats.
    - Scheduler computes the optimal placement to minimize carbon impact.
-   - _Crucially, the Scheduler does **not** persist this result yet._
+   - _Crucially, the Scheduler will immediately persists this result._
 3. **Response**: Scheduler returns the **Proposed Schedule** (Workload Blocks +
    Impact Metrics) to the Client.
+4. **Persistence**:
+   - Write to DB
 
-#### Phase 2: Commitment (Persist)
+#### Phase 2: Commitment (Deletion)
 
 1. **User Decision**: The user reviews the proposal in the UI.
-   - **Discard**: User cancels; no further action is taken.
-   - **Accept**: User confirms the schedule.
-2. **Commit**: Client `POST`s the accepted **Workload ID** to the "Commit" endpoint.
-3. **Persistence**:
-   - Validation (done by the Scheduler)
-   - Write to DB
+   - **Discard**: User cancels the schedule.
+   - **Accept**: User confirms - no further action is taken.
+2. **Reject**: Client `DELETE`s the rejected **Workload ID** to the "Delete" endpoint of scheduler.
+3. **Deletion**: Scheduler deletes the previously persisted schedule.
+
 
 ### Schedule Visualization
 
@@ -66,5 +68,6 @@ This feature allows users to inspect the details of a previously scheduled job.
 The viewable information is the same as the "Proposed Schedule" from the
 optimization phase (i.e., the environmental impact metrics).
 
-> [!TODO]  
-> we need a new api endpoint for this
+1. **Request**: Client `GET`s the specific schedule from the Scheduler using schedule_id.
+2. **Presentation**: The UI displays all the details related to this job, including 
+   same information as in "Proposed Schedule" response.
