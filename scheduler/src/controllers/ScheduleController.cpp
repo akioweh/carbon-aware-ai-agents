@@ -86,11 +86,10 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     const auto &fullSchedule = scheduler.getSchedule();
 
     for (const auto &rawInterval : fullSchedule) {
-        const auto interval = rawInterval.toJson(); 
+        const auto interval = rawInterval.toJson();
         Json::Value block;
-        block["timestamp"] =
-            interval["timestamp"]; // Already string from
-                                    // ScheduledInterval::toJson
+        block["timestamp"] = interval["timestamp"]; // Already string from
+                                                    // ScheduledInterval::toJson
         block["location"] = interval["location"];
         block["job_id"] = interval["job_id"];
         block["additional_load"] = interval["additional_load"];

@@ -16,8 +16,8 @@ class ScheduledInterval : public Serializable {
     double totalLoad;      /// thats what we scheduled + predicted at that time
 
     ScheduledInterval(std::chrono::system_clock::time_point timestamp,
-                      std::string jobId, std::string location, double additionalLoad,
-                      double totalLoad)
+                      std::string jobId, std::string location,
+                      double additionalLoad, double totalLoad)
         : timestamp(timestamp), jobId(std::move(jobId)),
           location(std::move(location)), additionalLoad(additionalLoad),
           totalLoad(totalLoad) {};

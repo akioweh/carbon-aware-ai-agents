@@ -65,8 +65,8 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
         co2emissions += (interval.currentGreenness * energy) / KWH;
 
         fullSchedule.emplace(interval.timestamp, job.jobId,
-                              interval.datacenterInfo.name, additionalLoad,
-                              additionalLoad + interval.currentLoad);
+                             interval.datacenterInfo.name, additionalLoad,
+                             additionalLoad + interval.currentLoad);
     }
 
     const auto carbon_intensity =
