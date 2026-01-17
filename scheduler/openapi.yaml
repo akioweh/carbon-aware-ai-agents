@@ -13,6 +13,7 @@ servers:
 paths:
   /api/schedule/{schedule_id}:
     get:
+      operationId: getScheduledJob
       summary: Fetch a schedule.
       description: Gets schedule by its schedule_id.
       parameters:
@@ -32,6 +33,7 @@ paths:
                 $ref: "#/components/schemas/Error"
 
     delete:
+      operationId: deleteScheduledJob
       summary: Deletes a scheduled job
       description: Cause POST on this endpoint automatically persists the job, we need a way to delete it if user doesnt confirm it
       parameters:
@@ -48,6 +50,7 @@ paths:
 
   /api/schedule:
     get:
+      operationId: getSchedule
       summary: Fetch datacenter work schedule
       description: gets all already-scheduled jobs (gets all blocks) which start after start_time and end before end_time. Those arguments are optional, so providing neither gives back the whole schedule.
       parameters:
@@ -68,6 +71,7 @@ paths:
                 $ref: "#/components/schemas/Error"
 
     post:
+      operationId: scheduleJob
       summary: Schedule a job
       description: Submit a job and get back an optimized schedule placement (only blocks of this new job)
       requestBody:
