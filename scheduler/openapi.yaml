@@ -14,8 +14,8 @@ paths:
 
   /api/schedule/{schedule_id}:
     get:
-      summary: Fetch persisted schedule.
-      description: Gets earlier persisted schedule by its schedule_id.
+      summary: Fetch a schedule.
+      description: Gets schedule by its schedule_id.
       parameters: 
         - $ref: '#/components/parameters/ScheduleIdParam'
       responses:
@@ -32,9 +32,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+    delete:
+      summary: Deletes a scheduled job
+      description: Cause POST on this endpoint automatically persists the job, we need a way to delete it if user doesnt confirm it
+      parameters:
+        - $ref: '#/components/parameters/ScheduleIdParam'
+      responses:
+        "200":
+          description: Schedule deleted successfully
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/schedule:
     get:
-      summary: Fetch datacenter work schedule between start_time and end_time.
+      summary: Fetch datacenter work schedule
       description: gets all already-scheduled jobs (gets all blocks) which start after start_time and end before end_time. Those arguments are optional, so providing neither gives back the whole schedule.
       parameters:
         - $ref: '#/components/parameters/StartTimeParam'
@@ -71,26 +86,6 @@ paths:
                 $ref: "#/components/schemas/ScheduleCreationResponse"
         "400":
           description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/schedule/persist:
-    post:
-      summary: Persist a schedule.
-      description: Persists a schedule which was approved by a user.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PersistSchedule"
-      responses:
-        "200":
-          description: Schedule persisted successfully
-        "400":
-          description: Failed to persist
           content:
             application/json:
               schema:
