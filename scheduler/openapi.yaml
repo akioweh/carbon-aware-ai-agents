@@ -233,7 +233,7 @@ components:
       properties:
         schedule_id:
           type: string
-          desciption: Id of a schedule returned by POST /api/schedule.
+          description: Id of a schedule returned by POST /api/schedule.
           example: "Sche_123"
 
     Error:
