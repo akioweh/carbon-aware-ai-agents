@@ -31,7 +31,7 @@ ensures users can review the computed schedule and environmental impact of a job
 before approving it for deployment. (Even though we persist it immediately, it will be 
 deleted if user decides to reject it.)
 
-#### Phase 1: Optimization (Preview)
+#### Phase 1: Optimization (Persistence)
 
 1. **Submission**: Client `POST`s a Job Spec to the Scheduler.
 2. **Calculation**:
