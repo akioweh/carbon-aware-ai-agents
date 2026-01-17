@@ -1,4 +1,5 @@
 #include "ScheduleController.hpp"
+#include "ScheduledInterval.hpp"
 #include <JobRequest.hpp>
 #include <utils/Utils.hpp>
 
@@ -85,8 +86,8 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     Json::Value blocks(Json::arrayValue);
     const auto &fullSchedule = scheduler.getSchedule();
 
-    for (const auto &rawInterval : fullSchedule) {
-        const auto interval = rawInterval.toJson();
+    for (const auto &interval :
+         fullSchedule | std::views::transform(&ScheduledInterval::toJson)) {
         Json::Value block;
         block["timestamp"] = interval["timestamp"]; // Already string from
                                                     // ScheduledInterval::toJson
