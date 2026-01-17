@@ -26,31 +26,28 @@ the global schedule to determine the available capacity at data centers.
 
 ### Job Scheduling
 
-The core user interaction follows a two-phase "Preview-Commit" workflow. This
-ensures users can review the computed schedule and environmental impact of a job
-before approving it for deployment. (Even though we persist it immediately, it will be 
-deleted if user decides to reject it.)
+The core user interaction follows a two-phase Commit–Cancel workflow. This design guarantees that the schedule shown to the user exactly reflects how the job will execute.
 
-#### Phase 1: Optimization (Persistence)
+A traditional “preview” is not viable because the scheduling environment is shared: other users may submit jobs between preview and confirmation, causing the final schedule to differ. To prevent this, the system commits the schedule immediately, then allows the user to cancel if desired. As a result, the schedule the user sees cannot worsen due to concurrent submissions.
+
+#### Phase 1: Commitment (Optimization and Persistence)
 
 1. **Submission**: Client `POST`s a Job Spec to the Scheduler.
 2. **Calculation**:
    - Scheduler fetches _Context_ (grid carbon, already-scheduled jobs, data
      center load) from Stats.
    - Scheduler computes the optimal placement to minimize carbon impact.
-   - _Crucially, the Scheduler will immediately persists this result._
-3. **Response**: Scheduler returns the **Proposed Schedule** (Workload Blocks +
+3. **Persistence**: The Scheduler immediately persists the computed schedule to the database, reserving the required resources.
+4. **Response**: Scheduler returns the **Proposed Schedule** (Workload Blocks +
    Impact Metrics) to the Client.
-4. **Persistence**:
-   - Write to DB
 
-#### Phase 2: Commitment (Deletion)
+
+#### Phase 2: User Decision (Cancellation Option)
 
 1. **User Decision**: The user reviews the proposal in the UI.
-   - **Discard**: User cancels the schedule.
+   - **Cancel**: Client `DELETE`s the rejected **Workload ID** to the "Delete" endpoint of scheduler.
    - **Accept**: User confirms - no further action is taken.
-2. **Reject**: Client `DELETE`s the rejected **Workload ID** to the "Delete" endpoint of scheduler.
-3. **Deletion**: Scheduler deletes the previously persisted schedule.
+2. **Deletion**: Scheduler deletes the previously persisted schedule.
 
 
 ### Schedule Visualization
