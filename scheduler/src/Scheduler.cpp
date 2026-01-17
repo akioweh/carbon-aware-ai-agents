@@ -1,14 +1,13 @@
 #include <JobRequest.hpp>
 #include <PredictionApi.hpp>
-#include <ScheduleForDatacenter.hpp>
 #include <Scheduler.hpp>
 
 using namespace std;
 using namespace drogon;
 
 auto Scheduler::getCombinedIntervals(
-    map<long long, vector<PredictedDatacenterInformation>> &data)
-    -> multiset<PredictedDatacenterInformation> {
+    std::map<long long, std::vector<PredictedDatacenterInformation>> &data)
+    -> std::multiset<PredictedDatacenterInformation> {
     multiset<PredictedDatacenterInformation> intervals;
 
     for (const auto &predictions : views::values(data)) {
@@ -65,18 +64,9 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
 
         co2emissions += (interval.currentGreenness * energy) / KWH;
 
-        if (!fullSchedule.contains(interval.datacenterInfo.datacenterId)) {
-            auto scheduleForDC = ScheduleForDatacenter(interval.datacenterInfo);
-            fullSchedule.emplace(interval.datacenterInfo.datacenterId,
-                                 scheduleForDC);
-        }
-
-        const auto scheduledInterval =
-            ScheduledInterval(interval.timestamp, job.jobId, additionalLoad,
+        fullSchedule.emplace(interval.timestamp, job.jobId,
+                              interval.datacenterInfo.name, additionalLoad,
                               additionalLoad + interval.currentLoad);
-
-        fullSchedule[interval.datacenterInfo.datacenterId].addInterval(
-            scheduledInterval);
     }
 
     const auto carbon_intensity =
@@ -90,7 +80,7 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
 }
 
 void Scheduler::show() const {
-    for (auto [datacenterId, scheduleForDC] : fullSchedule) {
-        scheduleForDC.show();
+    for (const auto &interval : fullSchedule) {
+        interval.show();
     }
 }
