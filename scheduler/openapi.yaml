@@ -11,13 +11,12 @@ servers:
     description: Local development server
 
 paths:
-
   /api/schedule/{schedule_id}:
     get:
       summary: Fetch a schedule.
       description: Gets schedule by its schedule_id.
-      parameters: 
-        - $ref: '#/components/parameters/ScheduleIdParam'
+      parameters:
+        - $ref: "#/components/parameters/ScheduleIdParam"
       responses:
         "200":
           description: Successful response with specific schedule data
@@ -30,13 +29,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
     delete:
       summary: Deletes a scheduled job
       description: Cause POST on this endpoint automatically persists the job, we need a way to delete it if user doesnt confirm it
       parameters:
-        - $ref: '#/components/parameters/ScheduleIdParam'
+        - $ref: "#/components/parameters/ScheduleIdParam"
       responses:
         "200":
           description: Schedule deleted successfully
@@ -52,8 +51,8 @@ paths:
       summary: Fetch datacenter work schedule
       description: gets all already-scheduled jobs (gets all blocks) which start after start_time and end before end_time. Those arguments are optional, so providing neither gives back the whole schedule.
       parameters:
-        - $ref: '#/components/parameters/StartTimeParam'
-        - $ref: '#/components/parameters/EndTimeParam'
+        - $ref: "#/components/parameters/StartTimeParam"
+        - $ref: "#/components/parameters/EndTimeParam"
       responses:
         "200":
           description: Successful response with schedule data
@@ -91,22 +90,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-
-
-
 components:
   parameters:
     StartTimeParam:
       name: start_time
       in: query
-      description: Only include blocks starting after this time 
+      description: Only include blocks starting after this time
       required: false
       schema:
         type: string
         format: date-time
         description: Earliest time to start
         example: "2025-12-08T00:00:00Z"
-    
+
     EndTimeParam:
       name: end_time
       in: query
