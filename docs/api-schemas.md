@@ -101,11 +101,20 @@ optimization.
 
 **Endpoints:**
 
-- **`GET /api/schedule`**: Retrieves all currently planned jobs in the provided time interval. Time interval is optional, so providing neither gives back the complete schedule. This allows the UI to visualize the global state of workloads. 
-- **`GET /api/schedule/{schedule_id}`**: Retrieves specific job which was already scheduled. This will allow users to view how real efficiency and schedule varies from the predicted one.
+- **`GET /api/schedule`**: Retrieves all currently planned jobs in the provided
+  time interval. Time interval is optional, so providing neither gives back the
+  complete schedule. This allows the UI to visualize the global state of
+  workloads.
+- **`GET /api/schedule/{schedule_id}`**: Retrieves specific job which was
+  already scheduled. This will allow users to view how real efficiency and
+  schedule varies from the predicted one.
 - **`POST /api/schedule`**: The optimization operation. Accepts a job
-  specification and returns an optimized placement plan. It immidietly persists it.
-- **`DELETE /api/schedule/{schedule_id}`**: Deletion operation. Allows for deleting an already scheduled job with its ID. It is necessary, because we automatically persist the job when scheduled, and user might not accept the proposed schedule.
+  specification and returns an optimized placement plan. It immediately persists
+  it.
+- **`DELETE /api/schedule/{schedule_id}`**: Deletion operation. Allows for
+  deleting an already scheduled job with its ID. It is necessary, because we
+  automatically persist the job when scheduled, and user might not accept the
+  proposed schedule.
 
 **Unit Interaction Sequence:**
 
@@ -119,8 +128,8 @@ optimization.
 
 2. **Optimization**: The scheduler processes this request by finding time slots
    and locations that minimize carbon impact while satisfying all constraints.
-   (This involves querying the Stats component for necessary data.) It also automatically
-   persists this job.
+   (This involves querying the Stats component for necessary data.) It also
+   automatically persists this job.
 
 3. **Schedule Response**: On success, the API returns:
    - **Schedule Info**: Specific time allocations at designated locations with
@@ -128,9 +137,9 @@ optimization.
    - **Impact Metrics**: Projected environmental impact data, including unit and
      total carbon emissions and the SCI score.
 
-4. **Commitment**: The user accepts the proposal - nothing happends, because the job
-    is already persisted. If the user rejects the proposal, UI sends a delete request
-    to the scheduler.
+4. **Commitment**: The user accepts the proposal - nothing happens, because the
+   job is already persisted. If the user rejects the proposal, UI sends a delete
+   request to the scheduler.
 
 ### 2. Scheduler → Stats: Data Retrieval & State Management
 
