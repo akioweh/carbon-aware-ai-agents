@@ -26,41 +26,45 @@ the global schedule to determine the available capacity at data centers.
 
 ### Job Scheduling
 
-The core user interaction follows a two-phase "Preview-Commit" workflow. This
-ensures users can review the computed schedule and environmental impact of a job
-before approving it for deployment.
+The core user interaction follows a two-phase Commit–Cancel workflow. This
+design guarantees that the schedule shown to the user exactly reflects how the
+job will execute.
 
-#### Phase 1: Optimization (Preview)
+> [!NOTE]  
+> A traditional “preview” is not viable because the scheduling environment is
+> shared: other users may submit jobs between preview and confirmation, causing
+> the final schedule to differ. To prevent this, the system commits the schedule
+> immediately, then allows the user to cancel if desired. As a result, the
+> schedule the user sees cannot worsen due to concurrent submissions.
+
+#### Phase 1: Commitment (Optimization and Persistence)
 
 1. **Submission**: Client `POST`s a Job Spec to the Scheduler.
 2. **Calculation**:
    - Scheduler fetches _Context_ (grid carbon, already-scheduled jobs, data
      center load) from Stats.
    - Scheduler computes the optimal placement to minimize carbon impact.
-   - _Crucially, the Scheduler does **not** persist this result yet._
-3. **Response**: Scheduler returns the **Proposed Schedule** (Workload Blocks +
-   Impact Metrics) to the Client.
+3. **Persistence**: The Scheduler immediately persists the computed schedule to
+   the database, reserving the required resources.
+4. **Response**: Scheduler returns the optimized schedule (Workload Blocks) and
+   Impact metrics to the Client.
 
-#### Phase 2: Commitment (Persist)
+#### Phase 2: User Decision (Cancellation Option)
 
 1. **User Decision**: The user reviews the proposal in the UI.
-   - **Discard**: User cancels; no further action is taken.
-   - **Accept**: User confirms the schedule.
-2. **Commit**: Client `POST`s the accepted **Workload Blocks** (and Job
-   Metadata) to the "Commit" endpoint.
-3. **Persistence**:
-   - Validation (done either by the Scheduler or Stats)
-   - Write to DB
+   - **Cancel**: Client `DELETE`s the rejected **Workload ID** to the "Delete"
+     endpoint of scheduler.
+   - **Accept**: User confirms - no further action is taken.
+2. **Deletion**: Scheduler deletes the previously persisted schedule.
 
 ### Schedule Visualization
 
 This feature allows the client to view the global state of the data centers,
 seeing both the background "baseline" load and the jobs they have scheduled.
 
-1. **Request**: Client `GET`s the schedule from the Scheduler.
-2. **Retrieval**: Scheduler queries the Stats component for all active blocks
-   within the requested window.
-3. **Presentation**: The UI displays the data in some nice calendar format or
+1. **Request**: Client `GET`s the schedule from the Scheduler, in any time
+   interval.
+2. **Presentation**: The UI displays the data in some nice calendar format or
    something :).
 
 ### Scheduled Job Details View
@@ -69,5 +73,7 @@ This feature allows users to inspect the details of a previously scheduled job.
 The viewable information is the same as the "Proposed Schedule" from the
 optimization phase (i.e., the environmental impact metrics).
 
-> [!TODO]  
-> we need a new api endpoint for this
+1. **Request**: Client `GET`s the specific schedule from the Scheduler using
+   schedule_id.
+2. **Presentation**: The UI displays all the details related to this job,
+   including same information as in "Proposed Schedule" response.
