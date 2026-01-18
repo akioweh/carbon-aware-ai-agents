@@ -227,15 +227,6 @@ components:
               type: number
               description: the sci bruh
               example: 20
-
-    PersistSchedule:
-      type: object
-      properties:
-        schedule_id:
-          type: string
-          description: Id of a schedule returned by POST /api/schedule.
-          example: "Sche_123"
-
     Error:
       type: object
       required:
