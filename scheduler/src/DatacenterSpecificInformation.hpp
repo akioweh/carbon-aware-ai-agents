@@ -5,7 +5,7 @@
 #include <string>
 #include <utility>
 
-class DatacenterSpecificInformation : public Serializable {
+class DatacenterSpecificInformation {
   public:
     double maxLoad;
     std::string locationId;
@@ -25,8 +25,10 @@ class DatacenterSpecificInformation : public Serializable {
     static auto parseJsonForDCSpecificInfo(const std::string &datacenterName,
                                            const Json::Value &respJson)
         -> DatacenterSpecificInformation;
-
-    [[nodiscard]] auto toJson() const -> Json::Value override;
 };
+
+auto toJson(const DatacenterSpecificInformation &obj) -> Json::Value;
+
+static_assert(Serializable<DatacenterSpecificInformation>);
 
 #endif

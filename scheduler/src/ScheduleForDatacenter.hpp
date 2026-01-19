@@ -9,7 +9,7 @@
 #include <set>
 #include <utility>
 
-class ScheduleForDatacenter : public Serializable {
+class ScheduleForDatacenter {
   public:
     DatacenterSpecificInformation datacenterInfo;
     std::set<ScheduledInterval> schedule;
@@ -21,7 +21,10 @@ class ScheduleForDatacenter : public Serializable {
 
     void addInterval(const ScheduledInterval &newInterval);
     void show();
-    [[nodiscard]] auto toJson() const -> Json::Value override;
 };
+
+auto toJson(const ScheduleForDatacenter &obj) -> Json::Value;
+
+static_assert(Serializable<ScheduleForDatacenter>);
 
 #endif

@@ -86,7 +86,7 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     const auto &fullSchedule = scheduler.getSchedule();
 
     for (const auto &[dcId, scheduleForDC] : fullSchedule) {
-        Json::Value dcJson = scheduleForDC.toJson();
+        Json::Value dcJson = toJson(scheduleForDC);
         // Assuming datacenterInfo has a name field we can use as location
         std::string location = dcJson["datacenterInfo"]["name"].asString();
         const auto &intervals = dcJson["intervals"];
@@ -94,8 +94,7 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
         for (const auto &interval : intervals) {
             Json::Value block;
             block["timestamp"] =
-                interval["timestamp"]; // Already string from
-                                       // ScheduledInterval::toJson
+                interval["timestamp"]; // Already string from toJson
             block["location"] = location;
             block["job_id"] = interval["job_id"];
             block["additional_load"] = interval["additional_load"];
@@ -105,7 +104,7 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     }
     ret["scheduled_blocks"] = blocks;
 
-    ret["impact"] = impact.toJson();
+    ret["impact"] = toJson(impact);
 
     const auto resp = drogon::HttpResponse::newHttpJsonResponse(ret);
     callback(resp);

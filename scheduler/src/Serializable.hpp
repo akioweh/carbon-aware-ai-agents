@@ -4,10 +4,9 @@
 
 #include <json/value.h>
 
-class Serializable {
-  public:
-    virtual ~Serializable() = default;
-    [[nodiscard]] virtual auto toJson() const -> Json::Value = 0;
+template <typename T>
+concept Serializable = requires(const T &obj) {
+    { toJson(obj) } -> std::convertible_to<Json::Value>;
 };
 
 #endif
