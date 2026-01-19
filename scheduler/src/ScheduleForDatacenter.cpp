@@ -17,7 +17,7 @@ void ScheduleForDatacenter::show() {
     cout << "]" << '\n' << '\n';
 }
 
-auto toJson(const ScheduleForDatacenter &obj) -> Json::Value {
+auto f_toJson(const ScheduleForDatacenter &obj) -> Json::Value {
     auto res = Json::Value{};
     res["datacenterInfo"] = toJson(obj.datacenterInfo);
     auto intervalsJson = Json::Value(Json::arrayValue);

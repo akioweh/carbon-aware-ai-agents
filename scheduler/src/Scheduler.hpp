@@ -15,7 +15,7 @@ struct SchedulingImpact {
     double sci{};
 };
 
-inline auto toJson(const SchedulingImpact &obj) -> Json::Value {
+inline auto f_toJson(const SchedulingImpact &obj) -> Json::Value {
     auto res = Json::Value{};
     res["carbon_intensity"] = obj.carbon_intensity;
     res["total_emissions"] = obj.total_emissions;
