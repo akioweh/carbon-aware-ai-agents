@@ -6,14 +6,15 @@
 #define SCHEDULER_UTIL_CORO
 #pragma once
 
-#include "utils/Utils.hpp"
 #include <atomic>
 #include <coroutine>
 #include <cstddef>
 #include <drogon/drogon.h>
 #include <drogon/utils/coroutine.h>
 #include <expected>
+#include <mutex>
 #include <tuple>
+#include <vector>
 
 namespace scheduler::coro {
 namespace detail {
@@ -22,6 +23,9 @@ template <typename T> struct VectorResultContext {
     std::atomic<size_t> remaining;
     std::coroutine_handle<> continuation;
     std::vector<T> results;
+    std::mutex continuationMutex;
+    bool continuationInstalled{false};
+    bool resumePending{false};
 
     VectorResultContext(size_t cnt) : remaining(cnt), results(cnt) {}
 };
@@ -30,6 +34,9 @@ template <typename... Ts> struct ResultContext {
     std::atomic<size_t> remaining;
     std::coroutine_handle<> continuation;
     std::tuple<Ts...> results;
+    std::mutex continuationMutex;
+    bool continuationInstalled{false};
+    bool resumePending{false};
 
     ResultContext(size_t cnt) : remaining(cnt) {}
 };
@@ -44,8 +51,16 @@ struct Awaiter {
     std::shared_ptr<Context> ctx;
 
     auto await_ready() -> bool { return ctx->remaining.load() == 0; }
-    auto await_suspend(std::coroutine_handle<> handle) {
-        ctx->continuation = handle;
+    auto await_suspend(std::coroutine_handle<> handle) -> bool {
+        auto resumeNow = false;
+        {
+            std::scoped_lock lock(ctx->continuationMutex);
+            ctx->continuation = handle;
+            ctx->continuationInstalled = true;
+            if (ctx->resumePending)
+                resumeNow = true;
+        }
+        return !resumeNow;
     }
     auto await_resume() -> decltype(ctx->results) {
         return std::move(ctx->results);
@@ -66,14 +81,34 @@ auto when_all(drogon::Task<Rets>... coros)
     [&]<std::size_t... Is>(std::index_sequence<Is...>) -> auto {
         ((drogon::async_run(
              [task = std::move(coros), ctx]() mutable -> drogon::Task<void> {
-                 if constexpr (return_exceptions)
-                     std::get<Is>(ctx->results) =
-                         utils::pcall(drogon::async_func(task));
-                 else
+                 if constexpr (return_exceptions) {
+                     try {
+                         if constexpr (std::is_void_v<Rets>) {
+                             co_await task;
+                             std::get<Is>(ctx->results) = {};
+                         } else {
+                             std::get<Is>(ctx->results) = co_await task;
+                         }
+                     } catch (...) {
+                         std::get<Is>(ctx->results) =
+                             std::unexpected(std::current_exception());
+                     }
+                 } else {
                      std::get<Is>(ctx->results) = co_await task;
+                 }
 
-                 if (ctx->remaining.fetch_sub(1) == 1)
-                     ctx->continuation.resume();
+                 if (ctx->remaining.fetch_sub(1) == 1) {
+                     bool resumeNow = false;
+                     {
+                         std::scoped_lock lock(ctx->continuationMutex);
+                         if (ctx->continuationInstalled)
+                             resumeNow = true;
+                         else
+                             ctx->resumePending = true;
+                     }
+                     if (resumeNow)
+                         ctx->continuation.resume();
+                 }
              })),
          ...);
     }(std::make_index_sequence<N>{});
@@ -89,18 +124,39 @@ auto when_all(std::vector<drogon::Task<T>> coros)
     if (!n)
         co_return {};
 
-    auto ctx = std::make_shared<detail::VectorResultContext<T>>(n);
+    auto ctx = std::make_shared<detail::VectorResultContext<std::conditional_t<
+        return_exceptions, std::expected<T, std::exception_ptr>, T>>>(n);
 
     for (auto i = 0UZ; i < n; ++i) {
         drogon::async_run([i, task = std::move(coros[i]),
                            ctx]() mutable -> drogon::Task<void> {
-            if constexpr (return_exceptions) // idk...
-                ctx->results[i] = utils::pcall(drogon::async_func(task));
-            else
+            if constexpr (return_exceptions) {
+                try {
+                    if constexpr (std::is_void_v<T>) {
+                        co_await task;
+                        ctx->results[i] = {};
+                    } else {
+                        ctx->results[i] = co_await task;
+                    }
+                } catch (...) {
+                    ctx->results[i] = std::unexpected(std::current_exception());
+                }
+            } else {
                 ctx->results[i] = co_await task;
+            }
 
-            if (ctx->remaining.fetch_sub(1) == 1)
-                ctx->continuation.resume();
+            if (ctx->remaining.fetch_sub(1) == 1) {
+                bool resumeNow = false;
+                {
+                    std::scoped_lock lock(ctx->continuationMutex);
+                    if (ctx->continuationInstalled)
+                        resumeNow = true;
+                    else
+                        ctx->resumePending = true;
+                }
+                if (resumeNow)
+                    ctx->continuation.resume();
+            }
         });
     }
 
