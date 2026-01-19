@@ -7,7 +7,7 @@
 #include <string>
 #include <utils/Utils.hpp>
 
-class ScheduledInterval : public Serializable {
+class ScheduledInterval {
   public:
     std::chrono::system_clock::time_point timestamp;
     std::string jobId;
@@ -30,16 +30,18 @@ class ScheduledInterval : public Serializable {
         std::cout << scheduler::utils::toIso8601(timestamp) << " " << jobId
                   << " " << additionalLoad << " " << totalLoad << ",\n";
     }
-
-    [[nodiscard]] auto toJson() const -> Json::Value override {
-        auto intervalJson = Json::Value{};
-        intervalJson["timestamp"] = scheduler::utils::toIso8601(timestamp);
-        intervalJson["job_id"] = jobId;
-        intervalJson["additional_load"] = additionalLoad;
-        intervalJson["total_load"] = totalLoad;
-        intervalJson["location"] = location;
-        return intervalJson;
-    }
 };
+
+inline auto f_toJson(const ScheduledInterval &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["timestamp"] = scheduler::utils::toIso8601(obj.timestamp);
+    res["job_id"] = obj.jobId;
+    res["additional_load"] = obj.additionalLoad;
+    res["total_load"] = obj.totalLoad;
+    res["location"] = obj.location;
+    return res;
+}
+
+static_assert(Serializable<ScheduledInterval>);
 
 #endif

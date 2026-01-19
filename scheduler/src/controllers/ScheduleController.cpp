@@ -86,8 +86,7 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     Json::Value blocks(Json::arrayValue);
     const auto &fullSchedule = scheduler.getSchedule();
 
-    for (const auto &interval :
-         fullSchedule | std::views::transform(&ScheduledInterval::toJson)) {
+    for (const auto &interval : fullSchedule | std::views::transform(toJson)) {
         Json::Value block;
         block["timestamp"] = interval["timestamp"]; // Already string from
                                                     // ScheduledInterval::toJson
@@ -100,7 +99,7 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
 
     ret["scheduled_blocks"] = blocks;
 
-    ret["impact"] = impact.toJson();
+    ret["impact"] = toJson(impact);
 
     const auto resp = drogon::HttpResponse::newHttpJsonResponse(ret);
     callback(resp);

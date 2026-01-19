@@ -5,6 +5,10 @@
 #include <drogon/drogon.h>
 #include <iostream>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif // _WIN32
+
 using namespace drogon;
 
 constexpr auto PORT = 80;
@@ -37,4 +41,7 @@ auto main() -> int {
     });
 
     drogon::app().run();
+#ifdef _WIN32
+    TerminateProcess(GetCurrentProcess(), 0);
+#endif // _WIN32
 }

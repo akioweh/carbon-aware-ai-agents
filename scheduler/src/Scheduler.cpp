@@ -72,9 +72,9 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
     const auto carbon_intensity =
         (totalEnergy > 0) ? (co2emissions * KWH / totalEnergy) : 0;
     const auto impact = SchedulingImpact{
-        co2emissions,
-        carbon_intensity,
-        carbon_intensity, // for now they're the same
+        .carbon_intensity = carbon_intensity,
+        .total_emissions = co2emissions,
+        .sci = carbon_intensity, // for now they're the same
     };
     co_return impact;
 }

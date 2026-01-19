@@ -14,12 +14,12 @@ auto DatacenterSpecificInformation::parseJsonForDCSpecificInfo(
     // ids but for now i wanted to stick with the id as numbers.
 }
 
-auto DatacenterSpecificInformation::toJson() const -> Json::Value {
-    auto infoJson = Json::Value{};
-    infoJson["maxLoad"] = maxLoad;
-    infoJson["locationId"] = locationId;
-    infoJson["name"] = name;
-    infoJson["region"] = region;
-    infoJson["datacenterId"] = static_cast<Json::Int64>(datacenterId);
-    return infoJson;
+auto f_toJson(const DatacenterSpecificInformation &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["maxLoad"] = obj.maxLoad;
+    res["locationId"] = obj.locationId;
+    res["name"] = obj.name;
+    res["region"] = obj.region;
+    res["datacenterId"] = static_cast<Json::Int64>(obj.datacenterId);
+    return res;
 }
