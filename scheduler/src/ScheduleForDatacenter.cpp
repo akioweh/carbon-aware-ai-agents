@@ -17,13 +17,12 @@ void ScheduleForDatacenter::show() {
     cout << "]" << '\n' << '\n';
 }
 
-auto ScheduleForDatacenter::toJson() const -> Json::Value {
-    auto dcJson = Json::Value{};
-    dcJson["datacenterInfo"] = datacenterInfo.toJson();
+auto toJson(const ScheduleForDatacenter &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["datacenterInfo"] = toJson(obj.datacenterInfo);
     auto intervalsJson = Json::Value(Json::arrayValue);
-    for (const auto &interval : schedule) {
-        intervalsJson.append(interval.toJson());
-    }
-    dcJson["intervals"] = intervalsJson;
-    return dcJson;
+    for (const auto &interval : obj.schedule)
+        intervalsJson.append(toJson(interval));
+    res["intervals"] = intervalsJson;
+    return res;
 }

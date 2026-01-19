@@ -9,24 +9,21 @@
 #include <map>
 #include <set>
 
-struct SchedulingImpact : public Serializable {
-    double carbon_intensity;
-    double total_emissions;
-    double sci;
-
-    SchedulingImpact(double carbon_intensity, double total_emissions,
-                     double sci)
-        : carbon_intensity(carbon_intensity), total_emissions(total_emissions),
-          sci(sci) {}
-
-    [[nodiscard]] auto toJson() const -> Json::Value override {
-        auto json = Json::Value{};
-        json["carbon_intensity"] = carbon_intensity;
-        json["total_emissions"] = total_emissions;
-        json["sci"] = sci;
-        return json;
-    }
+struct SchedulingImpact {
+    double carbon_intensity{};
+    double total_emissions{};
+    double sci{};
 };
+
+inline auto toJson(const SchedulingImpact &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["carbon_intensity"] = obj.carbon_intensity;
+    res["total_emissions"] = obj.total_emissions;
+    res["sci"] = obj.sci;
+    return res;
+}
+
+static_assert(Serializable<SchedulingImpact>);
 
 class Scheduler {
   private:
