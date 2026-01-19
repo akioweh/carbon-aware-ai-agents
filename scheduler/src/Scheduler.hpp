@@ -10,14 +10,9 @@
 #include <set>
 
 struct SchedulingImpact {
-    double carbon_intensity;
-    double total_emissions;
-    double sci;
-
-    SchedulingImpact(double carbon_intensity, double total_emissions,
-                     double sci)
-        : carbon_intensity(carbon_intensity), total_emissions(total_emissions),
-          sci(sci) {}
+    double carbon_intensity{};
+    double total_emissions{};
+    double sci{};
 };
 
 inline auto toJson(const SchedulingImpact &obj) -> Json::Value {
