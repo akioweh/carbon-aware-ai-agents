@@ -2,21 +2,13 @@ openapi: 3.0.3
 info:
   title: Stats API (Stats Component)
   description: |
-    API for environmental and operational time-series data to support carbon-aware scheduling.
-    
-    ## Design Philosophy
-    
-    All metrics follow a **normalized time-series structure** with:
-    - Location-based hierarchy: `/locations/{location}/metrics/{metric}`
-    - Unified query parameters: `start`, `end`, `include_forecast`
-    - Consistent response format with metadata (location, metric, unit)
-    - Clear distinction between historical data and forecasts (`is_forecast` flag)
+    API for carbon-aware scheduling predictions.
     
     ## Available Endpoints
     
-    - **forecast_greenness**: Grid carbon intensity forecasting
-    - **forecast_load**: Data center load and capacity tracking
-    - **datacenters**: List of available datacenter names
+    - `/datacenters` - List of available datacenter names
+    - `/locations/{location}/metrics/forecast_greenness` - Next week greenness predictions (cached 5 min)
+    - `/locations/{location}/metrics/forecast_load` - Next week load predictions (cached 5 min)
   version: 1.0.0
   contact:
     name: API Support
@@ -26,16 +18,16 @@ servers:
     description: Local development server
 
 tags:
-  - name: Context
-    description: |
-      Unified location-based metrics API.
-      All metrics follow the same time-series structure and query patterns.
+  - name: Datacenters
+    description: Datacenter information
+  - name: Forecasts
+    description: ML-based predictions for load and greenness metrics
 
 paths:
   /datacenters:
     get:
       tags:
-        - Context
+        - Datacenters
       summary: Get datacenter names
       description: Returns a list of available datacenter names
       operationId: getDatacenterNames
@@ -56,217 +48,84 @@ paths:
   /locations/{location}/metrics/forecast_greenness:
     get:
       tags:
-        - Context
-      summary: Get carbon intensity data
+        - Forecasts
+      summary: Get greenness forecast for next week
       description: |
-        Returns grid carbon intensity time-series data for a location.
-        Supports historical data and future forecasts.
+        Returns ML-generated greenness predictions for the next week.
+        Results are cached for 5 minutes.
       parameters:
         - name: location
           in: path
           required: true
-          description: Location identifier (use 'all' for all locations)
+          description: Datacenter identifier
           schema:
             type: string
           example: "dc1"
-        - name: start
-          in: query
-          description: Start time (ISO 8601). Defaults to current time if forecasting, or 24h ago if historical.
-          schema:
-            type: string
-            format: date-time
-          example: "2025-12-08T00:00:00Z"
-        - name: end
-          in: query
-          description: End time (ISO 8601). Defaults to 24h from start.
-          schema:
-            type: string
-            format: date-time
-          example: "2025-12-09T00:00:00Z"
-        - name: include_forecast
-          in: query
-          description: Include forecast data beyond current time
-          schema:
-            type: boolean
-            default: true
-          example: true
       responses:
         '200':
-          description: Carbon intensity time-series
+          description: Greenness forecast for next week
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MetricTimeSeries'
-              example:
-                location_id: "dc1"
-                metric: "carbon_intensity"
-                unit: "kg_co2_per_kwh"
-                data:
-                  - timestamp: "2025-12-08T00:00:00Z"
-                    value: 0.25
-                  - timestamp: "2025-12-08T01:00:00Z"
-                    value: 0.22
-                  - timestamp: "2025-12-08T02:00:00Z"
-                    value: 0.15
+                $ref: '#/components/schemas/ForecastResponse'
+        '500':
+          description: Error generating forecast
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /locations/{location}/metrics/forecast_load:
     get:
       tags:
-        - Context
-      summary: Get data center load data
+        - Forecasts
+      summary: Get load forecast for next week
       description: |
-        Returns data center load and capacity time-series data.
-        Includes current load, capacity, and available resources.
+        Returns ML-generated load predictions for the next week.
+        Results are cached for 5 minutes.
       parameters:
         - name: location
           in: path
           required: true
-          description: Location identifier
+          description: Datacenter identifier
           schema:
             type: string
           example: "dc1"
-        - name: start
-          in: query
-          description: Start time (ISO 8601). Defaults to 24h ago.
-          schema:
-            type: string
-            format: date-time
-        - name: end
-          in: query
-          description: End time (ISO 8601). Defaults to now.
-          schema:
-            type: string
-            format: date-time
       responses:
         '200':
-          description: Load time-series with capacity info
+          description: Load forecast for next week
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoadMetricTimeSeries'
-              example:
-                location_id: "dc1"
-                metric: "load"
-                unit: "utilization_units"
-                capacity:
-                  max_load: 50.0
-                  total_gpus: 32
-                data:
-                  - timestamp: "2025-12-08T00:00:00Z"
-                    value: 25.5
-                    available_gpus: 16
-                  - timestamp: "2025-12-08T01:00:00Z"
-                    value: 28.0
-                    available_gpus: 14
+                $ref: '#/components/schemas/ForecastResponse'
+        '500':
+          description: Error generating forecast
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
   schemas:
-    MetricTimeSeries:
+    ForecastResponse:
       type: object
       description: |
-        Unified time-series structure for metrics.
-        All time-series data follows this normalized format.
-      required:
-        - location_id
-        - metric
-        - unit
-        - data
-      properties:
-        location_id:
-          type: string
-          description: Location identifier
-          example: "dc1"
-        metric:
-          type: string
-          description: Metric name
-          example: "carbon_intensity"
-        unit:
-          type: string
-          description: Unit of measurement
-          example: "kg_co2_per_kwh"
-        data:
-          type: array
-          description: Time-series data points
-          items:
-            $ref: '#/components/schemas/TimeSeriesPoint'
+        ML-generated forecast response.
+        Structure depends on the predictor implementation.
+        Cached for 5 minutes to avoid redundant ML predictions.
+      additionalProperties: true
+      example:
+        location_id: "dc1"
+        metric: "load"
+        predictions: []
     
-    TimeSeriesPoint:
+    Error:
       type: object
-      description: A single point in a time-series
+      description: Error response
       required:
-        - timestamp
-        - value
+        - error
       properties:
-        timestamp:
+        error:
           type: string
-          format: date-time
-          description: Time of measurement or forecast
-          example: "2025-12-08T00:00:00Z"
-        value:
-          type: number
-          description: Metric value at this time
-          example: 0.25
-        is_forecast:
-          type: boolean
-          description: Whether this is a forecast (future) or historical/current data
-          default: false
-          example: true
-    
-    LoadMetricTimeSeries:
-      type: object
-      description: Load time-series with capacity information
-      required:
-        - location_id
-        - metric
-        - unit
-        - capacity
-        - data
-      properties:
-        location_id:
-          type: string
-          example: "dc1"
-        metric:
-          type: string
-          example: "load"
-        unit:
-          type: string
-          example: "utilization_units"
-        capacity:
-          $ref: '#/components/schemas/CapacityInfo'
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/LoadTimeSeriesPoint'
-    
-    CapacityInfo:
-      type: object
-      description: Capacity limits for a location
-      properties:
-        max_load:
-          type: number
-          description: Maximum load capacity
-          example: 50.0
-        total_gpus:
-          type: integer
-          description: Total number of GPUs
-          example: 32
-    
-    LoadTimeSeriesPoint:
-      type: object
-      description: Load data point with resource availability
-      required:
-        - timestamp
-        - value
-      properties:
-        timestamp:
-          type: string
-          format: date-time
-          example: "2025-12-08T00:00:00Z"
-        value:
-          type: number
-          description: Load value
-          example: 25.5
-        available_gpus:
-          type: integer
-          description: Number of GPUs available at this time
-          example: 16
+          description: Error message
+          example: "Data centre 'dc1' not found"
