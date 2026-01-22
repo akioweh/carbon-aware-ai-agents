@@ -53,29 +53,6 @@ def save_prediction(key, data):
 # Initialize database on module load
 init_db()
 
-def get_history():
-    with open("history.json", "r") as f:
-        return json.load(f)
-
-def full_history():
-    return jsonify(get_history())
-
-def load_history():
-    data = get_history()
-    result = {
-        dc: [{"timestamp": d["timestamp"], "load": d["load"]} for d in entries]
-        for dc, entries in data.items()
-    }
-    return jsonify(result)
-
-def greenness_history():
-    data = get_history()
-    result = {
-        dc: [{"timestamp": d["timestamp"], "greenness": d["greenness"]} for d in entries]
-        for dc, entries in data.items()
-    }
-    return jsonify(result)
-
 def prediction_loop():
     while True:
         for dc in DATA_CENTRES:
