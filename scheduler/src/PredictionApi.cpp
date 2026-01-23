@@ -28,18 +28,9 @@ auto PredictionApi::getDataSingleDatacenter(const string &datacenterName)
     const string loadPath = getLoadPath(datacenterName);
     const string greennessPath = getGreennessPath(datacenterName);
 
-    auto loadJsonPromise = scheduler::utils::makeGetRequest(host, loadPath);
-    auto greennessJsonPromise =
-        scheduler::utils::makeGetRequest(host, greennessPath);
-
-    vector<Task<shared_ptr<Json::Value>>> Promises;
-    Promises.push_back(std::move(loadJsonPromise));
-    Promises.push_back(std::move(greennessJsonPromise));
-    // tasks are move only so i cannot do initilizer list
-
-    auto requestPtrs = co_await scheduler::coro::when_all(std::move(Promises));
-    auto [loadJsonPtr, greennessJsonPtr] =
-        tuple{requestPtrs[0], requestPtrs[1]};
+    auto [loadJsonPtr, greennessJsonPtr] = co_await scheduler::coro::when_all(
+        scheduler::utils::makeGetRequest(host, loadPath),
+        scheduler::utils::makeGetRequest(host, greennessPath));
 
     if (!loadJsonPtr || !greennessJsonPtr) {
         LOG_ERROR << "Failed to get data from stats API";
