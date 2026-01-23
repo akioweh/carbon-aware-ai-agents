@@ -10,14 +10,25 @@
 #include <coroutine>
 #include <cstddef>
 #include <drogon/drogon.h>
-#include <drogon/utils/coroutine.h>
 #include <expected>
+#include <memory>
 #include <mutex>
+#include <ranges>
 #include <tuple>
+#include <variant>
 #include <vector>
 
 namespace scheduler::coro {
 namespace detail {
+
+// vector or tuple cannot hold void, so we use std::monostate
+template <typename T>
+using StorageType = std::conditional_t<std::is_void_v<T>, std::monostate, T>;
+
+template <typename T, bool return_exceptions>
+using ResultType =
+    std::conditional_t<return_exceptions, std::expected<T, std::exception_ptr>,
+                       StorageType<T>>;
 
 template <typename T> struct VectorResultContext {
     std::atomic<size_t> remaining;
@@ -31,14 +42,12 @@ template <typename T> struct VectorResultContext {
 };
 
 template <typename... Ts> struct ResultContext {
-    std::atomic<size_t> remaining;
+    std::atomic<size_t> remaining{sizeof...(Ts)};
     std::coroutine_handle<> continuation;
     std::tuple<Ts...> results;
     std::mutex continuationMutex;
     bool continuationInstalled{false};
     bool resumePending{false};
-
-    ResultContext(size_t cnt) : remaining(cnt) {}
 };
 
 template <typename Context>
@@ -50,119 +59,145 @@ template <typename Context>
 struct Awaiter {
     std::shared_ptr<Context> ctx;
 
-    auto await_ready() -> bool { return ctx->remaining.load() == 0; }
-    auto await_suspend(std::coroutine_handle<> handle) -> bool {
+    // if true, caller suspension and await_suspend() call are skipped
+    auto await_ready() -> bool {
+        return ctx->remaining.load(std::memory_order::acquire) == 0;
+    }
+    // executed after caller is suspended, with its handle
+    auto await_suspend(std::coroutine_handle<> caller_handle) -> bool {
         auto resumeNow = false;
         {
             std::scoped_lock lock(ctx->continuationMutex);
-            ctx->continuation = handle;
+            ctx->continuation = caller_handle;
             ctx->continuationInstalled = true;
             if (ctx->resumePending)
                 resumeNow = true;
         }
+        // return false to resume caller, true/void to suspend caller
+        // if not returning false, we must handle.resume() later
         return !resumeNow;
     }
-    auto await_resume() -> decltype(ctx->results) {
-        return std::move(ctx->results);
-    }
+    // executed after caller is resumed (or if await_ready() == true)
+    // to compute the value of the caller's "co_await this" expr
+    auto await_resume() -> auto && { return std::move(ctx->results); }
 };
 
 } // namespace detail
 
 template <typename... Rets, bool return_exceptions = false,
           size_t N = sizeof...(Rets)>
-auto when_all(drogon::Task<Rets>... coros)
-    -> drogon::Task<std::tuple<std::conditional_t<
-        return_exceptions, std::expected<Rets, std::exception_ptr>, Rets>...>> {
-    auto ctx = std::make_shared<detail::ResultContext<std::conditional_t<
-        return_exceptions, std::expected<Rets, std::exception_ptr>, Rets>...>>(
-        N);
+    requires(N > 0)
+auto when_all(drogon::Task<Rets>... coros) -> detail::Awaiter<
+    detail::ResultContext<detail::ResultType<Rets, return_exceptions>...>> {
+
+    auto ctx = std::make_shared<detail::ResultContext<
+        detail::ResultType<Rets, return_exceptions>...>>();
+
+    auto launch_task =
+        [&]<size_t Index, typename RetType,
+            typename TaskType = drogon::Task<RetType>>(TaskType tsk) -> auto {
+        drogon::async_run(
+            [task = std::move(tsk), ctx]() mutable -> drogon::Task<void> {
+                auto assign = [&](auto &&val) -> auto {
+                    std::get<Index>(ctx->results) =
+                        std::forward<decltype(val)>(val);
+                };
+
+                if constexpr (return_exceptions) {
+                    try {
+                        if constexpr (std::is_void_v<RetType>) {
+                            co_await task;
+                            assign({});
+                        } else {
+                            assign(co_await task);
+                        }
+                    } catch (...) {
+                        assign(std::unexpected(std::current_exception()));
+                    }
+                } else {
+                    if constexpr (std::is_void_v<RetType>) {
+                        co_await task;
+                        assign(std::monostate{});
+                    } else {
+                        assign(co_await task);
+                    }
+                }
+
+                if (ctx->remaining.fetch_sub(1) == 1) {
+                    bool resumeNow = false;
+                    {
+                        std::scoped_lock lock(ctx->continuationMutex);
+                        if (ctx->continuationInstalled)
+                            resumeNow = true;
+                        else
+                            ctx->resumePending = true;
+                    }
+                    if (resumeNow)
+                        ctx->continuation.resume();
+                }
+            });
+    };
 
     [&]<std::size_t... Is>(std::index_sequence<Is...>) -> auto {
-        ((drogon::async_run(
-             [task = std::move(coros), ctx]() mutable -> drogon::Task<void> {
-                 if constexpr (return_exceptions) {
-                     try {
-                         if constexpr (std::is_void_v<Rets>) {
-                             co_await task;
-                             std::get<Is>(ctx->results) = {};
-                         } else {
-                             std::get<Is>(ctx->results) = co_await task;
-                         }
-                     } catch (...) {
-                         std::get<Is>(ctx->results) =
-                             std::unexpected(std::current_exception());
-                     }
-                 } else {
-                     std::get<Is>(ctx->results) = co_await task;
-                 }
-
-                 if (ctx->remaining.fetch_sub(1) == 1) {
-                     bool resumeNow = false;
-                     {
-                         std::scoped_lock lock(ctx->continuationMutex);
-                         if (ctx->continuationInstalled)
-                             resumeNow = true;
-                         else
-                             ctx->resumePending = true;
-                     }
-                     if (resumeNow)
-                         ctx->continuation.resume();
-                 }
-             })),
-         ...);
+        (launch_task.template operator()<Is, Rets>(std::move(coros)), ...);
     }(std::make_index_sequence<N>{});
 
-    co_return co_await detail::Awaiter{ctx};
+    return detail::Awaiter{ctx};
 }
 
 template <typename T, bool return_exceptions = false>
-auto when_all(std::vector<drogon::Task<T>> coros)
-    -> drogon::Task<std::vector<std::conditional_t<
-        return_exceptions, std::expected<T, std::exception_ptr>, T>>> {
+auto when_all(std::vector<drogon::Task<T>> coros) -> detail::Awaiter<
+    detail::VectorResultContext<detail::ResultType<T, return_exceptions>>> {
     const auto n = coros.size();
-    if (!n)
-        co_return {};
 
-    auto ctx = std::make_shared<detail::VectorResultContext<std::conditional_t<
-        return_exceptions, std::expected<T, std::exception_ptr>, T>>>(n);
+    auto ctx = std::make_shared<
+        detail::VectorResultContext<detail::ResultType<T, return_exceptions>>>(
+        n);
 
-    for (auto i = 0UZ; i < n; ++i) {
-        drogon::async_run([i, task = std::move(coros[i]),
-                           ctx]() mutable -> drogon::Task<void> {
-            if constexpr (return_exceptions) {
-                try {
+    for (auto &&[i, tsk] : std::views::enumerate(coros)) {
+        drogon::async_run(
+            [i, task = std::move(tsk), ctx]() mutable -> drogon::Task<void> {
+                auto assign = [&](auto &&val) -> auto {
+                    ctx->results[i] = std::forward<decltype(val)>(val);
+                };
+
+                if constexpr (return_exceptions) {
+                    try {
+                        if constexpr (std::is_void_v<T>) {
+                            co_await task;
+                            assign({});
+                        } else {
+                            assign(co_await task);
+                        }
+                    } catch (...) {
+                        assign(std::unexpected(std::current_exception()));
+                    }
+                } else {
                     if constexpr (std::is_void_v<T>) {
                         co_await task;
-                        ctx->results[i] = {};
+                        assign(std::monostate{});
                     } else {
-                        ctx->results[i] = co_await task;
+                        assign(co_await task);
                     }
-                } catch (...) {
-                    ctx->results[i] = std::unexpected(std::current_exception());
                 }
-            } else {
-                ctx->results[i] = co_await task;
-            }
 
-            if (ctx->remaining.fetch_sub(1) == 1) {
-                bool resumeNow = false;
-                {
-                    std::scoped_lock lock(ctx->continuationMutex);
-                    if (ctx->continuationInstalled)
-                        resumeNow = true;
-                    else
-                        ctx->resumePending = true;
+                if (ctx->remaining.fetch_sub(1) == 1) {
+                    bool resumeNow = false;
+                    {
+                        std::scoped_lock lock(ctx->continuationMutex);
+                        if (ctx->continuationInstalled)
+                            resumeNow = true;
+                        else
+                            ctx->resumePending = true;
+                    }
+                    if (resumeNow)
+                        ctx->continuation.resume();
                 }
-                if (resumeNow)
-                    ctx->continuation.resume();
-            }
-        });
+            });
     }
 
-    co_return co_await detail::Awaiter{ctx};
+    return detail::Awaiter{ctx};
 }
 
 } // namespace scheduler::coro
-
 #endif // SCHEDULER_UTIL_CORO
