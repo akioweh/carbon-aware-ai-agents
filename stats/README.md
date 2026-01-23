@@ -56,8 +56,10 @@ as per the endpoints every time `app` is ran.
 
 #### Forecast Endpoints
 
-- `GET /locations/{location}/metrics/forecast_load` - Returns load forecast for the next week
-- `GET /locations/{location}/metrics/forecast_greenness` - Returns greenness forecast for the next week
+- `GET /locations/{location}/metrics/forecast_load` - Returns load forecast for
+  the next week
+- `GET /locations/{location}/metrics/forecast_greenness` - Returns greenness
+  forecast for the next week
 
 #### Datacenter Endpoints
 
@@ -106,20 +108,27 @@ as per the endpoints every time `app` is ran.
 
 ## Data Generation
 
-The `generate_history.py` script creates synthetic data with the following
+The `generate_history.py` script creates synthetic data with complex, realistic
 patterns:
 
-- **Load**: Follows a daily sinusoidal pattern with peak at 3pm and low at 3am
-  - Weekends have 30% less load than weekdays
-  - Random noise is added for realism
-  - Values range from 0-50 units
+- **Load**: Follows a realistic "workday" vs "weekend" schedule.
+  - **Weekdays**: Feature a morning spike (start of work), a slight lunch dip,
+    sustained afternoon load, and evening activity.
+  - **Weekends**: Smoother, lower overall load peaking in the afternoon.
+  - **Micro-bursts**: Random, short-duration spikes in load (simulating batch
+    jobs or traffic surges).
+  - Values range from 0-50 units.
 
-- **Greenness**: Varies by time of day to simulate solar energy availability
-  - High during sunny hours (10am-4pm): ~80
-  - Medium during morning/evening (6am-10am, 4pm-8pm): ~40-50
-  - Low during night (8pm-6am): ~10
-  - Random noise is added for realism
-  - Values range from 0-100
+- **Greenness**: Modeled using a simulated "Weather System" that persists state
+  over time.
+  - **Solar**: Bell curve based on time of day, modulated by dynamic **Cloud
+    Cover**.
+  - **Wind**: Random walk "wind speed" trend that changes slowly over
+    hours/days.
+  - **Grid Baseline**: A slowly fluctuating baseline representing other grid
+    sources.
+  - The final score is a weighted sum of Solar, Wind, and Grid factors.
+  - Values range from 0-100.
 
 ## Service Behavior
 
