@@ -13,15 +13,10 @@ Data is collected at 5-minute intervals and is pattern-based to enable forecasti
 
 ## Getting Started
 
-### Prerequisites
-
-- Python 3.x
-- Flask
-
 ### Installation
 
 ```bash
-pip install flask
+pip install -r requirements.txt
 ```
 
 ### Generate History Data
