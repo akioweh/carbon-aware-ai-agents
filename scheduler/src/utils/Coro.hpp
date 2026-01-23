@@ -81,10 +81,8 @@ template <typename Context, bool return_exceptions> struct Awaiter {
     // if not returning false, we must handle.resume() later
     auto await_suspend(std::coroutine_handle<> caller_handle) -> bool {
         auto expected_handle = NO_CONTINUATION;
-        if (ctx->continuation.compare_exchange_strong(
-                expected_handle, caller_handle, std::memory_order::acq_rel))
-            return {};
-        return false; // already done, resume caller immediately
+        return ctx->continuation.compare_exchange_strong(
+            expected_handle, caller_handle, std::memory_order::acq_rel);
     }
 
     // executed after caller is resumed (or if await_ready() == true)
