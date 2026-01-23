@@ -16,7 +16,7 @@ class SchedulerTask {
 
   public:
     JobRequest jobRequest;
-    SchedulerTask(const JobRequest &jobRequest) : jobRequest(jobRequest) {};
+    SchedulerTask(JobRequest jobRequest) : jobRequest(std::move(jobRequest)) {};
 
     auto await_ready() -> bool { return false; }
 
@@ -44,6 +44,7 @@ class SchedulingQueue {
     using LockFreeQueue = boost::lockfree::queue<SchedulerTask *>;
     LockFreeQueue Q;
     std::atomic<bool> running{false};
+    std::atomic<int> queueSize{0};
 
     auto runTasks() -> drogon::Task<>;
     auto push_back(SchedulerTask *);
