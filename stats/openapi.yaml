@@ -1,131 +1,204 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: Stats API (Stats Component)
-  description: |
-    API for carbon-aware scheduling predictions.
-    
-    ## Available Endpoints
-    
-    - `/datacenters` - List of available datacenter names
-    - `/locations/{location}/metrics/forecast_greenness` - Next week greenness predictions (cached 5 min)
-    - `/locations/{location}/metrics/forecast_load` - Next week load predictions (cached 5 min)
+  title: Stats API
+  description: Statistics provider for carbon-aware scheduling predictions.
   version: 1.0.0
-  contact:
-    name: API Support
-
-servers:
-  - url: http://localhost:5000
-    description: Local development server
-
-tags:
-  - name: Datacenters
-    description: Datacenter information
-  - name: Forecasts
-    description: ML-based predictions for load and greenness metrics
-
 paths:
-  /datacenters:
-    get:
-      tags:
-        - Datacenters
-      summary: Get datacenter names
-      description: Returns a list of available datacenter names
-      operationId: getDatacenterNames
-      responses:
-        '200':
-          description: List of datacenter names
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
-              example:
-                - "dc1"
-                - "dc2"
-                - "dc3"
-
-  /locations/{location}/metrics/forecast_greenness:
-    get:
-      tags:
-        - Forecasts
-      summary: Get greenness forecast for next week
-      description: |
-        Returns ML-generated greenness predictions for the next week.
-        Results are cached for 5 minutes.
-      parameters:
-        - name: location
-          in: path
-          required: true
-          description: Datacenter identifier
-          schema:
-            type: string
-          example: "dc1"
-      responses:
-        '200':
-          description: Greenness forecast for next week
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForecastResponse'
-        '500':
-          description: Error generating forecast
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
   /locations/{location}/metrics/forecast_load:
     get:
       tags:
-        - Forecasts
+      - Forecasts
       summary: Get load forecast for next week
-      description: |
-        Returns ML-generated load predictions for the next week.
-        Results are cached for 5 minutes.
+      operationId: get_load_forecast_locations__location__metrics_forecast_load_get
       parameters:
-        - name: location
-          in: path
-          required: true
-          description: Datacenter identifier
-          schema:
-            type: string
-          example: "dc1"
+      - name: location
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Location
       responses:
         '200':
-          description: Load forecast for next week
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ForecastResponse'
         '500':
-          description: Error generating forecast
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Internal Server Error
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /locations/{location}/metrics/forecast_greenness:
+    get:
+      tags:
+      - Forecasts
+      summary: Get greenness forecast for next week
+      description: 'Returns ML-generated greenness predictions for the next week.
 
+        Results are cached for 5 minutes.'
+      operationId: get_carbon_forecast_locations__location__metrics_forecast_greenness_get
+      parameters:
+      - name: location
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Location
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForecastResponse'
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Internal Server Error
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /datacenter:
+    get:
+      tags:
+      - Datacenters
+      summary: Get datacenter names
+      description: Returns a list of available datacenter names.
+      operationId: get_datacenters_datacenter_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+                title: Response Get Datacenters Datacenter Get
 components:
   schemas:
-    ForecastResponse:
+    Capacity:
+      properties:
+        max_load:
+          type: number
+          title: Max Load
+          description: Maximum load capacity
+        total_gpus:
+          type: integer
+          title: Total Gpus
+          description: Total number of GPUs
       type: object
-      description: |
-        ML-generated forecast response.
-        Structure depends on the predictor implementation.
-        Cached for 5 minutes to avoid redundant ML predictions.
-      additionalProperties: true
-      example:
-        location_id: "dc1"
-        metric: "load"
-        predictions: []
-    
-    Error:
-      type: object
-      description: Error response
       required:
-        - error
+      - max_load
+      - total_gpus
+      title: Capacity
+    ErrorResponse:
       properties:
         error:
           type: string
-          description: Error message
-          example: "Data centre 'dc1' not found"
+          title: Error
+      type: object
+      required:
+      - error
+      title: ErrorResponse
+    ForecastDataPoint:
+      properties:
+        timestamp:
+          type: string
+          title: Timestamp
+          description: ISO format timestamp
+        value:
+          type: number
+          title: Value
+          description: Forecasted value
+        is_forecast:
+          type: boolean
+          title: Is Forecast
+          description: Indicates if this is a forecast
+        available_gpus:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Available Gpus
+          description: Number of available GPUs (load forecast only)
+      type: object
+      required:
+      - timestamp
+      - value
+      - is_forecast
+      title: ForecastDataPoint
+    ForecastResponse:
+      properties:
+        location_id:
+          type: string
+          title: Location Id
+          description: Datacenter identifier
+        metric:
+          type: string
+          title: Metric
+          description: Metric name (e.g. forecast_load, forecast_greenness)
+        unit:
+          type: string
+          title: Unit
+          description: Unit of measurement
+        capacity:
+          anyOf:
+          - $ref: '#/components/schemas/Capacity'
+          - type: 'null'
+          description: Capacity information (load forecast only)
+        data:
+          items:
+            $ref: '#/components/schemas/ForecastDataPoint'
+          type: array
+          title: Data
+          description: Time series data
+      type: object
+      required:
+      - location_id
+      - metric
+      - unit
+      - data
+      title: ForecastResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
