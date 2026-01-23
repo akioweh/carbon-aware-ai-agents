@@ -26,7 +26,7 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                 std::function<void(const drogon::HttpResponsePtr &)> callback)
         -> drogon::Task<void>;
 
-    static std::shared_ptr<SchedulingQueue> schedulingQueue;
+    inline static std::shared_ptr<SchedulingQueue> schedulingQueue;
 
     static auto setSchedulingQueue(std::shared_ptr<SchedulingQueue> queue) {
         schedulingQueue = std::move(queue);

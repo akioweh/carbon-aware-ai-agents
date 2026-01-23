@@ -26,21 +26,21 @@ auto generateJobRequest(int seed) -> JobRequest {
 auto main() -> int {
     drogon::app().setLogPath(".");
 
-    auto schedulingQueue = std::make_shared<SchedulingQueue>() ;
-    ScheduleController::setSchedulingQueue(schedulingQueue) ;
-
-    Scheduler scheduler;
+    auto schedulingQueue = std::make_shared<SchedulingQueue>();
+    ScheduleController::setSchedulingQueue(schedulingQueue);
 
     drogon::async_run([&]() -> drogon::Task<> {
-        auto impact =
-            co_await scheduler.calculateSchedule(generateJobRequest(1));
+        auto [impact, dummy] =
+            co_await schedulingQueue->computeSchedule(generateJobRequest(1));
         std::cout << "Expected carbon emmissions: " << impact.total_emissions
                   << '\n';
         std::cout << "Expected carbon intensity: " << impact.carbon_intensity
                   << '\n';
         std::cout << "SCI: " << impact.sci << '\n';
 
-        scheduler.show();
+        for (auto i : dummy) {
+            i.show();
+        }
         drogon::app().quit();
         co_return;
     });
