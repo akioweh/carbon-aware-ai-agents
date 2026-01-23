@@ -1,4 +1,6 @@
 #include "Scheduler.hpp"
+#include "SchedulingQueue.hpp"
+#include "controllers/ScheduleController.hpp"
 #include <JobRequest.hpp>
 #include <PredictionApi.hpp>
 #include <chrono>
@@ -23,6 +25,9 @@ auto generateJobRequest(int seed) -> JobRequest {
 
 auto main() -> int {
     drogon::app().setLogPath(".");
+
+    auto schedulingQueue = std::make_shared<SchedulingQueue>() ;
+    ScheduleController::setSchedulingQueue(schedulingQueue) ;
 
     Scheduler scheduler;
 

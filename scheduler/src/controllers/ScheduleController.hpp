@@ -1,5 +1,6 @@
 #ifndef SCHEDULE_CONTROLLER_HPP
 #define SCHEDULE_CONTROLLER_HPP
+#include "SchedulingQueue.hpp"
 #pragma once
 
 #include <Scheduler.hpp>
@@ -24,6 +25,12 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
     getSchedule(drogon::HttpRequestPtr req,
                 std::function<void(const drogon::HttpResponsePtr &)> callback)
         -> drogon::Task<void>;
+
+    static std::shared_ptr<SchedulingQueue> schedulingQueue;
+
+    static auto setSchedulingQueue(std::shared_ptr<SchedulingQueue> queue) {
+        schedulingQueue = std::move(queue);
+    }
 };
 
 #endif
