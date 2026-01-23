@@ -1,5 +1,6 @@
 import json
 import matplotlib.pyplot as plt
+from generate_history import DATA_CENTRES
 
 # Load the data
 with open('history.json', 'r') as f:
@@ -16,7 +17,7 @@ colors = ['blue', 'red', 'green', 'orange', 'purple']
 
 # Plot 1: Load comparison
 plt.subplot(2, 1, 1)
-for idx, dc in enumerate([f"Data Centre {i}" for i in range(1, 6)]):
+for idx, dc in enumerate(DATA_CENTRES):
     if dc in history_data:
         history_load = [item['load'] for item in history_data[dc]]
         history_indices = range(len(history_load))
@@ -37,7 +38,7 @@ plt.grid(True, alpha=0.3)
 
 # Plot 2: Greenness comparison
 plt.subplot(2, 1, 2)
-for idx, dc in enumerate([f"Data Centre {i}" for i in range(1, 6)]):
+for idx, dc in enumerate(DATA_CENTRES):
     if dc in history_data:
         history_greenness = [item['greenness'] for item in history_data[dc]]
         history_indices = range(len(history_greenness))

@@ -109,10 +109,12 @@ def get_next_week_greenness(historical_greenness):
     return prediction
 
     
+from generate_history import DATA_CENTRES
+
 if __name__ == "__main__":
     all_predictions = {}
     
-    for dc in [f"Data Centre {i}" for i in range(1,6)]:
+    for dc in DATA_CENTRES:
         # Test the prediction functions
         load_pred = generate_next_week_load_prediction(dc)
         print(f"Generated {len(load_pred['data'])} load predictions for {dc}")
