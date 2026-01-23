@@ -75,16 +75,13 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     const auto jobRequest =
         JobRequest(jobType, workload, earliestStart, latestFinish, jobId);
 
-    auto scheduler = Scheduler{};
-
-    SchedulingImpact impact = co_await scheduler.calculateSchedule(jobRequest);
+    const auto &&[impact, fullSchedule] = co_await schedulingQueue->computeSchedule(jobRequest) ;
 
     Json::Value ret;
     ret["schedule_id"] = "sched-" + jobId;
     ret["message"] = "Schedule created successfully";
 
     Json::Value blocks(Json::arrayValue);
-    const auto &fullSchedule = scheduler.getSchedule();
 
     for (const auto &interval : fullSchedule | std::views::transform(toJson)) {
         Json::Value block;
