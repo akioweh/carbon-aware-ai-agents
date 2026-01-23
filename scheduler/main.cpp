@@ -13,7 +13,7 @@
 
 using namespace drogon;
 
-constexpr auto PORT = 80;
+constexpr auto PORT = 6969;
 constexpr auto N_THREADS = 8;
 
 auto generateJobRequest(int seed) -> JobRequest {
@@ -29,6 +29,7 @@ auto main() -> int {
     auto schedulingQueue = std::make_shared<SchedulingQueue>();
     ScheduleController::setSchedulingQueue(schedulingQueue);
 
+    /*
     drogon::async_run([&]() -> drogon::Task<> {
         auto [impact, dummy] =
             co_await schedulingQueue->computeSchedule(generateJobRequest(1));
@@ -44,7 +45,8 @@ auto main() -> int {
         drogon::app().quit();
         co_return;
     });
-
+    */
+    drogon::app().addListener("0.0.0.0", PORT);
     drogon::app().run();
 #ifdef _WIN32
     TerminateProcess(GetCurrentProcess(), 0);
