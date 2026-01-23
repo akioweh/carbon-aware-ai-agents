@@ -2,11 +2,13 @@ from flask import Flask, jsonify
 import json
 import sqlite3
 import time
+import threading
 from predictor import generate_next_week_load_prediction, generate_next_week_greenness_prediction
 
 app = Flask(__name__)
 
 DB_FILE = "cache.db"
+from generate_history import DATA_CENTRES
 
 def init_db():
     with sqlite3.connect(DB_FILE) as conn:
@@ -51,69 +53,20 @@ def save_prediction(key, data):
 # Initialize database on module load
 init_db()
 
-def get_history():
-    with open("history.json", "r") as f:
-        return json.load(f)
+def prediction_loop():
+    while True:
+        for dc in DATA_CENTRES:
+            try:
+                load_data = generate_next_week_load_prediction(dc)
+                save_prediction(f"load_forecast_{dc}", load_data)
 
-def full_history():
-    return jsonify(get_history())
+                greenness_data = generate_next_week_greenness_prediction(dc)
+                save_prediction(f"greenness_forecast_{dc}", greenness_data)
+            except Exception as e:
+                print(f"Error at {dc}, {e}")
+        time.sleep(300)
+threading.Thread(target=prediction_loop, daemon=True).start()
 
-def load_history():
-    data = get_history()
-    result = {
-        dc: [{"timestamp": d["timestamp"], "load": d["load"]} for d in entries]
-        for dc, entries in data.items()
-    }
-    return jsonify(result)
-
-def greenness_history():
-    data = get_history()
-    result = {
-        dc: [{"timestamp": d["timestamp"], "greenness": d["greenness"]} for d in entries]
-        for dc, entries in data.items()
-    }
-    return jsonify(result)
-
-def latest():
-    data = get_history()
-    result = {dc: entries[-1] for dc, entries in data.items()}
-    return jsonify(result)
-
-def latest_load():
-    data = get_history()
-    result = {dc: {"timestamp": entries[-1]["timestamp"], "load": entries[-1]["load"]}
-              for dc, entries in data.items()}
-    return jsonify(result)
-
-def latest_green():
-    data = get_history()
-    result = {dc: {"timestamp": entries[-1]["timestamp"], "greenness": entries[-1]["greenness"]}
-              for dc, entries in data.items()}
-    return jsonify(result)
-
-def history_for_dc(dc):
-    data = get_history()
-    if dc not in data:
-        return jsonify({"error": f"Data centre '{dc}' not found"}), 404
-    return jsonify(data[dc])
-
-def load_history_for_dc(dc):
-    data = get_history()
-    if dc not in data:
-        return jsonify({"error": f"Data centre '{dc}' not found"}), 404
-    return jsonify([{"timestamp": d["timestamp"], "load": d["load"]} for d in data[dc]])
-
-def greenness_history_for_dc(dc):
-    data = get_history()
-    if dc not in data:
-        return jsonify({"error": f"Data centre '{dc}' not found"}), 404
-    return jsonify([{"timestamp": d["timestamp"], "greenness": d["greenness"]} for d in data[dc]])
-
-def latest_for_dc(dc):
-    data = get_history()
-    if dc not in data:
-        return jsonify({"error": f"Data centre '{dc}' not found"}), 404
-    return jsonify(data[dc][-1])
 
 @app.get("/locations/<location>/metrics/forecast_load")
 def get_load_forecast(location):
@@ -121,13 +74,7 @@ def get_load_forecast(location):
     try:
         cache_key = f"load_forecast_{location}"
         cached_result = get_cached_prediction(cache_key)
-        
-        if cached_result:
-            return jsonify(cached_result)
-
-        result = generate_next_week_load_prediction(location)
-        save_prediction(cache_key, result)
-        return jsonify(result)
+        return jsonify(cached_result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -137,13 +84,14 @@ def get_carbon_forecast(location):
     try:
         cache_key = f"greenness_forecast_{location}"
         cached_result = get_cached_prediction(cache_key)
-        
-        if cached_result:
-            return jsonify(cached_result)
+        return jsonify(cached_result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-        result = generate_next_week_greenness_prediction(location)
-        save_prediction(cache_key, result)
-        return jsonify(result)
+@app.get("/datacenter")
+def get_datacenters():
+    try:
+        return jsonify(DATA_CENTRES)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
