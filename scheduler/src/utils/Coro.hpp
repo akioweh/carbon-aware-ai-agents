@@ -12,7 +12,6 @@
 #include <drogon/drogon.h>
 #include <expected>
 #include <memory>
-#include <mutex>
 #include <ranges>
 #include <tuple>
 #include <utility>
@@ -32,26 +31,34 @@ using ResultType =
                        StorageType<T>>;
 
 // we done, but waiting for continuation to be installed
-inline static const std::coroutine_handle<> WAITING_CONTINUATION =
+inline static const auto WAITING_CONTINUATION =
     std::coroutine_handle<>::from_address(reinterpret_cast<void *>(1));
 // no continuation installed yet (and not done)
-inline static const std::coroutine_handle<> NO_CONTINUATION =
+inline static const auto NO_CONTINUATION =
     std::coroutine_handle<>::from_address(nullptr);
+// for lock-free exception capturing
+inline static constexpr char NO_EXCEPTION = 0;
+inline static constexpr char EXCEPTION_CAPTURED = 1;
+inline static constexpr char EXCEPTION_IN_PROGRESS = 2;
 
 template <typename ResultsContainer> struct ResultContext {
     std::atomic<size_t> remaining;
-    std::atomic<std::coroutine_handle<>> continuation; // lock-free state repr
-    ResultsContainer results;
+    std::atomic<std::coroutine_handle<>> continuation;
+    std::atomic<char> exceptionState{NO_EXCEPTION};
     std::exception_ptr capturedException{nullptr};
-    std::mutex exceptionMutex; // can we do this lock-free?
+    ResultsContainer results;
 
     explicit ResultContext(size_t cnt) : remaining(cnt), results(cnt) {}
     ResultContext() : remaining(std::tuple_size_v<ResultsContainer>) {};
 
     void capture_exception(std::exception_ptr ex) {
-        std::scoped_lock lock{exceptionMutex};
-        if (!capturedException)
+        auto required = NO_EXCEPTION;
+        if (exceptionState.compare_exchange_strong(
+                required, EXCEPTION_IN_PROGRESS, std::memory_order::acq_rel)) {
             capturedException = std::move(ex);
+            exceptionState.store(EXCEPTION_CAPTURED,
+                                 std::memory_order::release);
+        }
     }
 
     // checks if all tasks are done, and resumes continuation if so
@@ -61,7 +68,7 @@ template <typename ResultsContainer> struct ResultContext {
 
         auto old_handle = continuation.exchange(WAITING_CONTINUATION,
                                                 std::memory_order::acq_rel);
-        if (old_handle.address() != nullptr)
+        if (old_handle != NO_CONTINUATION)
             old_handle.resume();
     }
 };
@@ -89,6 +96,7 @@ template <typename Context, bool return_exceptions> struct Awaiter {
     // to compute the value of the caller's "co_await this" expr
     auto await_resume() -> auto && {
         if constexpr (!return_exceptions) {
+            // should be safe by this point; no need to read atomic state flag
             if (ctx->capturedException)
                 std::rethrow_exception(ctx->capturedException);
         }
@@ -112,11 +120,15 @@ void wrap_task(drogon::Task<T> task, auto ctx, auto assign) {
             try {
                 if constexpr (std::is_void_v<T>) {
                     co_await task;
-                    if (return_exceptions || !ctx->capturedException)
+                    if (return_exceptions ||
+                        ctx->exceptionState.load(std::memory_order::acquire) ==
+                            NO_EXCEPTION)
                         assign({});
                 } else {
                     decltype(auto) result = co_await task;
-                    if (return_exceptions || !ctx->capturedException)
+                    if (return_exceptions ||
+                        ctx->exceptionState.load(std::memory_order::acquire) ==
+                            NO_EXCEPTION)
                         assign(std::move(result));
                 }
             } catch (...) {
