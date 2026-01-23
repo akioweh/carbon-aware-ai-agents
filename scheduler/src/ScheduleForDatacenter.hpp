@@ -23,7 +23,7 @@ class ScheduleForDatacenter {
     void show();
 };
 
-auto toJson(const ScheduleForDatacenter &obj) -> Json::Value;
+auto f_toJson(const ScheduleForDatacenter &obj) -> Json::Value;
 
 static_assert(Serializable<ScheduleForDatacenter>);
 

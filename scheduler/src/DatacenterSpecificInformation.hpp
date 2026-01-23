@@ -27,7 +27,7 @@ class DatacenterSpecificInformation {
         -> DatacenterSpecificInformation;
 };
 
-auto toJson(const DatacenterSpecificInformation &obj) -> Json::Value;
+auto f_toJson(const DatacenterSpecificInformation &obj) -> Json::Value;
 
 static_assert(Serializable<DatacenterSpecificInformation>);
 

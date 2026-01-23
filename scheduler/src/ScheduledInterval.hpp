@@ -30,7 +30,7 @@ class ScheduledInterval {
     }
 };
 
-inline auto toJson(const ScheduledInterval &obj) -> Json::Value {
+inline auto f_toJson(const ScheduledInterval &obj) -> Json::Value {
     auto res = Json::Value{};
     res["timestamp"] = scheduler::utils::toIso8601(obj.timestamp);
     res["job_id"] = obj.jobId;

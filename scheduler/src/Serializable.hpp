@@ -6,7 +6,15 @@
 
 template <typename T>
 concept Serializable = requires(const T &obj) {
-    { toJson(obj) } -> std::convertible_to<Json::Value>;
+    { f_toJson(obj) } -> std::convertible_to<Json::Value>;
 };
+
+struct toJsonFn {
+    auto operator()(const Serializable auto &obj) const -> auto {
+        return f_toJson(obj);
+    }
+};
+
+inline constexpr toJsonFn toJson{};
 
 #endif
