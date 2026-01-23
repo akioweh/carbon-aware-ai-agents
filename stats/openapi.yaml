@@ -23,7 +23,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ForecastResponse'
+                $ref: '#/components/schemas/LoadForecastResponse'
         '500':
           content:
             application/json:
@@ -58,7 +58,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ForecastResponse'
+                $ref: '#/components/schemas/GreennessForecastResponse'
         '500':
           content:
             application/json:
@@ -114,7 +114,63 @@ components:
       required:
       - error
       title: ErrorResponse
-    ForecastDataPoint:
+    GreennessForecastDataPoint:
+      properties:
+        timestamp:
+          type: string
+          title: Timestamp
+          description: ISO format timestamp
+        value:
+          type: number
+          title: Value
+          description: Forecasted value
+        is_forecast:
+          type: boolean
+          title: Is Forecast
+          description: Indicates if this is a forecast
+      type: object
+      required:
+      - timestamp
+      - value
+      - is_forecast
+      title: GreennessForecastDataPoint
+    GreennessForecastResponse:
+      properties:
+        location_id:
+          type: string
+          title: Location Id
+          description: Datacenter identifier
+        metric:
+          type: string
+          title: Metric
+          description: Metric name (e.g. forecast_load, forecast_greenness)
+        unit:
+          type: string
+          title: Unit
+          description: Unit of measurement
+        data:
+          items:
+            $ref: '#/components/schemas/GreennessForecastDataPoint'
+          type: array
+          title: Data
+          description: Time series data
+      type: object
+      required:
+      - location_id
+      - metric
+      - unit
+      - data
+      title: GreennessForecastResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    LoadForecastDataPoint:
       properties:
         timestamp:
           type: string
@@ -129,18 +185,17 @@ components:
           title: Is Forecast
           description: Indicates if this is a forecast
         available_gpus:
-          anyOf:
-          - type: integer
-          - type: 'null'
+          type: integer
           title: Available Gpus
-          description: Number of available GPUs (load forecast only)
+          description: Number of available GPUs
       type: object
       required:
       - timestamp
       - value
       - is_forecast
-      title: ForecastDataPoint
-    ForecastResponse:
+      - available_gpus
+      title: LoadForecastDataPoint
+    LoadForecastResponse:
       properties:
         location_id:
           type: string
@@ -155,13 +210,11 @@ components:
           title: Unit
           description: Unit of measurement
         capacity:
-          anyOf:
-          - $ref: '#/components/schemas/Capacity'
-          - type: 'null'
-          description: Capacity information (load forecast only)
+          $ref: '#/components/schemas/Capacity'
+          description: Capacity information
         data:
           items:
-            $ref: '#/components/schemas/ForecastDataPoint'
+            $ref: '#/components/schemas/LoadForecastDataPoint'
           type: array
           title: Data
           description: Time series data
@@ -170,17 +223,9 @@ components:
       - location_id
       - metric
       - unit
+      - capacity
       - data
-      title: ForecastResponse
-    HTTPValidationError:
-      properties:
-        detail:
-          items:
-            $ref: '#/components/schemas/ValidationError'
-          type: array
-          title: Detail
-      type: object
-      title: HTTPValidationError
+      title: LoadForecastResponse
     ValidationError:
       properties:
         loc:

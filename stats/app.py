@@ -25,25 +25,35 @@ class Capacity(BaseModel):
     total_gpus: int = Field(..., description='Total number of GPUs')
 
 
-class ForecastDataPoint(BaseModel):
+class BaseForecastDataPoint(BaseModel):
     timestamp: str = Field(..., description='ISO format timestamp')
     value: float = Field(..., description='Forecasted value')
     is_forecast: bool = Field(..., description='Indicates if this is a forecast')
-    available_gpus: Optional[int] = Field(
-        None, description='Number of available GPUs (load forecast only)'
-    )
 
 
-class ForecastResponse(BaseModel):
+class LoadForecastDataPoint(BaseForecastDataPoint):
+    available_gpus: int = Field(..., description='Number of available GPUs')
+
+
+class GreennessForecastDataPoint(BaseForecastDataPoint):
+    pass
+
+
+class BaseForecastResponse(BaseModel):
     location_id: str = Field(..., description='Datacenter identifier')
     metric: str = Field(
         ..., description='Metric name (e.g. forecast_load, forecast_greenness)'
     )
     unit: str = Field(..., description='Unit of measurement')
-    capacity: Optional[Capacity] = Field(
-        None, description='Capacity information (load forecast only)'
-    )
-    data: list[ForecastDataPoint] = Field(..., description='Time series data')
+
+
+class LoadForecastResponse(BaseForecastResponse):
+    capacity: Capacity = Field(..., description='Capacity information')
+    data: list[LoadForecastDataPoint] = Field(..., description='Time series data')
+
+
+class GreennessForecastResponse(BaseForecastResponse):
+    data: list[GreennessForecastDataPoint] = Field(..., description='Time series data')
 
 
 class ErrorResponse(BaseModel):
@@ -141,7 +151,7 @@ app = FastAPI(
 
 @app.get(
     '/locations/{location}/metrics/forecast_load',
-    response_model=ForecastResponse,
+    response_model=LoadForecastResponse,
     tags=['Forecasts'],
     summary='Get load forecast for next week',
     responses={500: {'model': ErrorResponse}},
@@ -168,7 +178,7 @@ def get_load_forecast(location: str):
 
 @app.get(
     '/locations/{location}/metrics/forecast_greenness',
-    response_model=ForecastResponse,
+    response_model=GreennessForecastResponse,
     tags=['Forecasts'],
     summary='Get greenness forecast for next week',
     responses={500: {'model': ErrorResponse}},

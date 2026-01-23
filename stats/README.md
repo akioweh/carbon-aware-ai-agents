@@ -54,48 +54,53 @@ as per the endpoints every time `app` is ran.
 
 ### Endpoints
 
-#### History Endpoints
+#### Forecast Endpoints
 
-- `GET /history` - Returns complete history with timestamp, load, and greenness
-- `GET /load/history` - Returns load history only (timestamp + load)
-- `GET /greenness/history` - Returns greenness history only (timestamp +
-  greenness)
+- `GET /locations/{location}/metrics/forecast_load` - Returns load forecast for the next week
+- `GET /locations/{location}/metrics/forecast_greenness` - Returns greenness forecast for the next week
 
-#### Latest Endpoints
+#### Datacenter Endpoints
 
-- `GET /latest` - Returns the most recent data point (timestamp, load,
-  greenness)
-- `GET /load/latest` - Returns the most recent load data (timestamp + load)
-- `GET /greenness/latest` - Returns the most recent greenness data (timestamp +
-  greenness)
+- `GET /datacenter` - Returns a list of available datacenter names
 
 ### Example Responses
 
-#### Full Data Point
+#### Load Forecast Response
 
 ```json
 {
-  "timestamp": "2025-12-05T18:20:39.679404",
-  "load": 25.5,
-  "greenness": 75.3
+  "location_id": "Data-Center-1",
+  "metric": "forecast_load",
+  "unit": "utilization_units",
+  "capacity": {
+    "max_load": 50.0,
+    "total_gpus": 32
+  },
+  "data": [
+    {
+      "timestamp": "2026-01-23T19:00:00",
+      "value": 25.5,
+      "is_forecast": true,
+      "available_gpus": 16
+    }
+  ]
 }
 ```
 
-#### Load Data Point
+#### Greenness Forecast Response
 
 ```json
 {
-  "timestamp": "2025-12-05T18:20:39.679404",
-  "load": 25.5
-}
-```
-
-#### Greenness Data Point
-
-```json
-{
-  "timestamp": "2025-12-05T18:20:39.679404",
-  "greenness": 75.3
+  "location_id": "Data-Center-1",
+  "metric": "forecast_greenness",
+  "unit": "greenness_score",
+  "data": [
+    {
+      "timestamp": "2026-01-23T19:00:00",
+      "value": 75.3,
+      "is_forecast": true
+    }
+  ]
 }
 ```
 
