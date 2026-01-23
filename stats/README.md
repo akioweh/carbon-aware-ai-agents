@@ -1,15 +1,19 @@
 # Stats Component
 
-A Flask-based API for tracking and retrieving data center load and grid energy greenness metrics.
+A Flask-based API for tracking and retrieving data center load and grid energy
+greenness metrics.
 
 ## Overview
 
 This API provides historical and current data about:
 
-- **Load**: Data center load ranging from 0-50 arbitrary units (50 being capacity)
-- **Greenness**: Energy greenness score from 0-100 (higher values indicate greener energy)
+- **Load**: Data center load ranging from 0-50 arbitrary units (50 being
+  capacity)
+- **Greenness**: Energy greenness score from 0-100 (higher values indicate
+  greener energy)
 
-Data is collected at 5-minute intervals and is pattern-based to enable forecasting and task scheduling.
+Data is collected at 5-minute intervals and is pattern-based to enable
+forecasting and task scheduling.
 
 ## Getting Started
 
@@ -39,7 +43,8 @@ The API will start on `http://localhost:5000` by default.
 
 ## API Documentation
 
-The API is fully documented using OpenAPI 3.0 specification. See `openapi.yaml` for the complete specification.
+The API is fully documented using OpenAPI 3.0 specification. See `openapi.yaml`
+for the complete specification.
 
 ### Endpoints
 
@@ -47,13 +52,16 @@ The API is fully documented using OpenAPI 3.0 specification. See `openapi.yaml` 
 
 - `GET /history` - Returns complete history with timestamp, load, and greenness
 - `GET /load/history` - Returns load history only (timestamp + load)
-- `GET /greenness/history` - Returns greenness history only (timestamp + greenness)
+- `GET /greenness/history` - Returns greenness history only (timestamp +
+  greenness)
 
 #### Latest Endpoints
 
-- `GET /latest` - Returns the most recent data point (timestamp, load, greenness)
+- `GET /latest` - Returns the most recent data point (timestamp, load,
+  greenness)
 - `GET /load/latest` - Returns the most recent load data (timestamp + load)
-- `GET /greenness/latest` - Returns the most recent greenness data (timestamp + greenness)
+- `GET /greenness/latest` - Returns the most recent greenness data (timestamp +
+  greenness)
 
 ### Example Responses
 
@@ -87,7 +95,8 @@ The API is fully documented using OpenAPI 3.0 specification. See `openapi.yaml` 
 
 ## OpenAPI Schema
 
-The complete OpenAPI 3.0 schema is available in `openapi.yaml`. You can use this schema with various tools:
+The complete OpenAPI 3.0 schema is available in `openapi.yaml`. You can use this
+schema with various tools:
 
 ### Validation
 
@@ -100,7 +109,8 @@ openapi-spec-validator openapi.yaml
 
 ### Swagger UI
 
-You can view the API documentation using Swagger UI or other OpenAPI tools by importing the `openapi.yaml` file.
+You can view the API documentation using Swagger UI or other OpenAPI tools by
+importing the `openapi.yaml` file.
 
 ### Viewing with Swagger Editor
 
@@ -110,7 +120,8 @@ You can view the API documentation using Swagger UI or other OpenAPI tools by im
 
 ## Data Generation
 
-The `generate_history.py` script creates synthetic data with the following patterns:
+The `generate_history.py` script creates synthetic data with the following
+patterns:
 
 - **Load**: Follows a daily sinusoidal pattern with peak at 3pm and low at 3am
   - Weekends have 30% less load than weekdays
@@ -126,4 +137,6 @@ The `generate_history.py` script creates synthetic data with the following patte
 
 ## Notes
 
-This is a prototype API designed for demonstrating carbon-aware scheduling concepts. The data is synthetic and pattern-based to enable predictable forecasting and task scheduling.
+This is a prototype API designed for demonstrating carbon-aware scheduling
+concepts. The data is synthetic and pattern-based to enable predictable
+forecasting and task scheduling.
