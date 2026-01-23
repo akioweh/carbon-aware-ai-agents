@@ -96,8 +96,8 @@ template <typename Context, bool return_exceptions> struct Awaiter {
     // to compute the value of the caller's "co_await this" expr
     auto await_resume() -> auto && {
         if constexpr (!return_exceptions) {
-            // should be safe by this point; no need to read atomic state flag
-            if (ctx->capturedException)
+            if (ctx->exceptionState.load(std::memory_order::acquire) ==
+                EXCEPTION_CAPTURED) // don't think it can still be IN_PROGRESS
                 std::rethrow_exception(ctx->capturedException);
         }
         return std::move(ctx->results);
