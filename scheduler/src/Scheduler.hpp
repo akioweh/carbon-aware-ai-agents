@@ -2,10 +2,12 @@
 #define SCHEDULER
 #pragma once
 
+#include <Datacenter.hpp>
 #include <JobRequest.hpp>
-#include <PredictionApi.hpp>
+#include <PredictedDatacenterInformation.hpp>
 #include <ScheduleForDatacenter.hpp>
 #include <Serializable.hpp>
+#include <StatsAPIClient.hpp>
 #include <map>
 #include <set>
 
@@ -29,13 +31,12 @@ class Scheduler {
   private:
     static const unsigned int KWH = 1000 * 60 * 60;
 
-    PredictionApi predictionApi;
+    StatsAPIClient statsAPIClient;
 
     std::map<long long, ScheduleForDatacenter>
         fullSchedule; // datacenterId -> schedule
 
-    auto getCombinedIntervals(
-        std::map<long long, std::vector<PredictedDatacenterInformation>> &data)
+    auto getCombinedIntervals(const std::vector<Datacenter> &data)
         -> std::multiset<PredictedDatacenterInformation>;
 
     auto schedule(PredictedDatacenterInformation &interval, JobRequest &job)

@@ -1,19 +1,34 @@
 #include <JobRequest.hpp>
-#include <PredictionApi.hpp>
 #include <ScheduleForDatacenter.hpp>
 #include <Scheduler.hpp>
+#include <StatsAPIClient.hpp>
+#include <ranges>
 
 using namespace std;
 using namespace drogon;
 
-auto Scheduler::getCombinedIntervals(
-    map<long long, vector<PredictedDatacenterInformation>> &data)
+auto Scheduler::getCombinedIntervals(const vector<Datacenter> &data)
     -> multiset<PredictedDatacenterInformation> {
     multiset<PredictedDatacenterInformation> intervals;
 
-    for (const auto &predictions : views::values(data)) {
-        for (const auto &prediction : predictions)
-            intervals.insert(prediction);
+    for (const auto &dc : data) {
+        const auto hasher = hash<string>{};
+        const auto dcId = static_cast<long long>(hasher(dc.name));
+        DatacenterSpecificInformation dcInfo(dc.maxLoad, dc.id, dc.name,
+                                             "not defined yet", dcId);
+
+        if (dc.timeSeries.size() < 2)
+            continue;
+
+        auto duration = dc.timeSeries[1].timestamp - dc.timeSeries[0].timestamp;
+        auto lengthOfInterval =
+            chrono::duration_cast<chrono::seconds>(duration);
+
+        for (const auto &slot : dc.timeSeries) {
+            intervals.emplace(slot.timestamp, lengthOfInterval,
+                              slot.predictedLoad, slot.predictedGreenness,
+                              dcInfo);
+        }
     }
     return intervals;
 }
@@ -39,7 +54,7 @@ auto Scheduler::schedule(PredictedDatacenterInformation &interval,
 
 auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
 
-    auto data = co_await predictionApi.getData();
+    auto data = co_await statsAPIClient.getAllDatacenters();
 
     auto intervals = getCombinedIntervals(data);
 

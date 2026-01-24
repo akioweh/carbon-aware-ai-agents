@@ -1,6 +1,5 @@
 #include "Scheduler.hpp"
 #include <JobRequest.hpp>
-#include <PredictionApi.hpp>
 #include <chrono>
 #include <drogon/drogon.h>
 #include <iostream>
