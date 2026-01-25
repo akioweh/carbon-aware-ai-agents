@@ -141,17 +141,25 @@ optimization.
    job is already persisted. If the user rejects the proposal, UI sends a delete
    request to the scheduler.
 
-### 2. Scheduler → Stats: Data Retrieval & State Management
+### 2. Scheduler → Stats: Data Retrieval
 
-The Stats component serves two critical roles:
-
-1. **Context Provider**: Aggregates and forecasts environmental data (Carbon
-   Intensity, Weather) and Baseline Load.
-2. **State Manager**: Persists the "Global Schedule" by storing the Workload
-   Blocks committed by the Scheduler.
+The Stats component serves as a **Context Provider**, aggregating and
+forecasting environmental data (Carbon Intensity) and Baseline Load.
 
 **Endpoints:**
 
-> [!WARNING]  
-> currently the Stats API Schema is completely inaccurate and problematic; it
-> requires significant rework before this section can be meaningfully populated
+- **`GET /locations/{location}/metrics/forecast_load`**: Retrieves the load
+  forecast for the specified location for the next week. It includes capacity
+  information and time-series data of forecasted load values.
+- **`GET /locations/{location}/metrics/forecast_greenness`**: Retrieves the
+  greenness (carbon intensity) forecast for the specified location for the next
+  week.
+- **`GET /datacenter`**: Retrieves a list of available datacenter names.
+
+**Response Models:**
+
+- **Load Forecast**: Contains capacity limits (max load, total GPUs) and a
+  series of data points, each with a timestamp, predicted load value, and
+  available GPUs.
+- **Greenness Forecast**: Contains a series of data points, each with a
+  timestamp and a predicted greenness value (carbon intensity).
