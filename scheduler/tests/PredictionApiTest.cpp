@@ -1,8 +1,8 @@
 #define BOOST_TEST_MODULE PredictionApiTest
+#include "DrogonTestUtils.hpp"
 #include <PredictionApi.hpp>
 #include <boost/test/included/unit_test.hpp>
 #include <drogon/drogon.h>
-#include "DrogonTestUtils.hpp"
 
 BOOST_AUTO_TEST_CASE(test_get_data) {
     // assumes stats api running on localhost:5000.
