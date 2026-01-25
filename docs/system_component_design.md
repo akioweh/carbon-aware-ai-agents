@@ -129,7 +129,7 @@ flowchart TB
     classDef dataNode fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
 ```
 
-```mermad
+```mermaid
 sequenceDiagram
     autonumber
     actor U as User
