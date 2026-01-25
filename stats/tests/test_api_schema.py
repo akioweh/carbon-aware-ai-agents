@@ -1,10 +1,24 @@
 import schemathesis
-from hypothesis import settings
+from hypothesis import settings, HealthCheck
 
-schema = schemathesis.openapi.from_url('http://localhost:5000/openapi.json')
+# current setting it to True blows up your RAM (idk why, maybe because history generation?)
+RUN_DIRECTLY = False
+
+if RUN_DIRECTLY:
+    from ..app import app
+
+    schema = schemathesis.openapi.from_asgi('/openapi.json', app)
+else:
+    schema = schemathesis.openapi.from_url('http://localhost:5000/openapi.json')
 
 
-@schema.parametrize()
-@settings(max_examples=10)
-def test_api(case):
-    case.call_and_validate()
+# calling as_state_machine is necessary to enable link-following testing
+@settings(
+    max_examples=10,
+    suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow],
+)
+class APIWorkflow(schema.as_state_machine()):
+    pass
+
+
+TestAPI = APIWorkflow.TestCase

@@ -7,100 +7,110 @@ paths:
   /locations/{location}/metrics/forecast_load:
     get:
       tags:
-        - Forecasts
+      - Forecasts
       summary: Get load forecast for next week
       operationId: get_load_forecast_locations__location__metrics_forecast_load_get
       parameters:
-        - name: location
-          in: path
-          required: true
-          schema:
-            type: string
-            title: Location
+      - name: location
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Location
       responses:
-        "200":
+        '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoadForecastResponse"
-        "500":
+                $ref: '#/components/schemas/LoadForecastResponse'
+        '500':
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
           description: Internal Server Error
-        "404":
+        '404':
           description: Location not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "422":
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
           description: Validation Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HTTPValidationError"
+                $ref: '#/components/schemas/HTTPValidationError'
   /locations/{location}/metrics/forecast_greenness:
     get:
       tags:
-        - Forecasts
+      - Forecasts
       summary: Get greenness forecast for next week
-      description:
-        "Returns ML-generated greenness predictions for the next week.
+      description: 'Returns ML-generated greenness predictions for the next week.
 
-        Results are cached for 5 minutes."
+        Results are cached for 5 minutes.'
       operationId: get_carbon_forecast_locations__location__metrics_forecast_greenness_get
       parameters:
-        - name: location
-          in: path
-          required: true
-          schema:
-            type: string
-            title: Location
+      - name: location
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Location
       responses:
-        "200":
+        '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GreennessForecastResponse"
-        "500":
+                $ref: '#/components/schemas/GreennessForecastResponse'
+        '500':
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
           description: Internal Server Error
-        "404":
+        '404':
           description: Location not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "422":
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
           description: Validation Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HTTPValidationError"
-  /datacenter:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /locations:
     get:
       tags:
-        - Datacenters
-      summary: Get datacenter names
-      description: Returns a list of available datacenter names.
-      operationId: get_datacenters_datacenter_get
+      - Locations
+      summary: Get available locations
+      description: Returns a list of available locations.
+      operationId: get_locations_locations_get
       responses:
-        "200":
+        '200':
           description: Successful Response
           content:
             application/json:
               schema:
                 items:
-                  type: string
+                  $ref: '#/components/schemas/Location'
                 type: array
-                title: Response Get Datacenters Datacenter Get
+                title: Response Get Locations Locations Get
+          links:
+            GetLoadForecast:
+              operationId: get_load_forecast_locations__location__metrics_forecast_load_get
+              parameters:
+                location: $response.body#/0/id
+              description: Get load forecast for a location from the list
+            GetGreennessForecast:
+              operationId: get_carbon_forecast_locations__location__metrics_forecast_greenness_get
+              parameters:
+                location: $response.body#/0/id
+              description: Get greenness forecast for a location from the list
 components:
   schemas:
     Capacity:
@@ -115,8 +125,8 @@ components:
           description: Total number of GPUs
       type: object
       required:
-        - max_load
-        - total_gpus
+      - max_load
+      - total_gpus
       title: Capacity
     ErrorResponse:
       properties:
@@ -125,7 +135,7 @@ components:
           title: Error
       type: object
       required:
-        - error
+      - error
       title: ErrorResponse
     GreennessForecastDataPoint:
       properties:
@@ -143,9 +153,9 @@ components:
           description: Indicates if this is a forecast
       type: object
       required:
-        - timestamp
-        - value
-        - is_forecast
+      - timestamp
+      - value
+      - is_forecast
       title: GreennessForecastDataPoint
     GreennessForecastResponse:
       properties:
@@ -163,22 +173,22 @@ components:
           description: Unit of measurement
         data:
           items:
-            $ref: "#/components/schemas/GreennessForecastDataPoint"
+            $ref: '#/components/schemas/GreennessForecastDataPoint'
           type: array
           title: Data
           description: Time series data
       type: object
       required:
-        - location_id
-        - metric
-        - unit
-        - data
+      - location_id
+      - metric
+      - unit
+      - data
       title: GreennessForecastResponse
     HTTPValidationError:
       properties:
         detail:
           items:
-            $ref: "#/components/schemas/ValidationError"
+            $ref: '#/components/schemas/ValidationError'
           type: array
           title: Detail
       type: object
@@ -203,10 +213,10 @@ components:
           description: Number of available GPUs
       type: object
       required:
-        - timestamp
-        - value
-        - is_forecast
-        - available_gpus
+      - timestamp
+      - value
+      - is_forecast
+      - available_gpus
       title: LoadForecastDataPoint
     LoadForecastResponse:
       properties:
@@ -223,29 +233,44 @@ components:
           title: Unit
           description: Unit of measurement
         capacity:
-          $ref: "#/components/schemas/Capacity"
+          $ref: '#/components/schemas/Capacity'
           description: Capacity information
         data:
           items:
-            $ref: "#/components/schemas/LoadForecastDataPoint"
+            $ref: '#/components/schemas/LoadForecastDataPoint'
           type: array
           title: Data
           description: Time series data
       type: object
       required:
-        - location_id
-        - metric
-        - unit
-        - capacity
-        - data
+      - location_id
+      - metric
+      - unit
+      - capacity
+      - data
       title: LoadForecastResponse
+    Location:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Location identifier
+        name:
+          type: string
+          title: Name
+          description: Human-readable name
+      type: object
+      required:
+      - id
+      - name
+      title: Location
     ValidationError:
       properties:
         loc:
           items:
             anyOf:
-              - type: string
-              - type: integer
+            - type: string
+            - type: integer
           type: array
           title: Location
         msg:
@@ -256,7 +281,7 @@ components:
           title: Error Type
       type: object
       required:
-        - loc
-        - msg
-        - type
+      - loc
+      - msg
+      - type
       title: ValidationError

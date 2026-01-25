@@ -63,9 +63,9 @@ as per the endpoints every time `app` is ran.
 - `GET /locations/{location}/metrics/forecast_greenness` - Returns greenness
   forecast for the next week
 
-#### Datacenter Endpoints
+#### Location Endpoints
 
-- `GET /datacenter` - Returns a list of available datacenter names
+- `GET /locations` - Returns a list of available location's names and ids
 
 ### Example Responses
 

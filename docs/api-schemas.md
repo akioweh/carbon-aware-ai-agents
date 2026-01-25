@@ -154,7 +154,7 @@ forecasting environmental data (Carbon Intensity) and Baseline Load.
 - **`GET /locations/{location}/metrics/forecast_greenness`**: Retrieves the
   greenness (carbon intensity) forecast for the specified location for the next
   week.
-- **`GET /datacenter`**: Retrieves a list of available datacenter names.
+- **`GET /locations`**: Retrieves a list of available location names and IDs.
 
 **Response Models:**
 
