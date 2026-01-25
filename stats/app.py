@@ -154,7 +154,10 @@ app = FastAPI(
     response_model=LoadForecastResponse,
     tags=['Forecasts'],
     summary='Get load forecast for next week',
-    responses={500: {'model': ErrorResponse}},
+    responses={
+        500: {'model': ErrorResponse},
+        404: {'model': ErrorResponse, 'description': 'Location not found'},
+    },
 )
 def get_load_forecast(location: str):
     try:
@@ -171,6 +174,8 @@ def get_load_forecast(location: str):
             save_prediction(cache_key, data)
             return data
 
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={'error': str(e)})
     except Exception as e:
         print(f'Error processing request: {e}')
         return JSONResponse(status_code=500, content={'error': str(e)})
@@ -181,7 +186,10 @@ def get_load_forecast(location: str):
     response_model=GreennessForecastResponse,
     tags=['Forecasts'],
     summary='Get greenness forecast for next week',
-    responses={500: {'model': ErrorResponse}},
+    responses={
+        500: {'model': ErrorResponse},
+        404: {'model': ErrorResponse, 'description': 'Location not found'},
+    },
 )
 def get_carbon_forecast(location: str):
     """
@@ -197,6 +205,8 @@ def get_carbon_forecast(location: str):
             data = generate_next_week_greenness_prediction(location)
             save_prediction(cache_key, data)
             return data
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={'error': str(e)})
     except Exception as e:
         print(f'Error processing request: {e}')
         return JSONResponse(status_code=500, content={'error': str(e)})
