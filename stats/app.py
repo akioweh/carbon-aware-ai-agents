@@ -20,6 +20,11 @@ DB_FILE = 'cache.db'
 HISTORY_FILE = 'history.json'
 
 
+class Location(BaseModel):
+    id: str = Field(..., description='Location identifier')
+    name: str = Field(..., description='Human-readable name')
+
+
 class Capacity(BaseModel):
     max_load: float = Field(..., description='Maximum load capacity')
     total_gpus: int = Field(..., description='Total number of GPUs')
@@ -154,7 +159,10 @@ app = FastAPI(
     response_model=LoadForecastResponse,
     tags=['Forecasts'],
     summary='Get load forecast for next week',
-    responses={500: {'model': ErrorResponse}},
+    responses={
+        500: {'model': ErrorResponse},
+        404: {'model': ErrorResponse, 'description': 'Location not found'},
+    },
 )
 def get_load_forecast(location: str):
     try:
@@ -171,6 +179,8 @@ def get_load_forecast(location: str):
             save_prediction(cache_key, data)
             return data
 
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={'error': str(e)})
     except Exception as e:
         print(f'Error processing request: {e}')
         return JSONResponse(status_code=500, content={'error': str(e)})
@@ -181,7 +191,10 @@ def get_load_forecast(location: str):
     response_model=GreennessForecastResponse,
     tags=['Forecasts'],
     summary='Get greenness forecast for next week',
-    responses={500: {'model': ErrorResponse}},
+    responses={
+        500: {'model': ErrorResponse},
+        404: {'model': ErrorResponse, 'description': 'Location not found'},
+    },
 )
 def get_carbon_forecast(location: str):
     """
@@ -197,18 +210,42 @@ def get_carbon_forecast(location: str):
             data = generate_next_week_greenness_prediction(location)
             save_prediction(cache_key, data)
             return data
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={'error': str(e)})
     except Exception as e:
         print(f'Error processing request: {e}')
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@app.get('/datacenter', tags=['Datacenters'], summary='Get datacenter names')
-def get_datacenters() -> list[str]:
-    """Returns a list of available datacenter names."""
-    return DATA_CENTRES
+@app.get(
+    '/locations',
+    response_model=list[Location],
+    tags=['Locations'],
+    summary='Get available locations',
+    responses={
+        200: {
+            'description': 'Successful Response',
+            'links': {
+                'GetLoadForecast': {
+                    'operationId': 'get_load_forecast_locations__location__metrics_forecast_load_get',
+                    'parameters': {'location': '$response.body#/0/id'},
+                    'description': 'Get load forecast for a location from the list',
+                },
+                'GetGreennessForecast': {
+                    'operationId': 'get_carbon_forecast_locations__location__metrics_forecast_greenness_get',
+                    'parameters': {'location': '$response.body#/0/id'},
+                    'description': 'Get greenness forecast for a location from the list',
+                },
+            },
+        }
+    },
+)
+def get_locations() -> list[Location]:
+    """Returns a list of available locations."""
+    return [Location(id=dc, name=dc.replace('-', ' ')) for dc in DATA_CENTRES]
 
 
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, host='0.0.0.0', port=5000)
+    uvicorn.run(app, port=5000)

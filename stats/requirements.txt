@@ -4,3 +4,5 @@ prophet~=1.2.1
 matplotlib
 uvicorn
 pyyaml
+pytest
+schemathesis
