@@ -17,6 +17,8 @@ forecasting and task scheduling.
 
 ## Getting Started
 
+Use venv (in `.venv`).
+
 ### Installation
 
 ```bash
@@ -61,9 +63,9 @@ as per the endpoints every time `app` is ran.
 - `GET /locations/{location}/metrics/forecast_greenness` - Returns greenness
   forecast for the next week
 
-#### Datacenter Endpoints
+#### Location Endpoints
 
-- `GET /datacenter` - Returns a list of available datacenter names
+- `GET /locations` - Returns a list of available location's names and ids
 
 ### Example Responses
 
@@ -105,6 +107,33 @@ as per the endpoints every time `app` is ran.
   ]
 }
 ```
+
+## Testing
+
+The project uses `pytest` and `schemathesis` for property-based API testing.
+
+To run the tests:
+
+1. **Install dependencies**:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Start the API server** (in a separate terminal):
+
+   ```bash
+   python app.py
+   ```
+
+3. **Run the tests**:
+
+   ```bash
+   python -m pytest tests/test_api_schema.py
+   ```
+
+   Note: The tests assume the API server to be running on
+   `http://localhost:5000`.
 
 ## Data Generation
 

@@ -30,6 +30,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Internal Server Error
+        '404':
+          description: Location not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -65,19 +71,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Internal Server Error
+        '404':
+          description: Location not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-  /datacenter:
+  /locations:
     get:
       tags:
-      - Datacenters
-      summary: Get datacenter names
-      description: Returns a list of available datacenter names.
-      operationId: get_datacenters_datacenter_get
+      - Locations
+      summary: Get available locations
+      description: Returns a list of available locations.
+      operationId: get_locations_locations_get
       responses:
         '200':
           description: Successful Response
@@ -85,9 +97,20 @@ paths:
             application/json:
               schema:
                 items:
-                  type: string
+                  $ref: '#/components/schemas/Location'
                 type: array
-                title: Response Get Datacenters Datacenter Get
+                title: Response Get Locations Locations Get
+          links:
+            GetLoadForecast:
+              operationId: get_load_forecast_locations__location__metrics_forecast_load_get
+              parameters:
+                location: $response.body#/0/id
+              description: Get load forecast for a location from the list
+            GetGreennessForecast:
+              operationId: get_carbon_forecast_locations__location__metrics_forecast_greenness_get
+              parameters:
+                location: $response.body#/0/id
+              description: Get greenness forecast for a location from the list
 components:
   schemas:
     Capacity:
@@ -226,6 +249,21 @@ components:
       - capacity
       - data
       title: LoadForecastResponse
+    Location:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Location identifier
+        name:
+          type: string
+          title: Name
+          description: Human-readable name
+      type: object
+      required:
+      - id
+      - name
+      title: Location
     ValidationError:
       properties:
         loc:

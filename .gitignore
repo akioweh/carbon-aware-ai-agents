@@ -366,3 +366,9 @@ CMakeUserPresets.json
 .history
 .ionide
 
+cache.db
+history.json
+prediction.json
+predictions.json
+
+
