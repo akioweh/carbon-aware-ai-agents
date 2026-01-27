@@ -11,6 +11,12 @@
 #include <string>
 #include <vector>
 
+/// Location as returned by /locations endpoint
+struct Location {
+    std::string id;
+    std::string name;
+};
+
 struct LoadForecastDataPoint {
     std::chrono::system_clock::time_point timestamp;
     double value;
@@ -48,26 +54,24 @@ class StatsAPIClient {
   private:
     std::string host;
 
-    static auto getLoadPath(const std::string &datacenterName) -> std::string {
-        return "/locations/" + datacenterName + "/metrics/forecast_load";
+    static auto getLoadPath(const std::string &locationId) -> std::string {
+        return "/locations/" + locationId + "/metrics/forecast_load";
     }
-    static auto getGreennessPath(const std::string &datacenterName)
-        -> std::string {
-        return "/locations/" + datacenterName + "/metrics/forecast_greenness";
+    static auto getGreennessPath(const std::string &locationId) -> std::string {
+        return "/locations/" + locationId + "/metrics/forecast_greenness";
     }
-    static auto getDatacenterPath() -> std::string { return "/datacenter"; }
+    static auto getLocationsPath() -> std::string { return "/locations"; }
 
   public:
     explicit StatsAPIClient(std::string host = "http://127.0.0.1:5000");
 
-    auto getDatacenterNames() -> drogon::Task<std::vector<std::string>>;
-    auto getLoadForecast(const std::string &location)
+    auto getLocations() -> drogon::Task<std::vector<Location>>;
+    auto getLoadForecast(const std::string &locationId)
         -> drogon::Task<std::optional<LoadForecast>>;
-    auto getGreennessForecast(const std::string &location)
+    auto getGreennessForecast(const std::string &locationId)
         -> drogon::Task<std::optional<GreennessForecast>>;
 
-    auto getDatacenter(const std::string &datacenterName)
-        -> drogon::Task<Datacenter>;
+    auto getDatacenter(const std::string &locationId) -> drogon::Task<Datacenter>;
     auto getAllDatacenters() -> drogon::Task<std::vector<Datacenter>>;
 };
 

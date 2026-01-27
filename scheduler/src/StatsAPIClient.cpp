@@ -18,19 +18,21 @@ using namespace drogon;
 
 StatsAPIClient::StatsAPIClient(string host) : host(std::move(host)) {}
 
-auto StatsAPIClient::getDatacenterNames() -> Task<vector<string>> {
+auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
     auto jsonPtr =
-        co_await scheduler::utils::makeGetRequest(host, getDatacenterPath());
+        co_await scheduler::utils::makeGetRequest(host, getLocationsPath());
     if (!jsonPtr) {
-        LOG_ERROR << "Failed to get datacenter names";
+        LOG_ERROR << "Failed to get locations";
         co_return {};
     }
 
     const auto &json = *jsonPtr;
-    auto names = vector<string>(json.size());
-    for (const auto &&[i, name] : ranges::views::enumerate(json))
-        names[i] = name.asString();
-    co_return names;
+    auto locations = vector<Location>{};
+    locations.reserve(json.size());
+    for (const auto &item : json) {
+        locations.emplace_back(item["id"].asString(), item["name"].asString());
+    }
+    co_return locations;
 }
 
 auto StatsAPIClient::getLoadForecast(const string &location)
@@ -147,15 +149,15 @@ auto StatsAPIClient::getDatacenter(const string &datacenterName)
 }
 
 auto StatsAPIClient::getAllDatacenters() -> Task<vector<Datacenter>> {
-    auto names = co_await getDatacenterNames();
-    if (names.empty()) {
-        LOG_ERROR << "No datacenters found";
+    auto locations = co_await getLocations();
+    if (locations.empty()) {
+        LOG_ERROR << "No locations found";
         co_return {};
     }
 
     co_return co_await scheduler::coro::when_all(
-        names | views::transform([this](const auto &name) -> auto {
-            return getDatacenter(name);
+        locations | views::transform([this](const auto &loc) -> auto {
+            return getDatacenter(loc.id);
         }) |
         ranges::to<vector>());
 }
