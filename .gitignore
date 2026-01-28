@@ -1,8 +1,3 @@
-# Generated data files
-history.json
-prediction.json
-predictions.json
-
 # Python
 __pycache__/
 *.py[cod]
@@ -370,4 +365,10 @@ CMakeUserPresets.json
 # Ignore all local history of files
 .history
 .ionide
+
+cache.db
+history.json
+prediction.json
+predictions.json
+
 

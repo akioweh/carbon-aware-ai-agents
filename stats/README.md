@@ -1,32 +1,33 @@
 # Stats Component
 
-A Flask-based API for tracking and retrieving data center load and grid energy greenness metrics.
+A RESTful API for tracking and retrieving data center load and grid energy
+greenness metrics.
 
 ## Overview
 
 This API provides historical and current data about:
 
-- **Load**: Data center load ranging from 0-50 arbitrary units (50 being capacity)
-- **Greenness**: Energy greenness score from 0-100 (higher values indicate greener energy)
+- **Load**: Data center load ranging from 0-50 arbitrary units (50 being
+  capacity)
+- **Greenness**: Energy greenness score from 0-100 (higher values indicate
+  greener energy)
 
-Data is collected at 5-minute intervals and is pattern-based to enable forecasting and task scheduling.
+Data is collected at 5-minute intervals and is pattern-based to enable
+forecasting and task scheduling.
 
 ## Getting Started
 
-### Prerequisites
-
-- Python 3.x
-- Flask
+Use venv (in `.venv`).
 
 ### Installation
 
 ```bash
-pip install flask
+pip install -r requirements.txt
 ```
 
 ### Generate History Data
 
-Before running the API, generate sample history data:
+Before running the API, optionally generate sample history data:
 
 ```bash
 python generate_history.py
@@ -42,93 +43,132 @@ python app.py
 
 The API will start on `http://localhost:5000` by default.
 
+...or directly using `uvicorn`:
+
+```bash
+uvicorn app:app --reload
+```
+
 ## API Documentation
 
-The API is fully documented using OpenAPI 3.0 specification. See `openapi.yaml` for the complete specification.
+An OpenAPI 3.0 specification, [openapi.yaml](./openapi.yaml), is auto-generated
+as per the endpoints every time `app` is ran.
 
 ### Endpoints
 
-#### History Endpoints
+#### Forecast Endpoints
 
-- `GET /history` - Returns complete history with timestamp, load, and greenness
-- `GET /load/history` - Returns load history only (timestamp + load)
-- `GET /greenness/history` - Returns greenness history only (timestamp + greenness)
+- `GET /locations/{location}/metrics/forecast_load` - Returns load forecast for
+  the next week
+- `GET /locations/{location}/metrics/forecast_greenness` - Returns greenness
+  forecast for the next week
 
-#### Latest Endpoints
+#### Location Endpoints
 
-- `GET /latest` - Returns the most recent data point (timestamp, load, greenness)
-- `GET /load/latest` - Returns the most recent load data (timestamp + load)
-- `GET /greenness/latest` - Returns the most recent greenness data (timestamp + greenness)
+- `GET /locations` - Returns a list of available location's names and ids
 
 ### Example Responses
 
-#### Full Data Point
+#### Load Forecast Response
 
 ```json
 {
-  "timestamp": "2025-12-05T18:20:39.679404",
-  "load": 25.5,
-  "greenness": 75.3
+  "location_id": "Data-Center-1",
+  "metric": "forecast_load",
+  "unit": "utilization_units",
+  "capacity": {
+    "max_load": 50.0,
+    "total_gpus": 32
+  },
+  "data": [
+    {
+      "timestamp": "2026-01-23T19:00:00",
+      "value": 25.5,
+      "is_forecast": true,
+      "available_gpus": 16
+    }
+  ]
 }
 ```
 
-#### Load Data Point
+#### Greenness Forecast Response
 
 ```json
 {
-  "timestamp": "2025-12-05T18:20:39.679404",
-  "load": 25.5
+  "location_id": "Data-Center-1",
+  "metric": "forecast_greenness",
+  "unit": "greenness_score",
+  "data": [
+    {
+      "timestamp": "2026-01-23T19:00:00",
+      "value": 75.3,
+      "is_forecast": true
+    }
+  ]
 }
 ```
 
-#### Greenness Data Point
+## Testing
 
-```json
-{
-  "timestamp": "2025-12-05T18:20:39.679404",
-  "greenness": 75.3
-}
-```
+The project uses `pytest` and `schemathesis` for property-based API testing.
 
-## OpenAPI Schema
+To run the tests:
 
-The complete OpenAPI 3.0 schema is available in `openapi.yaml`. You can use this schema with various tools:
+1. **Install dependencies**:
 
-### Validation
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Validate the OpenAPI schema:
+2. **Start the API server** (in a separate terminal):
 
-```bash
-pip install openapi-spec-validator
-openapi-spec-validator openapi.yaml
-```
+   ```bash
+   python app.py
+   ```
 
-### Swagger UI
+3. **Run the tests**:
 
-You can view the API documentation using Swagger UI or other OpenAPI tools by importing the `openapi.yaml` file.
+   ```bash
+   python -m pytest tests/test_api_schema.py
+   ```
 
-### Viewing with Swagger Editor
-
-1. Go to [Swagger Editor](https://editor.swagger.io/)
-2. Import the `openapi.yaml` file
-3. View the interactive documentation
+   Note: The tests assume the API server to be running on
+   `http://localhost:5000`.
 
 ## Data Generation
 
-The `generate_history.py` script creates synthetic data with the following patterns:
+The `generate_history.py` script creates synthetic data with complex, realistic
+patterns:
 
-- **Load**: Follows a daily sinusoidal pattern with peak at 3pm and low at 3am
-  - Weekends have 30% less load than weekdays
-  - Random noise is added for realism
-  - Values range from 0-50 units
+- **Load**: Follows a realistic "workday" vs "weekend" schedule.
+  - **Weekdays**: Feature a morning spike (start of work), a slight lunch dip,
+    sustained afternoon load, and evening activity.
+  - **Weekends**: Smoother, lower overall load peaking in the afternoon.
+  - **Micro-bursts**: Random, short-duration spikes in load (simulating batch
+    jobs or traffic surges).
+  - Values range from 0-50 units.
 
-- **Greenness**: Varies by time of day to simulate solar energy availability
-  - High during sunny hours (10am-4pm): ~80
-  - Medium during morning/evening (6am-10am, 4pm-8pm): ~40-50
-  - Low during night (8pm-6am): ~10
-  - Random noise is added for realism
-  - Values range from 0-100
+- **Greenness**: Modeled using a simulated "Weather System" that persists state
+  over time.
+  - **Solar**: Bell curve based on time of day, modulated by dynamic **Cloud
+    Cover**.
+  - **Wind**: Random walk "wind speed" trend that changes slowly over
+    hours/days.
+  - **Grid Baseline**: A slowly fluctuating baseline representing other grid
+    sources.
+  - The final score is a weighted sum of Solar, Wind, and Grid factors.
+  - Values range from 0-100.
 
-## Notes
+## Service Behavior
 
-This is a prototype API designed for demonstrating carbon-aware scheduling concepts. The data is synthetic and pattern-based to enable predictable forecasting and task scheduling.
+- On startup, the service loads historical data from `history.json` and
+  generates them fresh if not found.
+- The service concurrently (in a background thread) computes new predictions
+  (every 5 minutes)
+- On each request, the service returns the latest data point from the history.
+
+Specifically, the background worker writes to a sqlite database that the request
+handlers also read from.
+
+> [!TIP]  
+> This architecture avoids stale data while also maintaining API latency.
