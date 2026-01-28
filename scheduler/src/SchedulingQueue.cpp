@@ -2,7 +2,6 @@
 #include "JobRequest.hpp"
 #include <SchedulingQueue.hpp>
 #include <atomic>
-#include <coroutine>
 #include <drogon/utils/coroutine.h>
 
 auto SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
@@ -36,6 +35,11 @@ start:;
         auto schedule = scheduler.getSchedule();
 
         auto persist = [impact, schedule]() mutable -> void {
+            if (schedule.size() == 0) {
+                LOG_WARN
+                    << "the size of a scheduled job is zero - not persisiting";
+                return;
+            }
             const auto &first = *schedule.begin();
             const auto jobId = first.jobId;
             calendarService.add(jobId, {impact, std::move(schedule)});
@@ -43,12 +47,13 @@ start:;
 
         task->setValue(impact, std::move(schedule));
         task->resume();
+
         // ok aparently this can break, if the coroutine gets destroyed
         // cause then the task points to garbage
         // however i dont really know how to solve it
         // cause then even the coroutine handle is bad, and its a pointer
         // so we cant know it points to garbage.
-        drogon::async_run([&persist]() -> drogon::Task<> {
+        drogon::async_run([persist]() mutable -> drogon::Task<> {
             persist();
             co_return;
         });

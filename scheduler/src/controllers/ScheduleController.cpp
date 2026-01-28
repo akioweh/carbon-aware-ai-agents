@@ -75,7 +75,8 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     const auto jobRequest =
         JobRequest(jobType, workload, earliestStart, latestFinish, jobId);
 
-    const auto &&[impact, fullSchedule] = co_await schedulingQueue.computeSchedule(jobRequest) ;
+    const auto &&[impact, fullSchedule] =
+        co_await schedulingQueue.computeSchedule(jobRequest);
 
     Json::Value ret;
     ret["schedule_id"] = "sched-" + jobId;

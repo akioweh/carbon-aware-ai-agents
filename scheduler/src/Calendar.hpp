@@ -9,7 +9,7 @@
 
 class CalendarService {
   private:
-    using Schedule = std::pair<SchedulingImpact,std::set<ScheduledInterval>>;
+    using Schedule = std::pair<SchedulingImpact, std::set<ScheduledInterval>>;
     using Calendar = std::map<std::string, Schedule>;
     Calendar calendar;
     mutable std::shared_mutex mutex;

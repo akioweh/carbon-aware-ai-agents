@@ -76,6 +76,7 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
         .total_emissions = co2emissions,
         .sci = carbon_intensity, // for now they're the same
     };
+
     co_return impact;
 }
 
