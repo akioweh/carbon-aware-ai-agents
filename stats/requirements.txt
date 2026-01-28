@@ -6,3 +6,4 @@ uvicorn
 pyyaml
 pytest
 schemathesis
+yaml
