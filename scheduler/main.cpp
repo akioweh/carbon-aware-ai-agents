@@ -25,10 +25,7 @@ auto generateJobRequest(int seed) -> JobRequest {
 
 auto main() -> int {
     drogon::app().setLogPath(".");
-
-    auto schedulingQueue = std::make_shared<SchedulingQueue>();
-    ScheduleController::setSchedulingQueue(schedulingQueue);
-
+    
     /*
     drogon::async_run([&]() -> drogon::Task<> {
         auto [impact, dummy] =

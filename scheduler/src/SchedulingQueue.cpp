@@ -1,3 +1,4 @@
+#include "Calendar.hpp"
 #include "JobRequest.hpp"
 #include <SchedulingQueue.hpp>
 #include <atomic>
@@ -19,7 +20,7 @@ auto SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
 
 auto SchedulingQueue::computeSchedule(const JobRequest &jobRequest)
     -> drogon::Task<std::pair<SchedulingImpact, std::set<ScheduledInterval>>> {
-    auto schedulerTask = std::make_shared<SchedulerTask>(jobRequest) ;
+    auto schedulerTask = std::make_shared<SchedulerTask>(jobRequest);
     push_back(schedulerTask.get());
     co_return co_await *schedulerTask;
 }
@@ -33,6 +34,13 @@ start:;
         Scheduler scheduler;
         auto impact = co_await scheduler.calculateSchedule(task->jobRequest);
         auto schedule = scheduler.getSchedule();
+
+        auto persist = [impact, schedule]() mutable -> void {
+            const auto &first = *schedule.begin();
+            const auto jobId = first.jobId;
+            calendarService.add(jobId, {impact, std::move(schedule)});
+        };
+
         task->setValue(impact, std::move(schedule));
         task->resume();
         // ok aparently this can break, if the coroutine gets destroyed
@@ -40,6 +48,10 @@ start:;
         // however i dont really know how to solve it
         // cause then even the coroutine handle is bad, and its a pointer
         // so we cant know it points to garbage.
+        drogon::async_run([&persist]() -> drogon::Task<> {
+            persist();
+            co_return;
+        });
     }
 
     running.store(false, std::memory_order_release);
@@ -51,5 +63,5 @@ start:;
         }
     }
 
-    co_return ;
+    co_return;
 }

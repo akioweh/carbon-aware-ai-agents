@@ -53,6 +53,13 @@ class SchedulingQueue {
     SchedulingQueue() : Q(initialSize) {};
     auto computeSchedule(const JobRequest &) -> drogon::Task<
         std::pair<SchedulingImpact, std::set<ScheduledInterval>>>;
+
+    SchedulingQueue(const SchedulingQueue &) = delete;
+    SchedulingQueue(SchedulingQueue &&) = delete;
+    auto operator=(const SchedulingQueue &) -> SchedulingQueue & = delete;
+    auto operator=(SchedulingQueue &&) -> SchedulingQueue & = delete;
 };
+
+inline SchedulingQueue schedulingQueue;
 
 #endif
