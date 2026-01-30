@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
+find_package(PostgreSQL REQUIRED)
 project(scheduler)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -15,7 +16,7 @@ target_include_directories(scheduler PRIVATE src)
 target_link_libraries(scheduler PRIVATE stdc++exp) # g++ std23 stuff
 
 find_package(Drogon CONFIG REQUIRED)
-target_link_libraries(scheduler PRIVATE Drogon::Drogon)
+target_link_libraries(scheduler PRIVATE Drogon::Drogon PostgreSQL::PostgreSQL)
 
 # copy compile_commands.json to root for clangd
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
