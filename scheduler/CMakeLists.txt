@@ -18,6 +18,12 @@ target_link_libraries(scheduler PRIVATE stdc++exp) # g++ std23 stuff
 find_package(Drogon CONFIG REQUIRED)
 target_link_libraries(scheduler PRIVATE Drogon::Drogon PostgreSQL::PostgreSQL)
 
+configure_file(
+    "${PROJECT_SOURCE_DIR}/config.json"
+    "${CMAKE_CURRENT_BINARY_DIR}/config.json"
+    COPYONLY
+)
+
 # copy compile_commands.json to root for clangd
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
   add_custom_target(CopyCompileCommands ALL

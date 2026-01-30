@@ -26,6 +26,8 @@ auto generateJobRequest(int seed) -> JobRequest {
 auto main() -> int {
     drogon::app().setLogPath(".");
 
+    drogon::app().loadConfigFile("config.json");
+    
     /*
     drogon::async_run([&]() -> drogon::Task<> {
         auto [impact, dummy] =
