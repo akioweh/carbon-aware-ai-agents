@@ -1,10 +1,4 @@
-#include "Scheduler.hpp"
-#include "SchedulingQueue.hpp"
-#include "controllers/ScheduleController.hpp"
-#include <JobRequest.hpp>
-#include <chrono>
 #include <drogon/drogon.h>
-#include <iostream>
 
 #ifdef _WIN32
 #include <windows.h>

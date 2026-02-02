@@ -1,14 +1,14 @@
 #ifndef SCHEDULER
 #define SCHEDULER
-#include "ScheduledInterval.hpp"
 #pragma once
 
-#include <Datacenter.hpp>
-#include <JobRequest.hpp>
-#include <PredictedDatacenterInformation.hpp>
+#include <structs/ScheduledInterval.hpp>
 #include <Serializable.hpp>
 #include <StatsAPIClient.hpp>
 #include <set>
+#include <structs/Datacenter.hpp>
+#include <structs/JobRequest.hpp>
+#include <structs/PredictedDatacenterInformation.hpp>
 
 struct SchedulingImpact {
     double carbon_intensity{};

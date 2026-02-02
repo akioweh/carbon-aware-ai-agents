@@ -1,5 +1,5 @@
-#include "StatsAPIClient.hpp"
-#include <Datacenter.hpp>
+#include <StatsAPIClient.hpp>
+#include <structs/Datacenter.hpp>
 #include <algorithm>
 #include <drogon/HttpClient.h>
 #include <drogon/HttpRequest.h>

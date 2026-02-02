@@ -1,10 +1,10 @@
 #ifndef CALENDAR
 #define CALENDAR
-#include "Scheduler.hpp"
-#include <expected>
 #pragma once
 
-#include <ScheduledInterval.hpp>
+#include <Scheduler.hpp>
+#include <expected>
+#include <structs/ScheduledInterval.hpp>
 #include <shared_mutex>
 
 class CalendarService {

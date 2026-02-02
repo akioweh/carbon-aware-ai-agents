@@ -2,13 +2,13 @@
 #define STATS_API_CLIENT
 #pragma once
 
-#include "Datacenter.hpp"
 #include <chrono>
 #include <drogon/drogon.h>
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
 #include <optional>
 #include <string>
+#include <structs/Datacenter.hpp>
 #include <vector>
 
 /// Location as returned by /locations endpoint
@@ -71,7 +71,8 @@ class StatsAPIClient {
     auto getGreennessForecast(const std::string &locationId)
         -> drogon::Task<std::optional<GreennessForecast>>;
 
-    auto getDatacenter(const std::string &locationId) -> drogon::Task<Datacenter>;
+    auto getDatacenter(const std::string &locationId)
+        -> drogon::Task<Datacenter>;
     auto getAllDatacenters() -> drogon::Task<std::vector<Datacenter>>;
 };
 

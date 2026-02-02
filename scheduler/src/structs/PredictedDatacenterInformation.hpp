@@ -6,8 +6,7 @@
 #include <chrono>
 #include <utility>
 
-class PredictedDatacenterInformation {
-  public:
+struct PredictedDatacenterInformation {
     std::chrono::system_clock::time_point timestamp;
     std::chrono::seconds lengthOfInterval;
     double currentLoad;

@@ -1,6 +1,6 @@
-#include <JobRequest.hpp>
 #include <Scheduler.hpp>
 #include <StatsAPIClient.hpp>
+#include <structs/JobRequest.hpp>
 
 using namespace std;
 using namespace drogon;

@@ -1,6 +1,6 @@
-#include "ScheduleController.hpp"
-#include "ScheduledInterval.hpp"
-#include <JobRequest.hpp>
+#include <controllers/ScheduleController.hpp>
+#include <structs/JobRequest.hpp>
+#include <structs/ScheduledInterval.hpp>
 #include <utils/Utils.hpp>
 
 using Callback = std::function<void(const drogon::HttpResponsePtr &)>;

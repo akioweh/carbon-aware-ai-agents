@@ -1,13 +1,13 @@
 #ifndef JOB_REQUEST
 #define JOB_REQUEST
+#pragma once
 
 #include <Serializable.hpp>
 #include <chrono>
 #include <string>
 #include <utility>
 
-class JobRequest {
-  public:
+struct JobRequest {
     std::string job_type;
     double workload_amount;
     std::chrono::system_clock::time_point earliest_start;

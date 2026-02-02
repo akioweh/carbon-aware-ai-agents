@@ -1,5 +1,6 @@
 #ifndef DATACENTER_SPECIFIC_INFORMATION
 #define DATACENTER_SPECIFIC_INFORMATION
+#pragma once
 
 #include <Serializable.hpp>
 #include <string>

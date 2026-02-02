@@ -1,13 +1,13 @@
 #ifndef SCHEDULING_QUEUE
 #define SCHEDULING_QUEUE
-#include "ScheduledInterval.hpp"
-#include <atomic>
-#include <coroutine>
 #pragma once
 
-#include <JobRequest.hpp>
 #include <Scheduler.hpp>
+#include <atomic>
 #include <boost/lockfree/queue.hpp>
+#include <coroutine>
+#include <structs/JobRequest.hpp>
+#include <structs/ScheduledInterval.hpp>
 
 class SchedulerTask {
     std::atomic<std::coroutine_handle<>> taskHandle{nullptr};

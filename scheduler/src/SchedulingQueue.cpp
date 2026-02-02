@@ -1,8 +1,8 @@
-#include "Calendar.hpp"
-#include "JobRequest.hpp"
+#include <Calendar.hpp>
 #include <SchedulingQueue.hpp>
 #include <atomic>
 #include <drogon/utils/coroutine.h>
+#include <structs/JobRequest.hpp>
 
 auto SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
     (void)queueSize.fetch_add(1, std::memory_order_release);

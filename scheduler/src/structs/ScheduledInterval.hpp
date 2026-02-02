@@ -27,8 +27,9 @@ class ScheduledInterval {
     }
 
     void show() const {
-        std::cout << location << " " << scheduler::utils::toIso8601(timestamp) << " " << jobId
-                  << " " << additionalLoad << " " << totalLoad << ",\n";
+        std::cout << location << " " << scheduler::utils::toIso8601(timestamp)
+                  << " " << jobId << " " << additionalLoad << " " << totalLoad
+                  << ",\n";
     }
 };
 

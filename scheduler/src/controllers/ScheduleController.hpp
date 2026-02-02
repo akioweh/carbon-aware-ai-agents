@@ -1,9 +1,9 @@
 #ifndef SCHEDULE_CONTROLLER_HPP
 #define SCHEDULE_CONTROLLER_HPP
-#include "SchedulingQueue.hpp"
 #pragma once
 
 #include <Scheduler.hpp>
+#include <SchedulingQueue.hpp>
 #include <drogon/HttpController.h>
 #include <drogon/utils/coroutine.h>
 
