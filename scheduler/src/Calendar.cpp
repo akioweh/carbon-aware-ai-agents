@@ -1,44 +1,48 @@
 #include "Calendar.hpp"
 #include "Scheduler.hpp"
 #include <expected>
-#include <mutex>
 #include <models/Impacts.h>
 #include <models/Jobs.h>
+#include <mutex>
+#include <trantor/utils/Date.h>
+#include <utils/Utils.hpp>
 
-using JobModel = drogon_model::calendar_db::Jobs ;
-using ImpactModel = drogon_model::calendar_db::Impacts ;
+using JobModel = drogon_model::calendar_db::Jobs;
+using ImpactModel = drogon_model::calendar_db::Impacts;
 
 using JobMapper = drogon::orm::Mapper<JobModel>;
 using ImpactMapper = drogon::orm::Mapper<ImpactModel>;
 
 auto CalendarService::add(const std::string &jobId, Schedule schedule) -> void {
     std::unique_lock lock(mutex);
-    
-    const auto dbPtr = drogon::app().getFastDbClient(); 
-    ImpactMapper impactMapper(dbPtr) ;
-    JobMapper jobsMapper(dbPtr) ;
 
-    const auto& [impact, intervals] = schedule; 
+    const auto dbPtr = drogon::app().getDbClient();
+    ImpactMapper impactMapper(dbPtr);
+    JobMapper jobsMapper(dbPtr);
+
+    const auto &[impact, intervals] = schedule;
 
     ImpactModel impactDB;
-    impactDB.setCarbonIntensity(impact.carbon_intensity) ;
-    impactDB.setSci(impact.sci) ;
-    impactDB.setTotalEmissions(impact.total_emissions) ;
+    impactDB.setCarbonIntensity(impact.carbon_intensity);
+    impactDB.setSci(impact.sci);
+    impactDB.setTotalEmissions(impact.total_emissions);
     // can refactor this later to other function
 
-    impactMapper.insert(impactDB) ;
-    const int impactId = *impactDB.getId() ;
+    impactMapper.insert(impactDB);
+    const int impactId = *impactDB.getId();
 
-    std::vector<JobModel> jobsBatch ;
-    for(const auto& interval: intervals)
-    {
-        JobModel job; 
-        job.setAdditionalLoad(interval.additionalLoad) ;
-        job.setTotalLoad(interval.totalLoad) ;
-        job.setLocationId(interval.location) ;
-        job.setImpactId(impactId) ;
+    std::vector<JobModel> jobsBatch;
+    for (const auto &interval : intervals) {
+        JobModel job;
+        job.setAdditionalLoad(interval.additionalLoad);
+        job.setTotalLoad(interval.totalLoad);
+        job.setLocationId(interval.location);
+        job.setImpactId(impactId);
+        job.setTimeStamp(
+            scheduler::utils::getPostGreDateFormat(interval.timestamp));
+        jobsMapper.insert(job);
         /// this can also be refactored
-        jobsBatch.push_back(std::move(job)) ;
+        jobsBatch.push_back(std::move(job));
     }
 
     calendar[jobId] = std::move(schedule);
