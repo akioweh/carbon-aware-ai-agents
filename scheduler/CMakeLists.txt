@@ -9,7 +9,10 @@ add_compile_options(-Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "src/*.cpp")
+file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS 
+    "src/*.cpp" 
+    "src/*.cc"
+)
 add_executable(scheduler main.cpp ${SRC_FILES})
 target_include_directories(scheduler PRIVATE src)
 
