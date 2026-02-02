@@ -1,8 +1,6 @@
 #include <JobRequest.hpp>
-#include <ScheduleForDatacenter.hpp>
 #include <Scheduler.hpp>
 #include <StatsAPIClient.hpp>
-#include <ranges>
 
 using namespace std;
 using namespace drogon;
@@ -80,18 +78,9 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
 
         co2emissions += (interval.currentGreenness * energy) / KWH;
 
-        if (!fullSchedule.contains(interval.datacenterInfo.datacenterId)) {
-            auto scheduleForDC = ScheduleForDatacenter(interval.datacenterInfo);
-            fullSchedule.emplace(interval.datacenterInfo.datacenterId,
-                                 scheduleForDC);
-        }
-
-        const auto scheduledInterval =
-            ScheduledInterval(interval.timestamp, job.jobId, additionalLoad,
-                              additionalLoad + interval.currentLoad);
-
-        fullSchedule[interval.datacenterInfo.datacenterId].addInterval(
-            scheduledInterval);
+        fullSchedule.emplace(interval.timestamp, job.jobId,
+                             interval.datacenterInfo.name, additionalLoad,
+                             additionalLoad + interval.currentLoad);
     }
 
     const auto carbon_intensity =
@@ -101,11 +90,12 @@ auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
         .total_emissions = co2emissions,
         .sci = carbon_intensity, // for now they're the same
     };
+
     co_return impact;
 }
 
 void Scheduler::show() const {
-    for (auto [datacenterId, scheduleForDC] : fullSchedule) {
-        scheduleForDC.show();
+    for (const auto &interval : fullSchedule) {
+        interval.show();
     }
 }

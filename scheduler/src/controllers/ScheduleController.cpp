@@ -1,4 +1,5 @@
 #include "ScheduleController.hpp"
+#include "ScheduledInterval.hpp"
 #include <JobRequest.hpp>
 #include <utils/Utils.hpp>
 
@@ -74,34 +75,26 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     const auto jobRequest =
         JobRequest(jobType, workload, earliestStart, latestFinish, jobId);
 
-    auto scheduler = Scheduler{};
-
-    SchedulingImpact impact = co_await scheduler.calculateSchedule(jobRequest);
+    const auto &&[impact, fullSchedule] =
+        co_await schedulingQueue.computeSchedule(jobRequest);
 
     Json::Value ret;
     ret["schedule_id"] = "sched-" + jobId;
     ret["message"] = "Schedule created successfully";
 
     Json::Value blocks(Json::arrayValue);
-    const auto &fullSchedule = scheduler.getSchedule();
 
-    for (const auto &[dcId, scheduleForDC] : fullSchedule) {
-        Json::Value dcJson = toJson(scheduleForDC);
-        // Assuming datacenterInfo has a name field we can use as location
-        std::string location = dcJson["datacenterInfo"]["name"].asString();
-        const auto &intervals = dcJson["intervals"];
+    for (const auto &interval : fullSchedule | std::views::transform(toJson)) {
+        Json::Value block;
+        block["timestamp"] = interval["timestamp"]; // Already string from
+                                                    // ScheduledInterval::toJson
+        block["location"] = interval["location"];
+        block["job_id"] = interval["job_id"];
+        block["additional_load"] = interval["additional_load"];
 
-        for (const auto &interval : intervals) {
-            Json::Value block;
-            block["timestamp"] =
-                interval["timestamp"]; // Already string from toJson
-            block["location"] = location;
-            block["job_id"] = interval["job_id"];
-            block["additional_load"] = interval["additional_load"];
-
-            blocks.append(block);
-        }
+        blocks.append(block);
     }
+
     ret["scheduled_blocks"] = blocks;
 
     ret["impact"] = toJson(impact);

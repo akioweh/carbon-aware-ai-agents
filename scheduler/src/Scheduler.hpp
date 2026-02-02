@@ -1,14 +1,13 @@
 #ifndef SCHEDULER
 #define SCHEDULER
+#include "ScheduledInterval.hpp"
 #pragma once
 
 #include <Datacenter.hpp>
 #include <JobRequest.hpp>
 #include <PredictedDatacenterInformation.hpp>
-#include <ScheduleForDatacenter.hpp>
 #include <Serializable.hpp>
 #include <StatsAPIClient.hpp>
-#include <map>
 #include <set>
 
 struct SchedulingImpact {
@@ -33,8 +32,7 @@ class Scheduler {
 
     StatsAPIClient statsAPIClient;
 
-    std::map<long long, ScheduleForDatacenter>
-        fullSchedule; // datacenterId -> schedule
+    std::set<ScheduledInterval> fullSchedule;
 
     auto getCombinedIntervals(const std::vector<Datacenter> &data)
         -> std::multiset<PredictedDatacenterInformation>;
@@ -46,7 +44,7 @@ class Scheduler {
     auto calculateSchedule(JobRequest job) -> drogon::Task<SchedulingImpact>;
     void show() const;
     [[nodiscard]] auto getSchedule() const
-        -> const std::map<long long, ScheduleForDatacenter> & {
+        -> const std::set<ScheduledInterval> & {
         return fullSchedule;
     }
 };

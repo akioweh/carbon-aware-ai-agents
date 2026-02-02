@@ -1,5 +1,6 @@
 #ifndef SCHEDULE_CONTROLLER_HPP
 #define SCHEDULE_CONTROLLER_HPP
+#include "SchedulingQueue.hpp"
 #pragma once
 
 #include <Scheduler.hpp>
