@@ -5,6 +5,7 @@
 #include <models/Jobs.h>
 #include <mutex>
 #include <trantor/utils/Date.h>
+#include <trantor/utils/Logger.h>
 #include <utils/Utils.hpp>
 
 using JobModel = drogon_model::calendar_db::Jobs;
@@ -16,9 +17,15 @@ using ImpactMapper = drogon::orm::Mapper<ImpactModel>;
 auto CalendarService::add(const std::string &jobId, Schedule schedule) -> void {
     std::unique_lock lock(mutex);
 
-    const auto dbPtr = drogon::app().getDbClient();
-    ImpactMapper impactMapper(dbPtr);
-    JobMapper jobsMapper(dbPtr);
+    const auto transaction =
+        drogon::app().getDbClient()->newTransaction([jobId](bool success) {
+            if (!success) {
+                LOG_ERROR << "Transaction failed! With jobId: " << jobId
+                          << '\n';
+            }
+        });
+    ImpactMapper impactMapper(transaction);
+    JobMapper jobsMapper(transaction);
 
     const auto &[impact, intervals] = schedule;
 
@@ -31,7 +38,6 @@ auto CalendarService::add(const std::string &jobId, Schedule schedule) -> void {
     impactMapper.insert(impactDB);
     const int impactId = *impactDB.getId();
 
-    std::vector<JobModel> jobsBatch;
     for (const auto &interval : intervals) {
         JobModel job;
         job.setAdditionalLoad(interval.additionalLoad);
@@ -42,7 +48,6 @@ auto CalendarService::add(const std::string &jobId, Schedule schedule) -> void {
             scheduler::utils::getPostGreDateFormat(interval.timestamp));
         jobsMapper.insert(job);
         /// this can also be refactored
-        jobsBatch.push_back(std::move(job));
     }
 
     calendar[jobId] = std::move(schedule);
