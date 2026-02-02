@@ -7,12 +7,11 @@
 #include <boost/lockfree/queue.hpp>
 #include <coroutine>
 #include <structs/JobRequest.hpp>
-#include <structs/ScheduledInterval.hpp>
+#include <structs/ScheduleBlock.hpp>
 
 class SchedulerTask {
     std::atomic<std::coroutine_handle<>> taskHandle{nullptr};
-    using Value = std::pair<SchedulingImpact, std::set<ScheduledInterval>>;
-    Value value;
+    ScheduleResult value;
 
   public:
     JobRequest jobRequest;
@@ -25,12 +24,9 @@ class SchedulerTask {
         taskHandle.notify_one();
     }
 
-    auto await_resume() -> Value { return std::move(value); }
+    auto await_resume() -> ScheduleResult { return std::move(value); }
 
-    auto setValue(SchedulingImpact impact,
-                  std::set<ScheduledInterval> &&schedule) {
-        value = {impact, std::move(schedule)};
-    }
+    auto setValue(const ScheduleResult &result) { value = std::move(result); }
 
     auto resume() {
         taskHandle.wait(nullptr, std::memory_order_acquire);
@@ -51,8 +47,7 @@ class SchedulingQueue {
 
   public:
     SchedulingQueue() : Q(initialSize) {};
-    auto computeSchedule(const JobRequest &) -> drogon::Task<
-        std::pair<SchedulingImpact, std::set<ScheduledInterval>>>;
+    auto computeSchedule(const JobRequest &) -> drogon::Task<ScheduleResult>;
 
     SchedulingQueue(const SchedulingQueue &) = delete;
     SchedulingQueue(SchedulingQueue &&) = delete;

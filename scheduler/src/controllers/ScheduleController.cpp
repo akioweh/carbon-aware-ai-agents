@@ -1,6 +1,6 @@
 #include <controllers/ScheduleController.hpp>
 #include <structs/JobRequest.hpp>
-#include <structs/ScheduledInterval.hpp>
+#include <structs/ScheduleBlock.hpp>
 #include <utils/Utils.hpp>
 
 using Callback = std::function<void(const drogon::HttpResponsePtr &)>;
@@ -14,11 +14,6 @@ void sendBadRequest(const Callback &callback, std::string_view message) {
     resp->setBody(err.toStyledString());
     resp->setContentTypeCode(drogon::CT_APPLICATION_JSON);
     callback(resp);
-}
-
-auto generateJobId() -> std::string {
-    static int counter = 0;
-    return "job-" + std::to_string(++counter);
 }
 } // namespace
 
@@ -70,35 +65,15 @@ auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
     }
     const auto &[earliestStart, latestFinish] = parseResult.value();
 
-    std::string jobId = generateJobId();
+    const auto jobRequest = JobRequest{
+        .job_type = jobType,
+        .workload_amount = workload,
+        .earliest_start = earliestStart,
+        .latest_finish = latestFinish,
+    };
 
-    const auto jobRequest =
-        JobRequest(jobType, workload, earliestStart, latestFinish, jobId);
-
-    const auto &&[impact, fullSchedule] =
-        co_await schedulingQueue.computeSchedule(jobRequest);
-
-    Json::Value ret;
-    ret["schedule_id"] = "sched-" + jobId;
-    ret["message"] = "Schedule created successfully";
-
-    Json::Value blocks(Json::arrayValue);
-
-    for (const auto &interval : fullSchedule | std::views::transform(toJson)) {
-        Json::Value block;
-        block["timestamp"] = interval["timestamp"]; // Already string from
-                                                    // ScheduledInterval::toJson
-        block["location"] = interval["location"];
-        block["job_id"] = interval["job_id"];
-        block["additional_load"] = interval["additional_load"];
-
-        blocks.append(block);
-    }
-
-    ret["scheduled_blocks"] = blocks;
-
-    ret["impact"] = toJson(impact);
-
+    const auto res = co_await schedulingQueue.computeSchedule(jobRequest);
+    const auto ret = toJson(res);
     const auto resp = drogon::HttpResponse::newHttpJsonResponse(ret);
     callback(resp);
     co_return;

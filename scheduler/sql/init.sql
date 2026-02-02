@@ -1,4 +1,3 @@
-
 create table if not exists impacts(
     id serial primary key,
     carbon_intensity double precision,
@@ -12,7 +11,6 @@ create table if not exists jobs(
     time_stamp TIMESTAMPTZ not null,
     location_id text,
     additional_load double precision,
-    total_load double precision,
 
     constraint fk_impact
         foreign key(impact_id)

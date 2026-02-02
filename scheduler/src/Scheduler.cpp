@@ -1,101 +1,91 @@
+#include <Calendar.hpp>
 #include <Scheduler.hpp>
 #include <StatsAPIClient.hpp>
+#include <algorithm>
+#include <map>
+#include <set>
 #include <structs/JobRequest.hpp>
 
 using namespace std;
 using namespace drogon;
 
-auto Scheduler::getCombinedIntervals(const vector<Datacenter> &data)
-    -> multiset<PredictedDatacenterInformation> {
-    multiset<PredictedDatacenterInformation> intervals;
+struct LoadBlock {
+    std::chrono::system_clock::time_point timestamp;
+    double load{};
+};
 
-    for (const auto &dc : data) {
-        const auto hasher = hash<string>{};
-        const auto dcId = static_cast<long long>(hasher(dc.name));
-        DatacenterSpecificInformation dcInfo(dc.maxLoad, dc.id, dc.name,
-                                             "not defined yet", dcId);
+auto operator<=>(const LoadBlock &lhs, const LoadBlock &rhs) -> auto {
+    return lhs.timestamp <=> rhs.timestamp;
+}
 
-        if (dc.timeSeries.size() < 2)
-            continue;
+// transform from { jobId: {impact, set<ScheduleBlock>} }
+// to dense vector (with implicitly continous timestamps) of loadvalues within
+// the given interval.
+auto flatten_calendar(const CalendarService::Calendar &calendar,
+                      const chrono::system_clock::time_point start_time,
+                      const chrono::system_clock::time_point end_time)
+    -> map<std::string, vector<double>> {
+    auto tmp_res = map<string, set<LoadBlock>>{};
+    for (const auto &[jobId, item] : calendar) {
+        const auto &[impact, scheduleBlocks] = item;
+        for (const auto &block :
+             scheduleBlocks | views::filter([&](const auto &block) -> auto {
+                 return block.timestamp >= start_time &&
+                        block.timestamp <= end_time;
+             }))
+            tmp_res[block.location].insert(LoadBlock{
+                .timestamp = block.timestamp, .load = block.additionalLoad});
+    }
 
-        auto duration = dc.timeSeries[1].timestamp - dc.timeSeries[0].timestamp;
-        auto lengthOfInterval =
-            chrono::duration_cast<chrono::seconds>(duration);
+    const auto n_intervals =
+        chrono::duration_cast<chrono::minutes>(end_time - start_time).count() /
+        5;
+    auto res = map<string, vector<double>>{};
+    for (auto &[location, loadBlocksSet] : tmp_res) {
+        res[location].assign(n_intervals, 0.);
 
-        for (const auto &slot : dc.timeSeries) {
-            intervals.emplace(slot.timestamp, lengthOfInterval,
-                              slot.predictedLoad, slot.predictedGreenness,
-                              dcInfo);
+        // chunk by same timestamp, summing loads
+        auto rn = loadBlocksSet |
+                  views::chunk_by([](const auto &a, const auto &b) -> auto {
+                      return a.timestamp == b.timestamp;
+                  }) |
+                  views::transform([](auto chunk) -> auto {
+                      double totalLoad = 0.;
+                      for (const auto &lb : chunk)
+                          totalLoad += lb.load;
+                      return LoadBlock{.timestamp = chunk.front().timestamp,
+                                       .load = totalLoad};
+                  });
+        for (const auto &lb : rn) {
+            const auto index = chrono::duration_cast<chrono::minutes>(
+                                   lb.timestamp - start_time)
+                                   .count() /
+                               5;
+            res[location].at(index) = lb.load;
         }
     }
-    return intervals;
+
+    return res;
 }
 
-auto Scheduler::schedule(PredictedDatacenterInformation &interval,
-                         JobRequest &job) -> double {
+auto dp1(const vector<double> &load, const double max_load,
+         const double tot_work) -> auto {
+    // do some dp to calculate, for all work amounts in [0, tot_work],
+    // the best (minimum impact) schedule to achieve that work
 
-    auto durationSeconds =
-        static_cast<double>(interval.lengthOfInterval.count());
-
-    double maxWorkInInterval =
-        (interval.datacenterInfo.maxLoad - interval.currentLoad) *
-        durationSeconds;
-
-    if (maxWorkInInterval >= job.workload_amount) {
-        double temp = job.workload_amount;
-        job.workload_amount = 0;
-        return temp / durationSeconds; /// this is the additional load
-    }
-    job.workload_amount -= maxWorkInInterval;
-    return maxWorkInInterval / durationSeconds;
+    return vector(max_load + 1, 0.);
 }
 
-auto Scheduler::calculateSchedule(JobRequest job) -> Task<SchedulingImpact> {
+auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
+    const auto time_window_start =
+        max(std::chrono::system_clock::now(), job.earliest_start);
+    const auto time_window_end = job.latest_finish;
+    auto datacenter_loads = flatten_calendar(
+        calendarService.get(), time_window_start, time_window_end);
 
-    auto data = co_await statsAPIClient.getAllDatacenters();
+    // call dp1 in parallel for each location
+    // then, merge results using mega dp (multiple-choice knapsack)
 
-    auto intervals = getCombinedIntervals(data);
-
-    double co2emissions = 0;
-    double totalEnergy = 0;
-
-    fullSchedule.clear();
-
-    while (intervals.size() > 0 && job.workload_amount > 0) {
-        auto interval = *intervals.begin();
-        intervals.erase(intervals.begin());
-
-        if (interval.timestamp > job.latest_finish ||
-            interval.timestamp < job.earliest_start) {
-            continue;
-        }
-
-        double additionalLoad = schedule(interval, job);
-        auto durationSeconds =
-            static_cast<double>(interval.lengthOfInterval.count());
-        double energy = additionalLoad * durationSeconds;
-        totalEnergy += energy;
-
-        co2emissions += (interval.currentGreenness * energy) / KWH;
-
-        fullSchedule.emplace(interval.timestamp, job.jobId,
-                             interval.datacenterInfo.name, additionalLoad,
-                             additionalLoad + interval.currentLoad);
-    }
-
-    const auto carbon_intensity =
-        (totalEnergy > 0) ? (co2emissions * KWH / totalEnergy) : 0;
-    const auto impact = SchedulingImpact{
-        .carbon_intensity = carbon_intensity,
-        .total_emissions = co2emissions,
-        .sci = carbon_intensity, // for now they're the same
-    };
-
-    co_return impact;
-}
-
-void Scheduler::show() const {
-    for (const auto &interval : fullSchedule) {
-        interval.show();
-    }
+    // TODO
+    co_return ScheduleResult{};
 }

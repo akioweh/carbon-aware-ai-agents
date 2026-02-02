@@ -4,17 +4,13 @@
 
 #include <Scheduler.hpp>
 #include <expected>
-#include <structs/ScheduledInterval.hpp>
 #include <shared_mutex>
+#include <structs/ScheduleBlock.hpp>
 
 class CalendarService {
-  private:
-    using Schedule = std::pair<SchedulingImpact, std::set<ScheduledInterval>>;
-    using Calendar = std::map<std::string, Schedule>;
-    Calendar calendar;
-    mutable std::shared_mutex mutex;
-
   public:
+    using Schedule = std::pair<ScheduleImpact, std::set<ScheduleBlock>>;
+    using Calendar = std::map<std::string, Schedule>;
     auto add(const std::string &jobId, Schedule schedule) -> void;
 
     auto get(const std::string &jobId) const
@@ -27,6 +23,10 @@ class CalendarService {
     CalendarService(CalendarService &&) = delete;
     auto operator=(const CalendarService &) -> CalendarService & = delete;
     auto operator=(CalendarService &&) -> CalendarService & = delete;
+
+  private:
+    Calendar calendar;
+    mutable std::shared_mutex mutex;
 };
 
 inline CalendarService calendarService;

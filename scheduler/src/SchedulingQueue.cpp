@@ -18,7 +18,7 @@ auto SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
 }
 
 auto SchedulingQueue::computeSchedule(const JobRequest &jobRequest)
-    -> drogon::Task<std::pair<SchedulingImpact, std::set<ScheduledInterval>>> {
+    -> drogon::Task<ScheduleResult> {
     auto schedulerTask = std::make_shared<SchedulerTask>(jobRequest);
     push_back(schedulerTask.get());
     co_return co_await *schedulerTask;
@@ -31,10 +31,10 @@ start:;
         (void)queueSize.fetch_sub(1, std::memory_order_release);
 
         Scheduler scheduler;
-        auto impact = co_await scheduler.calculateSchedule(task->jobRequest);
-        auto schedule = scheduler.getSchedule();
+        auto res = co_await scheduler.scheduleJob(task->jobRequest);
+        auto schedule = std::set<ScheduleBlock>{};
 
-        auto persist = [impact, schedule]() mutable -> void {
+        auto persist = [impact = res.impact, schedule]() mutable -> void {
             if (schedule.size() == 0) {
                 LOG_WARN
                     << "the size of a scheduled job is zero - not persisiting";
@@ -45,7 +45,7 @@ start:;
             calendarService.add(jobId, {impact, std::move(schedule)});
         };
 
-        task->setValue(impact, std::move(schedule));
+        task->setValue(res);
         task->resume();
 
         // ok aparently this can break, if the coroutine gets destroyed

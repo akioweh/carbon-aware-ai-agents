@@ -2,21 +2,20 @@
 #define SCHEDULER
 #pragma once
 
-#include <structs/ScheduledInterval.hpp>
 #include <Serializable.hpp>
 #include <StatsAPIClient.hpp>
-#include <set>
 #include <structs/Datacenter.hpp>
 #include <structs/JobRequest.hpp>
 #include <structs/PredictedDatacenterInformation.hpp>
+#include <structs/ScheduleBlock.hpp>
 
-struct SchedulingImpact {
+struct ScheduleImpact {
     double carbon_intensity{};
     double total_emissions{};
     double sci{};
 };
 
-inline auto f_toJson(const SchedulingImpact &obj) -> Json::Value {
+inline auto f_toJson(const ScheduleImpact &obj) -> Json::Value {
     auto res = Json::Value{};
     res["carbon_intensity"] = obj.carbon_intensity;
     res["total_emissions"] = obj.total_emissions;
@@ -24,29 +23,34 @@ inline auto f_toJson(const SchedulingImpact &obj) -> Json::Value {
     return res;
 }
 
-static_assert(Serializable<SchedulingImpact>);
+static_assert(Serializable<ScheduleImpact>);
+
+struct ScheduleResult {
+    std::string jobId;
+    std::vector<ScheduleBlock> schedule;
+    ScheduleImpact impact{};
+};
+
+inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["schedule_id"] = obj.jobId;
+    res["scheduled_blocks"] = Json::Value(Json::arrayValue);
+    res["impact"] = toJson(obj.impact);
+    for (const auto &block : obj.schedule)
+        res["schedule"].append(toJson(block));
+    return res;
+}
+
+static_assert(Serializable<ScheduleResult>);
 
 class Scheduler {
   private:
-    static const unsigned int KWH = 1000 * 60 * 60;
+    static constexpr unsigned int KWH = 1000 * 60 * 60;
 
-    StatsAPIClient statsAPIClient;
-
-    std::set<ScheduledInterval> fullSchedule;
-
-    auto getCombinedIntervals(const std::vector<Datacenter> &data)
-        -> std::multiset<PredictedDatacenterInformation>;
-
-    auto schedule(PredictedDatacenterInformation &interval, JobRequest &job)
-        -> double;
+    StatsAPIClient stats_api;
 
   public:
-    auto calculateSchedule(JobRequest job) -> drogon::Task<SchedulingImpact>;
-    void show() const;
-    [[nodiscard]] auto getSchedule() const
-        -> const std::set<ScheduledInterval> & {
-        return fullSchedule;
-    }
+    auto scheduleJob(JobRequest job) -> drogon::Task<ScheduleResult>;
 };
 
 #endif

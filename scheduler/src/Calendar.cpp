@@ -16,8 +16,8 @@ using ImpactMapper = drogon::orm::Mapper<ImpactModel>;
 auto CalendarService::add(const std::string &jobId, Schedule schedule) -> void {
     std::unique_lock lock(mutex);
 
-    const auto transaction =
-        drogon::app().getDbClient()->newTransaction([jobId](bool success) {
+    const auto transaction = drogon::app().getDbClient()->newTransaction(
+        [jobId](bool success) -> void {
             if (!success) {
                 LOG_ERROR << "Transaction failed! With jobId: " << jobId
                           << '\n';
@@ -40,7 +40,6 @@ auto CalendarService::add(const std::string &jobId, Schedule schedule) -> void {
     for (const auto &interval : intervals) {
         JobModel job;
         job.setAdditionalLoad(interval.additionalLoad);
-        job.setTotalLoad(interval.totalLoad);
         job.setLocationId(interval.location);
         job.setImpactId(impactId);
         job.setTimeStamp(
