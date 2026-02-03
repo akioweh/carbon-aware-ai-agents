@@ -8,6 +8,10 @@
 #include <structs/JobRequest.hpp>
 #include <structs/ScheduleBlock.hpp>
 
+/**
+ * @class ScheduleImpact
+ * @brief API DTO for the environmental impact of a schedule.
+ */
 struct ScheduleImpact {
     double carbon_intensity{};
     double total_emissions{};
@@ -24,6 +28,10 @@ inline auto f_toJson(const ScheduleImpact &obj) -> Json::Value {
 
 static_assert(Serializable<ScheduleImpact>);
 
+/**
+ * @class ScheduleResult
+ * @brief API DTO for the result of a scheduling operation.
+ */
 struct ScheduleResult {
     std::string jobId;
     std::vector<ScheduleBlock> schedule;
@@ -42,6 +50,12 @@ inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
 
 static_assert(Serializable<ScheduleResult>);
 
+/**
+ * @class Scheduler
+ * @brief The main schedule optimization engine.
+ *
+ * The scheduler itself is stateless.
+ */
 class Scheduler {
   private:
     static constexpr unsigned int KWH = 1000 * 60 * 60;

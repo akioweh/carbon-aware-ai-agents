@@ -6,6 +6,11 @@
 #include <string>
 #include <vector>
 
+/**
+ * @class TimeSlot
+ * @brief used in \ref Datacenter
+ *
+ */
 struct TimeSlot {
     std::chrono::system_clock::time_point timestamp;
     double predictedLoad;
@@ -13,10 +18,11 @@ struct TimeSlot {
     int availableGpus;
 };
 
-// defined as free functions for TimeSlot to remain an aggregate type
+// defined as a free function for TimeSlot to remain an aggregate type
 inline auto operator<=>(const TimeSlot &lhs, const TimeSlot &rhs) {
     return lhs.timestamp <=> rhs.timestamp;
 };
+// defined as a free function for TimeSlot to remain an aggregate type
 inline auto operator==(const TimeSlot &lhs, const TimeSlot &rhs) {
     return lhs.timestamp == rhs.timestamp &&
            lhs.predictedLoad == rhs.predictedLoad &&
@@ -24,6 +30,10 @@ inline auto operator==(const TimeSlot &lhs, const TimeSlot &rhs) {
            lhs.availableGpus == rhs.availableGpus;
 }
 
+/**
+ * @class Datacenter
+ * @brief DTO for per-location information as per stats API definition.
+ */
 struct Datacenter {
     std::string id;
     std::string name;

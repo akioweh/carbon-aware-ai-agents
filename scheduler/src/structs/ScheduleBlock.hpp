@@ -7,6 +7,11 @@
 #include <string>
 #include <utils/Utils.hpp>
 
+/**
+ * @class ScheduleBlock
+ * @brief The atomic unit of a schedule, representing an amount of load at a
+ * given location and time. Aligns with API definition.
+ */
 class ScheduleBlock {
   public:
     std::chrono::system_clock::time_point timestamp;
