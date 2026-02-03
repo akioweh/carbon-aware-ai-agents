@@ -13,10 +13,10 @@
     using JobMapper = drogon::orm::Mapper<JobModel>;
     using ImpactMapper = drogon::orm::Mapper<ImpactModel>;
 
-    auto f_toDto(ScheduleImpact) -> ImpactModel;
+    auto f_toDto(const ScheduleImpact&) -> ImpactModel;
     auto f_toDto(const ScheduleBlock &, int) -> JobModel;
-    auto f_fromDto(ImpactModel) -> ScheduleImpact;
-    auto f_fromDto(JobModel) -> ScheduleBlock;
+    auto f_fromDto(const ImpactModel&) -> ScheduleImpact;
+    auto f_fromDto(const JobModel&) -> ScheduleBlock;
 
     struct FromDtoFn {
         auto operator()(auto &&dto) const {

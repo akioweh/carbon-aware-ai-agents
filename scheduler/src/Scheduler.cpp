@@ -2,6 +2,7 @@
 #include <Scheduler.hpp>
 #include <StatsAPIClient.hpp>
 #include <algorithm>
+#include <drogon/HttpTypes.h>
 #include <map>
 #include <set>
 #include <structs/JobRequest.hpp>

@@ -15,10 +15,10 @@ class CalendarService {
     using Calendar = std::map<std::string, Schedule>;
     auto add(Schedule schedule) -> void;
 
-    auto get(const std::string &jobId) const
-        -> drogon::Task<std::expected<ScheduleResult, std::string>>;
+    auto get(const std::string &jobId)
+        -> ScheduleResult;
 
-    auto get() const -> Calendar;
+    auto get() -> Calendar;
 
     CalendarService() = default;
     CalendarService(const CalendarService &) = delete;

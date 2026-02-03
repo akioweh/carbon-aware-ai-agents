@@ -37,12 +37,10 @@ start:;
         auto persist = [impact = res.impact, schedule]() mutable -> void {
             if (schedule.size() == 0) {
                 LOG_WARN
-                    << "the size of a scheduled job is zero - not persisiting";
+                    << "the size of a scheduled job is zero - not persisiting"; 
                 return;
             }
-            const auto &first = *schedule.begin();
-            const auto jobId = first.jobId;
-            calendarService.add(jobId, {impact, std::move(schedule)});
+            calendarService.add({impact, std::move(schedule)});
         };
 
         task->setValue(res);
