@@ -2,9 +2,12 @@
 #define SCHEDULE_CONTROLLER_HPP
 #pragma once
 
+#include "structs/JobRequest.hpp"
+#include "structs/TimeIntervalParams.hpp"
 #include <Scheduler.hpp>
 #include <SchedulingQueue.hpp>
 #include <drogon/HttpController.h>
+#include <drogon/HttpResponse.h>
 #include <drogon/utils/coroutine.h>
 
 class ScheduleController : public drogon::HttpController<ScheduleController> {
@@ -16,15 +19,13 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                   drogon::Get);
     METHOD_LIST_END
 
-    auto calculateSchedule(
-        drogon::HttpRequestPtr req,
-        std::function<void(const drogon::HttpResponsePtr &)> callback)
-        -> drogon::Task<void>;
+    [[nodiscard]] auto calculateSchedule(drogon::HttpRequestPtr,
+                                         std::optional<JobRequest>) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
 
-    auto
-    getSchedule(drogon::HttpRequestPtr req,
-                std::function<void(const drogon::HttpResponsePtr &)> callback)
-        -> drogon::Task<void>;
+    [[nodiscard]] auto getSchedule(drogon::HttpRequestPtr,
+                                   std::optional<TimeIntervalParams>) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
 };
 
 #endif

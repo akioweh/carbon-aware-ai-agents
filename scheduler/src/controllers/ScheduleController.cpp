@@ -1,80 +1,57 @@
+#include "Calendar.hpp"
+#include "structs/TimeIntervalParams.hpp"
 #include <controllers/ScheduleController.hpp>
+#include <drogon/HttpResponse.h>
+#include <drogon/HttpTypes.h>
 #include <structs/JobRequest.hpp>
 #include <structs/ScheduleBlock.hpp>
 #include <utils/Utils.hpp>
 
-using Callback = std::function<void(const drogon::HttpResponsePtr &)>;
+using namespace std;
+using namespace drogon;
 
 namespace {
-void sendBadRequest(const Callback &callback, std::string_view message) {
-    auto resp = drogon::HttpResponse::newHttpResponse();
-    resp->setStatusCode(drogon::k400BadRequest);
+auto badRequest(string_view message, HttpStatusCode code = k400BadRequest) {
+    auto resp = HttpResponse::newHttpResponse();
+    resp->setStatusCode(code);
     Json::Value err;
-    err["error"] = std::string(message);
+    err["error"] = string(message);
     resp->setBody(err.toStyledString());
-    resp->setContentTypeCode(drogon::CT_APPLICATION_JSON);
-    callback(resp);
+    resp->setContentTypeCode(CT_APPLICATION_JSON);
+    return resp;
 }
 } // namespace
+auto ScheduleController::getSchedule(
+    HttpRequestPtr /*unused*/,
+    const optional<TimeIntervalParams> time_interval) const
+    -> Task<HttpResponsePtr> {
+    if (!time_interval)
+        co_return badRequest("Input data validation error",
+                             k422UnprocessableEntity);
 
-auto ScheduleController::getSchedule(drogon::HttpRequestPtr req,
-                                     Callback callback) -> drogon::Task<void> {
-
-    // TODO: empty stub awaiting stats component's calendar persistence support
-    Json::Value ret(Json::arrayValue);
-    const auto resp = drogon::HttpResponse::newHttpJsonResponse(ret);
-    callback(resp);
-    co_return;
+    // TODO: use time_interval to filter results once calendar supports it
+    const auto res = calendarService.get();
+    auto ret = Json::Value(Json::arrayValue);
+    for (const auto &[jobId, schedulePair] : res) {
+        const auto &[impact, scheduleBlocks] = schedulePair;
+        for (const auto &block : scheduleBlocks) {
+            ret.append(toJson(block));
+        }
+    }
+    const auto resp = HttpResponse::newHttpJsonResponse(ret);
+    co_return resp;
 }
 
-auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
-                                           Callback callback)
-    -> drogon::Task<void> {
+auto ScheduleController::calculateSchedule(
+    HttpRequestPtr /*unused*/, const optional<JobRequest> job_request) const
+    -> Task<HttpResponsePtr> {
+    if (!job_request)
+        co_return badRequest("Input data validation error",
+                             k422UnprocessableEntity);
 
-    const auto jsonPtr = req->jsonObject();
-    if (!jsonPtr) {
-        sendBadRequest(callback, "Invalid JSON");
-        co_return;
-    }
-
-    const auto &json = *jsonPtr;
-
-    if (!json.isMember("job_type") || !json.isMember("workload_amount") ||
-        !json.isMember("earliest_start") || !json.isMember("latest_finish")) {
-        sendBadRequest(callback, "Missing required fields");
-        co_return;
-    }
-
-    const auto jobType = json["job_type"].asString();
-    const auto workload = json["workload_amount"].asDouble();
-    const auto earliestStartStr = json["earliest_start"].asString();
-    const auto latestFinishStr = json["latest_finish"].asString();
-
-    // i like haskell better
-    auto parseResult =
-        scheduler::utils::parseIso8601(earliestStartStr)
-            .and_then([&](auto timePoint) -> auto {
-                return scheduler::utils::parseIso8601(latestFinishStr)
-                    .transform([timePoint](auto latestFinish) -> auto {
-                        return std::make_pair(timePoint, latestFinish);
-                    });
-            });
-    if (!parseResult) {
-        sendBadRequest(callback, parseResult.error());
-        co_return;
-    }
-    const auto &[earliestStart, latestFinish] = parseResult.value();
-
-    const auto jobRequest = JobRequest{
-        .job_type = jobType,
-        .workload_amount = workload,
-        .earliest_start = earliestStart,
-        .latest_finish = latestFinish,
-    };
-
-    const auto res = co_await schedulingQueue.computeSchedule(jobRequest);
+    const auto res =
+        co_await schedulingQueue.computeSchedule(job_request.value());
     const auto ret = toJson(res);
-    const auto resp = drogon::HttpResponse::newHttpJsonResponse(ret);
-    callback(resp);
-    co_return;
+    const auto resp = HttpResponse::newHttpJsonResponse(ret);
+    co_return resp;
 }
