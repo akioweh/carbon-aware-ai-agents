@@ -20,6 +20,8 @@ class CalendarService {
 
     auto get() -> Calendar;
 
+    auto deleteSchedule(const std::string &jobId);
+
     CalendarService() = default;
     CalendarService(const CalendarService &) = delete;
     CalendarService(CalendarService &&) = delete;

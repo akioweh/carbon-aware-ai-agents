@@ -2,6 +2,7 @@
 #include <Calendar.hpp>
 #include <DtoMappers/Mappers.h>
 #include <Scheduler.hpp>
+#include <drogon/orm/Exception.h>
 #include <mutex>
 #include <ranges>
 #include <utils/Utils.hpp>
@@ -13,6 +14,7 @@ auto CalendarService::add(Schedule schedule) -> void {
         drogon::app().getDbClient()->newTransaction([](bool success) -> void {
             if (!success) {
                 LOG_ERROR << "Transaction failed!" << '\n';
+                throw drogon::orm::DrogonDbException() ;
             }
         });
     mappers::ImpactMapper impactMapper(transaction);
@@ -35,8 +37,7 @@ auto CalendarService::add(Schedule schedule) -> void {
         std::move(schedule);
 }
 
-auto CalendarService::get(const std::string &jobIdString)
-    -> ScheduleResult {
+auto CalendarService::get(const std::string &jobIdString) -> ScheduleResult {
     std::shared_lock lock(mutex);
 
     auto result = calendar.find(jobIdString);
@@ -56,7 +57,7 @@ auto CalendarService::get(const std::string &jobIdString)
     auto impact = mappers::fromDto(impactMapper.findByPrimaryKey(jobIdInt));
     auto jobsModels = jobsMapper.findBy(
         drogon::orm::Criteria(mappers::JobModel::Cols::_impact_id,
-                                drogon::orm::CompareOperator::EQ, jobIdInt));
+                              drogon::orm::CompareOperator::EQ, jobIdInt));
     auto jobs = mappers::fromDtoAll(jobsModels);
 
     auto stringJobId = scheduler::utils::parseIntToStringID(jobIdInt);
@@ -74,14 +75,21 @@ auto CalendarService::get() -> Calendar {
 
     for (const auto &impactDto : impactMapper.findAll()) {
         auto impact = mappers::fromDto(impactDto);
-        calendar[scheduler::utils::parseIntToStringID(
-                        impactDto.getValueOfId())]
+        calendar[scheduler::utils::parseIntToStringID(impactDto.getValueOfId())]
             .first = impact;
     }
     auto allJobs = mappers::fromDtoAll(jobsMapper.findAll());
     for (const auto &job : allJobs) {
         calendar[job.jobId].second.insert(job);
     }
-
     return calendar;
+}
+
+auto CalendarService::deleteSchedule(const std::string &jobId)
+{
+    auto dbPtr = drogon::app().getDbClient(); 
+    mappers::ImpactMapper impactMapper(dbPtr) ;
+    impactMapper.deleteByPrimaryKey(scheduler::utils::parseStringIDtoInt(jobId)) ;
+    // we have cascade on delete, so no need to delete the children manually
+    calendar.erase(jobId) ;
 }
