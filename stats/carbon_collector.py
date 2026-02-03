@@ -44,7 +44,6 @@ def init_database(db_path: Path) -> sqlite3.Connection:
             region_id INTEGER NOT NULL,
             timestamp_from TEXT NOT NULL,
             timestamp_to TEXT NOT NULL,
-            forecast INTEGER,
             actual INTEGER,
             index_value TEXT,
             collected_at TEXT NOT NULL,
@@ -100,14 +99,13 @@ def store_reading(conn: sqlite3.Connection, region_id: int, data: dict) -> None:
         cursor = conn.execute(
             """
             INSERT INTO carbon_readings
-            (region_id, timestamp_from, timestamp_to, forecast, actual, index_value, collected_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (region_id, timestamp_from, timestamp_to, actual, index_value, collected_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 region_id,
                 region_data.get("data", [{}])[0].get("from", ""),
                 region_data.get("data", [{}])[0].get("to", ""),
-                intensity.get("forecast"),
                 intensity.get("actual"),
                 intensity.get("index"),
                 collected_at,
@@ -153,27 +151,10 @@ def dump_database(db_path: Path, output_path: Path = None) -> Path:
     return output_path
 
 
-def get_stats(conn: sqlite3.Connection) -> None:
-    """Print database statistics."""
+def get_reading_count(conn: sqlite3.Connection) -> int:
+    """Get total number of readings."""
     cursor = conn.execute("SELECT COUNT(*) FROM carbon_readings")
-    total_readings = cursor.fetchone()[0]
-
-    cursor = conn.execute("""
-        SELECT r.name, COUNT(*) as count,
-               AVG(cr.forecast) as avg_forecast,
-               MIN(cr.collected_at) as first,
-               MAX(cr.collected_at) as last
-        FROM carbon_readings cr
-        JOIN regions r ON cr.region_id = r.region_id
-        GROUP BY cr.region_id
-    """)
-
-    print(f"\n{'='*60}")
-    print(f"Database Statistics - Total readings: {total_readings}")
-    print(f"{'='*60}")
-    for row in cursor:
-        print(f"  {row[0]}: {row[1]} readings, avg forecast: {row[2]:.1f if row[2] else 'N/A'}")
-    print(f"{'='*60}\n")
+    return cursor.fetchone()[0]
 
 
 def run_collector():
@@ -194,7 +175,7 @@ def run_collector():
 
     def job():
         collect_all_regions(conn)
-        get_stats(conn)
+        print(f"  Total readings: {get_reading_count(conn)}")
 
     # Run immediately, then schedule every 5 minutes
     job()
@@ -209,7 +190,7 @@ def run_collector():
         print("\n\nCollection stopped by user.")
 
     finally:
-        get_stats(conn)
+        print(f"\nTotal readings collected: {get_reading_count(conn)}")
         dump_path = dump_database(DB_PATH)
         conn.close()
         print(f"\nFinal database dump: {dump_path}")
@@ -226,10 +207,10 @@ if __name__ == "__main__":
             else:
                 print(f"Database not found: {DB_PATH}")
         elif sys.argv[1] == "stats":
-            # Show stats only
+            # Show reading count
             if DB_PATH.exists():
                 conn = sqlite3.connect(DB_PATH)
-                get_stats(conn)
+                print(f"Total readings: {get_reading_count(conn)}")
                 conn.close()
             else:
                 print(f"Database not found: {DB_PATH}")
