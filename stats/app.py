@@ -15,6 +15,7 @@ from predictor import (
     generate_next_week_load_prediction,
     generate_next_week_greenness_prediction,
 )
+import db_utils
 
 DB_FILE = 'cache.db'
 HISTORY_FILE = 'history.json'
@@ -66,14 +67,39 @@ class ErrorResponse(BaseModel):
 
 
 def init_db():
-    """Initialize the SQLite database for caching."""
+    """Initialize the SQLite database for caching and historical data."""
     with sqlite3.connect(DB_FILE) as conn:
+        # Enable WAL mode for better concurrent access
+        conn.execute('PRAGMA journal_mode=WAL')
+        
+        # Predictions cache table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS predictions (
                 key TEXT PRIMARY KEY,
                 data TEXT,
                 timestamp REAL
             )
+        """)
+        
+        # Historical time-series data table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS historical_data (
+                location TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                load REAL NOT NULL,
+                greenness REAL NOT NULL,
+                PRIMARY KEY (location, timestamp)
+            )
+        """)
+        
+        # Create indexes for efficient querying
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_historical_timestamp 
+            ON historical_data(timestamp)
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_historical_location_timestamp 
+            ON historical_data(location, timestamp)
         """)
 
 
@@ -131,8 +157,12 @@ def prediction_loop():
 async def lifespan(app: FastAPI):
     init_db()
 
-    if not os.path.exists(HISTORY_FILE):
-        print('Generating history data...')
+    # Migrate existing history.json to database if it exists and DB is empty
+    if os.path.exists(HISTORY_FILE) and db_utils.count_historical_data() == 0:
+        print('Migrating history.json to database...')
+        db_utils.migrate_json_to_db(HISTORY_FILE)
+    elif db_utils.count_historical_data() == 0:
+        print('No historical data found, generating initial data...')
         generate_history()
 
     thread = threading.Thread(target=prediction_loop, daemon=True)

@@ -1,16 +1,14 @@
-import json
 from datetime import datetime
 from prophet import Prophet as p
 import pandas as pd
+import db_utils
+import json
 
 
 def generate_next_week_load_prediction(location):
     """Generate load predictions for the next week at a specific location."""
-    with open('history.json', 'r') as f:
-        history_json = json.load(f)
-
-    # Get history for specific location
-    location_history = history_json.get(location, [])
+    # Get history for specific location from database
+    location_history = db_utils.get_historical_data(location)
 
     if not location_history:
         raise ValueError(f'No history found for location: {location}')
@@ -18,7 +16,7 @@ def generate_next_week_load_prediction(location):
     historical_load = pd.DataFrame(
         [
             {
-                'timestamp': datetime.fromisoformat(entry['timestamp']),
+                'timestamp': entry['timestamp'],
                 'load': entry['load'],
             }
             for entry in location_history
@@ -48,11 +46,8 @@ def generate_next_week_load_prediction(location):
 
 def generate_next_week_greenness_prediction(location):
     """Generate greenness/carbon predictions for the next week at a specific location."""
-    with open('history.json', 'r') as f:
-        history_json = json.load(f)
-
-    # Get history for specific location
-    location_history = history_json.get(location, [])
+    # Get history for specific location from database
+    location_history = db_utils.get_historical_data(location)
 
     if not location_history:
         raise ValueError(f'No history found for location: {location}')
@@ -60,7 +55,7 @@ def generate_next_week_greenness_prediction(location):
     historical_greenness = pd.DataFrame(
         [
             {
-                'timestamp': datetime.fromisoformat(entry['timestamp']),
+                'timestamp': entry['timestamp'],
                 'greenness': entry['greenness'],
             }
             for entry in location_history
