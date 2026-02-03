@@ -6,3 +6,5 @@ uvicorn
 pyyaml
 pytest
 schemathesis
+requests
+schedule
