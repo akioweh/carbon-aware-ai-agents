@@ -1,16 +1,18 @@
 import json
-from datetime import datetime
-from prophet import Prophet as p
+from datetime import datetime, timedelta
+
 import pandas as pd
+from prophet import Prophet as p
+
+import db_utils
 
 
 def generate_next_week_load_prediction(location):
     """Generate load predictions for the next week at a specific location."""
-    with open('history.json', 'r') as f:
-        history_json = json.load(f)
-
-    # Get history for specific location
-    location_history = history_json.get(location, [])
+    # Get history for specific location from database
+    # optimization: limit to 60 days of data
+    start_time = datetime.now() - timedelta(days=60)
+    location_history = db_utils.get_historical_data(location, start_time=start_time)
 
     if not location_history:
         raise ValueError(f'No history found for location: {location}')
@@ -18,7 +20,7 @@ def generate_next_week_load_prediction(location):
     historical_load = pd.DataFrame(
         [
             {
-                'timestamp': datetime.fromisoformat(entry['timestamp']),
+                'timestamp': entry['timestamp'],
                 'load': entry['load'],
             }
             for entry in location_history
@@ -48,11 +50,10 @@ def generate_next_week_load_prediction(location):
 
 def generate_next_week_greenness_prediction(location):
     """Generate greenness/carbon predictions for the next week at a specific location."""
-    with open('history.json', 'r') as f:
-        history_json = json.load(f)
-
-    # Get history for specific location
-    location_history = history_json.get(location, [])
+    # Get history for specific location from database
+    # optimization: limit to 60 days of data
+    start_time = datetime.now() - timedelta(days=60)
+    location_history = db_utils.get_historical_data(location, start_time=start_time)
 
     if not location_history:
         raise ValueError(f'No history found for location: {location}')
@@ -60,7 +61,7 @@ def generate_next_week_greenness_prediction(location):
     historical_greenness = pd.DataFrame(
         [
             {
-                'timestamp': datetime.fromisoformat(entry['timestamp']),
+                'timestamp': entry['timestamp'],
                 'greenness': entry['greenness'],
             }
             for entry in location_history
