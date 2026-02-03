@@ -10,8 +10,8 @@
     namespace mappers {
     using JobModel = drogon_model::calendar_db::Jobs;
     using ImpactModel = drogon_model::calendar_db::Impacts;
-    using JobMapper = drogon::orm::Mapper<JobModel>;
-    using ImpactMapper = drogon::orm::Mapper<ImpactModel>;
+    using JobMapper = drogon::orm::CoroMapper<JobModel>;
+    using ImpactMapper = drogon::orm::CoroMapper<ImpactModel>;
 
     auto f_toDto(const ScheduleImpact&) -> ImpactModel;
     auto f_toDto(const ScheduleBlock &, int) -> JobModel;

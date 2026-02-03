@@ -3,7 +3,6 @@
 #pragma once
 
 #include <Scheduler.hpp>
-#include <expected>
 #include <models/Impacts.h>
 #include <models/Jobs.h>
 #include <shared_mutex>
@@ -13,14 +12,14 @@ class CalendarService {
   public:
     using Schedule = std::pair<ScheduleImpact, std::set<ScheduleBlock>>;
     using Calendar = std::map<std::string, Schedule>;
-    auto add(Schedule schedule) -> void;
+    auto add(Schedule schedule) -> drogon::Task<>;
 
     auto get(const std::string &jobId)
-        -> ScheduleResult;
+        -> drogon::Task<ScheduleResult>;
 
-    auto get() -> Calendar;
+    auto get() -> drogon::Task<Calendar>;
 
-    auto deleteSchedule(const std::string &jobId);
+    auto deleteSchedule(const std::string &jobId)->drogon::Task<>;
 
     CalendarService() = default;
     CalendarService(const CalendarService &) = delete;
