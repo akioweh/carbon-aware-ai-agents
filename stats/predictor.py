@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from prophet import Prophet as p
 import pandas as pd
 import db_utils
@@ -8,7 +8,9 @@ import json
 def generate_next_week_load_prediction(location):
     """Generate load predictions for the next week at a specific location."""
     # Get history for specific location from database
-    location_history = db_utils.get_historical_data(location)
+    # optimization: limit to 60 days of data
+    start_time = datetime.now() - timedelta(days=60)
+    location_history = db_utils.get_historical_data(location, start_time=start_time)
 
     if not location_history:
         raise ValueError(f'No history found for location: {location}')
@@ -47,7 +49,9 @@ def generate_next_week_load_prediction(location):
 def generate_next_week_greenness_prediction(location):
     """Generate greenness/carbon predictions for the next week at a specific location."""
     # Get history for specific location from database
-    location_history = db_utils.get_historical_data(location)
+    # optimization: limit to 60 days of data
+    start_time = datetime.now() - timedelta(days=60)
+    location_history = db_utils.get_historical_data(location, start_time=start_time)
 
     if not location_history:
         raise ValueError(f'No history found for location: {location}')
