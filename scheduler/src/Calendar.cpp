@@ -42,8 +42,7 @@ auto CalendarService::add(const std::string &jobId, Schedule schedule) -> void {
         job.setAdditionalLoad(interval.additionalLoad);
         job.setLocationId(interval.location);
         job.setImpactId(impactId);
-        job.setTimeStamp(
-            scheduler::utils::getPostGreDateFormat(interval.timestamp));
+        job.setTimeStamp(scheduler::utils::chronoToTrantor(interval.timestamp));
         jobsMapper.insert(job);
         /// this can also be refactored
     }
