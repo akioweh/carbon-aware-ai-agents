@@ -1,0 +1,2 @@
+$schema: https://www.schemastore.org/prettierrc.json
+proseWrap: always

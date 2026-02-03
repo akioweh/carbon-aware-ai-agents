@@ -1,38 +1,138 @@
+#include <DatacenterSpecificInformation.hpp>
+#include <PredictedDatacenterInformation.hpp>
 #include <PredictionApi.hpp>
+#include <algorithm>
+#include <drogon/HttpClient.h>
+#include <drogon/HttpRequest.h>
+#include <drogon/HttpResponse.h>
+#include <drogon/HttpTypes.h>
+#include <drogon/utils/coroutine.h>
+#include <json/value.h>
+#include <trantor/utils/Logger.h>
+#include <utils/Coro.hpp>
+#include <utils/Utils.hpp>
 
 using namespace std;
+using namespace drogon;
 
-auto makeUpPredictionData(
-    const DatacenterSpecificInformation &datacenterSpecificInformation)
-    -> vector<PredictedDatacenterInformation> {
-    long long greennees = 90;
-    int load = 13;
-    vector<PredictedDatacenterInformation> predictions;
-    predictions.reserve(100);
-    for (int i = 0; i < 100; i++) {
-        predictions.emplace_back(i * 5, 5, (load + i * 17) % 100,
-                                 (greennees + i * 13) % 400,
-                                 datacenterSpecificInformation);
+auto PredictionApi::getLoadPath(const string &datacenterName) -> string {
+    return "/locations/" + datacenterName + "/metrics/forecast_load";
+}
+
+auto PredictionApi::getGreennessPath(const string &datacenterName) -> string {
+    return "/locations/" + datacenterName + "/metrics/forecast_greenness";
+}
+
+auto PredictionApi::getDataSingleDatacenter(const string &datacenterName)
+    -> Task<vector<PredictedDatacenterInformation>> {
+    const string loadPath = getLoadPath(datacenterName);
+    const string greennessPath = getGreennessPath(datacenterName);
+
+    auto [loadJsonPtr, greennessJsonPtr] = co_await scheduler::coro::when_all(
+        scheduler::utils::makeGetRequest(host, loadPath),
+        scheduler::utils::makeGetRequest(host, greennessPath));
+
+    if (!loadJsonPtr || !greennessJsonPtr) {
+        LOG_ERROR << "Failed to get data from stats API";
+        co_return {};
     }
-    return predictions;
+
+    auto loadData = parseJsonForLoad(*loadJsonPtr);
+    auto greennessData = parseJsonForGreenness(*greennessJsonPtr);
+    auto datacenterSpecificInfo =
+        DatacenterSpecificInformation::parseJsonForDCSpecificInfo(
+            datacenterName, *loadJsonPtr);
+
+    ranges::sort(loadData);
+    ranges::sort(greennessData);
+    // sorting after timestamps
+
+    co_return constructDCPredictions(loadData, greennessData,
+                                     datacenterSpecificInfo);
+}
+
+auto PredictionApi::constructDCPredictions(
+    vector<pair<chrono::system_clock::time_point, double>> &loadData,
+    vector<pair<chrono::system_clock::time_point, double>> &greennessData,
+    DatacenterSpecificInformation &datacenterSpecificInfo)
+    -> vector<PredictedDatacenterInformation> {
+
+    if (loadData.size() == 0)
+        return {};
+    // if we dont have any data we cannot deduce the length of interval
+
+    // assuming uniform intervals
+    auto duration = loadData[1].first - loadData[0].first;
+    auto lengthOfInterval = chrono::duration_cast<chrono::seconds>(duration);
+
+    vector<PredictedDatacenterInformation> DCInfo;
+
+    for (unsigned long long i = 0;
+         i < min(greennessData.size(), loadData.size()); i++) {
+        auto [timestamp, predictedLoad] = loadData[i];
+        auto [dummy, predictedGreenness] = greennessData[i];
+        DCInfo.emplace_back(timestamp, lengthOfInterval, predictedLoad,
+                            predictedGreenness, datacenterSpecificInfo);
+    }
+
+    return DCInfo;
 }
 
 auto PredictionApi::getData()
-    -> map<int, vector<PredictedDatacenterInformation>> {
-    DatacenterSpecificInformation datacenterA = DatacenterSpecificInformation(
-        100, "Amsterdam", "AmsterdamDC", "Europe", 1);
+    -> Task<map<long long, vector<PredictedDatacenterInformation>>> {
+    vector<string> datacenterNamesList = {"Data-Center-1", "Data-Center-2",
+                                          "Data-Center-3", "Data-Center-4",
+                                          "Data-Center-5"};
+    // this will be made an API call to get the names. It just isnt implemented
+    // yet.
 
-    DatacenterSpecificInformation datacenterB =
-        DatacenterSpecificInformation(100, "Hamburg", "HamburgDC", "Europe", 2);
+    vector<Task<vector<PredictedDatacenterInformation>>> promisedData;
+    promisedData.reserve(datacenterNamesList.size());
+    for (auto &name : datacenterNamesList)
+        promisedData.push_back(getDataSingleDatacenter(name));
 
-    DatacenterSpecificInformation datacenterC =
-        DatacenterSpecificInformation(100, "London", "LondonDC", "Europe", 3);
+    auto resolvedData =
+        co_await scheduler::coro::when_all(std::move(promisedData));
 
-    map<int, vector<PredictedDatacenterInformation>> data;
+    map<long long, vector<PredictedDatacenterInformation>> data;
+    for (auto &dcData : resolvedData) {
+        if (dcData.empty())
+            continue;
+        data[dcData.front().datacenterInfo.datacenterId] = dcData;
+    }
+    co_return data;
+}
 
-    data[datacenterA.datacenterId] = makeUpPredictionData(datacenterA);
-    data[datacenterB.datacenterId] = makeUpPredictionData(datacenterB);
-    data[datacenterC.datacenterId] = makeUpPredictionData(datacenterC);
+auto PredictionApi::parseJsonForLoad(const Json::Value &respJson)
+    -> vector<pair<chrono::system_clock::time_point, double>> {
+    vector<pair<chrono::system_clock::time_point, double>> loadData;
+    for (auto obj : respJson["data"]) {
+        auto time_res =
+            scheduler::utils::parseIso8601(obj["timestamp"].asString());
+        if (!time_res) {
+            LOG_ERROR << "Failed to parse timestamp: "
+                      << obj["timestamp"].asString();
+            continue;
+        }
+        double load = obj["value"].asDouble();
+        loadData.emplace_back(time_res.value(), load);
+    }
+    return loadData;
+}
 
-    return data;
+auto PredictionApi::parseJsonForGreenness(const Json::Value &respJson)
+    -> vector<pair<chrono::system_clock::time_point, double>> {
+    vector<pair<chrono::system_clock::time_point, double>> greennessData;
+    for (auto obj : respJson["data"]) {
+        auto time_res =
+            scheduler::utils::parseIso8601(obj["timestamp"].asString());
+        if (!time_res) {
+            LOG_ERROR << "Failed to parse timestamp: "
+                      << obj["timestamp"].asString();
+            continue;
+        }
+        double load = obj["value"].asDouble();
+        greennessData.emplace_back(time_res.value(), load);
+    }
+    return greennessData;
 }

@@ -1,8 +1,10 @@
 #ifndef SCHEDULE
 #define SCHEDULE
+#pragma once
 
 #include <DatacenterSpecificInformation.hpp>
 #include <ScheduledInterval.hpp>
+#include <Serializable.hpp>
 
 #include <set>
 #include <utility>
@@ -17,8 +19,12 @@ class ScheduleForDatacenter {
 
     ScheduleForDatacenter() = default;
 
-    void addInterval(ScheduledInterval newInterval);
+    void addInterval(const ScheduledInterval &newInterval);
     void show();
 };
+
+auto f_toJson(const ScheduleForDatacenter &obj) -> Json::Value;
+
+static_assert(Serializable<ScheduleForDatacenter>);
 
 #endif

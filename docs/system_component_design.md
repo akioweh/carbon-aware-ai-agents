@@ -7,48 +7,51 @@ This document briefs on the architectural design of this software system.
 The System will be comprised of three independent components:
 
 - Scheduler: the core logical computational program
-- Stats: ingests and forecasts external data under a uniform interface for the Scheduler
+- Stats: ingests and forecasts external data under a uniform interface for the
+  Scheduler
 - UI: a web-app to take user input and display Scheduler output
 
-The components are independent software processes separated on an area-of-concern basis.
-The components will interact and communicate using HTTP (RESTful) APIs.
-Having the API on the network layer maximizes modularity, allowing each component to be developed
-both in parallel and in whatever language and dev stack that is the most appropriate for the job.
+The components are independent software processes separated on an
+area-of-concern basis. The components will interact and communicate using HTTP
+(RESTful) APIs. Having the API on the network layer maximizes modularity,
+allowing each component to be developed both in parallel and in whatever
+language and dev stack that is the most appropriate for the job.
 
 ## Components
 
 ### Scheduler
 
-This is the core logical program that determines the best "deployment schedule" for
-a given AI workload to "minimize environmental impact".
+This is the core logical program that determines the best "deployment schedule"
+for a given AI workload to "minimize environmental impact".
 
-The environmental and stateful data required for the scheduling is obtained from
-the Stats component.
-Ultimately, the user interacts with the scheduler via the UI, where the outputs
-are also visualized/displayed.
+The environmental context and baseline load forecasts are obtained from the
+Stats component. The Scheduler itself persists and manages the "Global Schedule"
+(the state of all scheduled user jobs). Ultimately, the user interacts with the
+scheduler via the UI, where the outputs are also visualized/displayed.
 
 ### Stats
 
-The scheduling work requires multiple types of data,
-each of which may have multiple sources:
+The scheduling work requires multiple types of data, each of which may have
+multiple sources:
 
 - environmental (per location over time): grid carbon intensity, weather, etc.
-- data center state (per center): current load, total capacity, etc.
-- temporary constraints (misc factors)
+- data center state (per center): baseline load, total capacity, etc.
 
-The Stats component should integrate with these sources and relay the data,
+The Stats component integrates with these sources and relays the data,
 potentially with forecasts, to the Scheduler under an uniform interface.
 
-Of course, this component also handles data sanitation, normalization, persistence, etc.
+Of course, this component also handles data sanitation, normalization, and
+persistence of its own historical data.
 
 ### UI
 
-Standard server-side rendered web-app.
-This component provides the human-computer interface.
+Standard server-side rendered web-app. This component provides the
+human-computer interface.
 
 The main interfaces will include:
 
-- visualizations of data center states together with the environmental costs at each
+- visualizations of data center states together with the environmental costs at
+  each
 - task input / control
 - presentation of the scheduler output for a task
 
@@ -126,7 +129,7 @@ flowchart TB
     classDef dataNode fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
 ```
 
-```mermad
+```mermaid
 sequenceDiagram
     autonumber
     actor U as User
@@ -154,13 +157,13 @@ sequenceDiagram
     activate Sched
 
     %% Scheduler needs context
-    Sched->>Stats: GET /api/context?window=start_end
+    Sched->>Stats: GET /locations/{loc}/metrics/forecast_...
     activate Stats
-    Stats-->>Sched: 200 OK <br>{ "cost_context": { ... } }
+    Stats-->>Sched: 200 OK <br>{ "forecast_data": { ... } }
     deactivate Stats
 
     %% Logic Calculation
-    Sched->>Sched: Run Constraint Solver<br>(Job Spec + Cost Context)
+    Sched->>Sched: Run Constraint Solver<br>(Job Spec + Forecast Context)
 
     %% Return Result
     Sched-->>UI: 200 OK<br>{ "schedule": { ... } }

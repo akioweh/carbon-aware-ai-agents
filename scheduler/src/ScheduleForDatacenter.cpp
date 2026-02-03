@@ -5,15 +5,24 @@
 
 using namespace std;
 
-void ScheduleForDatacenter::addInterval(ScheduledInterval newInterval) {
+void ScheduleForDatacenter::addInterval(const ScheduledInterval &newInterval) {
     schedule.insert(newInterval);
 }
 
 void ScheduleForDatacenter::show() {
     cout << datacenterInfo.maxLoad << " " << datacenterInfo.name << ":" << '\n';
     cout << "[" << '\n';
-    for (auto interval : schedule) {
+    for (const auto &interval : schedule)
         interval.show();
-    }
     cout << "]" << '\n' << '\n';
+}
+
+auto f_toJson(const ScheduleForDatacenter &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["datacenterInfo"] = toJson(obj.datacenterInfo);
+    auto intervalsJson = Json::Value(Json::arrayValue);
+    for (const auto &interval : obj.schedule)
+        intervalsJson.append(toJson(interval));
+    res["intervals"] = intervalsJson;
+    return res;
 }

@@ -1,6 +1,7 @@
 #ifndef DATACENTER_SPECIFIC_INFORMATION
 #define DATACENTER_SPECIFIC_INFORMATION
 
+#include <Serializable.hpp>
 #include <string>
 #include <utility>
 
@@ -10,16 +11,24 @@ class DatacenterSpecificInformation {
     std::string locationId;
     std::string name;
     std::string region;
-    int datacenterId;
+    long long datacenterId;
 
     DatacenterSpecificInformation(double maxLoad, std::string locationId,
                                   std::string name, std::string region,
-                                  int datacenterId)
+                                  long long datacenterId)
         : maxLoad(maxLoad), locationId(std::move(locationId)),
           name(std::move(name)), region(std::move(region)),
           datacenterId(datacenterId) {};
 
     DatacenterSpecificInformation() = default;
+
+    static auto parseJsonForDCSpecificInfo(const std::string &datacenterName,
+                                           const Json::Value &respJson)
+        -> DatacenterSpecificInformation;
 };
+
+auto f_toJson(const DatacenterSpecificInformation &obj) -> Json::Value;
+
+static_assert(Serializable<DatacenterSpecificInformation>);
 
 #endif

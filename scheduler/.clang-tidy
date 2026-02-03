@@ -4,3 +4,5 @@ Checks: >
   modernize-*,
   performance-*,
   readability-*,
+  -readability-braces-around-statements,
+  -bugprone-easily-swappable-parameters,

@@ -4,47 +4,107 @@ import random
 from datetime import datetime, timedelta
 
 MAX_CAPACITY = 50
-DATA_CENTRES = ["Data-Centre-1", "Data-Centre-2", "Data-Centre-3", "Data-Centre-4", "Data-Centre-5"]
+DATA_CENTRES = [
+    'Data-Center-1',
+    'Data-Center-2',
+    'Data-Center-3',
+    'Data-Center-4',
+    'Data-Center-5',
+]
 
-def generate_load(timestamp):
+
+class WeatherSystem:
+    def __init__(self):
+        self.wind_speed = random.uniform(0, 100)
+        self.cloud_cover = random.uniform(0, 100)
+        self.trend_duration = 0
+        self.wind_trend = 0
+        self.cloud_trend = 0
+
+    def update(self):
+        # Update weather patterns slowly
+        if self.trend_duration <= 0:
+            self.trend_duration = random.randint(
+                12, 48
+            )  # 1-4 hours (in 5-min intervals)
+            self.wind_trend = random.uniform(-2, 2)
+            self.cloud_trend = random.uniform(-5, 5)
+
+        self.wind_speed = max(
+            0, min(100, self.wind_speed + self.wind_trend + random.uniform(-1, 1))
+        )
+        self.cloud_cover = max(
+            0, min(100, self.cloud_cover + self.cloud_trend + random.uniform(-2, 2))
+        )
+        self.trend_duration -= 1
+
+
+def get_solar_intensity(timestamp, cloud_cover):
     hour = timestamp.hour + timestamp.minute / 60
-
-    phase_shift = -3  # moves the peak to 3pm and dip to 3am
-    x = (hour + phase_shift) / 24 * 2 * math.pi
-
-    daily_cycle = (math.sin(x) + 1) / 2
-
-    weekday = timestamp.weekday()
-    if weekday >= 5:  # saturday or sunday less load
-        weekend_factor = 0.7
+    # Peak at noon (12), zero before 6 and after 18
+    if 6 <= hour <= 18:
+        # Simple bell-ish curve
+        intensity = math.sin((hour - 6) / 12 * math.pi) * 100
+        # Cloud cover reduces solar
+        intensity *= 1 - (cloud_cover / 100) * 0.8
     else:
-        weekend_factor = 1.0
+        intensity = 0
+    return max(0, intensity)
 
-    base_load = daily_cycle * MAX_CAPACITY * weekend_factor
 
-    noise = random.uniform(-0.1 * MAX_CAPACITY, 0.1 * MAX_CAPACITY)
+def generate_load(timestamp, dc_index):
+    hour = timestamp.hour + timestamp.minute / 60
+    weekday = timestamp.weekday()
 
-    value = base_load + noise
+    # Workday pattern
+    is_weekend = weekday >= 5
 
-    value = max(0, min(MAX_CAPACITY, value))
+    if is_weekend:
+        # Weekend: lazier, lower peak, starts later
+        base_curve = (
+            20
+            + 15 * math.exp(-((hour - 14) ** 2) / 20)  # Broad afternoon peak
+            + 5 * math.cos(hour / 3)  # Some wobbles
+        )
+    else:
+        # Weekday: Morning spike, lunch dip, afternoon work, evening streaming
+        base_curve = (
+            5  # Baseline
+            + 35 * math.exp(-((hour - 10) ** 2) / 4)  # Morning peak (10am)
+            + 30 * math.exp(-((hour - 15) ** 2) / 6)  # Afternoon plateau
+            + 10 * math.exp(-((hour - 21) ** 2) / 4)  # Evening activity
+        )
+        # Deep night dip
+        if 0 <= hour < 5:
+            base_curve *= 0.5
 
-    return value
+    # Add randomness/noise
+    noise = random.uniform(-2, 2)
 
-def generate_greenness(timestamp):
-    hour = timestamp.hour
+    # Occasional spikes (server updates, batch jobs) - more likely at night
+    if random.random() < 0.01:
+        noise += random.uniform(10, 20)
 
-    # opposite of load, high in day (sun) and low in night
-    base = (
-        10 if hour < 6 else
-        50 if hour < 10 else
-        80 if hour < 16 else
-        40 if hour < 20 else
-        10
-    )
+    value = base_curve + noise
 
-    noise = random.uniform(-9, 9)
-    value = max(0, min(100, base + noise))  # 0–100 scale
-    return value
+    # DC specific variance
+    value += (dc_index % 3) * 2  # Slight offset per DC
+
+    return max(0, min(MAX_CAPACITY, value))
+
+
+def generate_greenness(timestamp, weather):
+    solar = get_solar_intensity(timestamp, weather.cloud_cover)
+    wind = weather.wind_speed * 0.7  # Wind contribution
+
+    # Base grid mix (nuclear/hydro/coal/gas) - varies slowly
+    grid_base = 30 + 10 * math.sin(timestamp.hour / 24 * 2 * math.pi)
+
+    total_greenness = 0.4 * solar + 0.4 * wind + 0.2 * grid_base
+
+    noise = random.uniform(-2, 2)
+    return max(0, min(100, total_greenness + noise))
+
 
 def generate_history():
     now = datetime.now()
@@ -54,19 +114,27 @@ def generate_history():
     # dictionary keyed by data centre name
     histories = {dc: [] for dc in DATA_CENTRES}
 
+    # Shared weather system (or could be per region)
+    weather = WeatherSystem()
+
     while current <= now:
-        for dc in DATA_CENTRES:
-            histories[dc].append({
-                "timestamp": current.isoformat(),
-                "load": generate_load(current),
-                "greenness": generate_greenness(current)
-            })
+        weather.update()
+
+        for i, dc in enumerate(DATA_CENTRES):
+            histories[dc].append(
+                {
+                    'timestamp': current.isoformat(),
+                    'load': generate_load(current, i),
+                    'greenness': generate_greenness(current, weather),
+                }
+            )
         current += timedelta(minutes=5)
 
-    with open("history.json", "w") as f:
+    with open('history.json', 'w') as f:
         json.dump(histories, f, indent=2)
 
-    print("history.json generated.")
+    print('history.json generated.')
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     generate_history()
