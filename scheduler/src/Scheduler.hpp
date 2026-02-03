@@ -6,7 +6,6 @@
 #include <StatsAPIClient.hpp>
 #include <structs/Datacenter.hpp>
 #include <structs/JobRequest.hpp>
-#include <structs/PredictedDatacenterInformation.hpp>
 #include <structs/ScheduleBlock.hpp>
 
 struct ScheduleImpact {
