@@ -6,7 +6,7 @@
 #include <structs/ScheduleBlock.hpp>
 
 namespace mappers {
-auto toDto(const ScheduleImpact &impact) -> ImpactModel {
+auto f_toDto(const ScheduleImpact &impact) -> ImpactModel {
     ImpactModel impactDB;
     impactDB.setCarbonIntensity(impact.carbon_intensity);
     impactDB.setSci(impact.sci);
@@ -14,7 +14,7 @@ auto toDto(const ScheduleImpact &impact) -> ImpactModel {
     return impactDB;
 }
 
-auto toDto(const ScheduleBlock &block, int impactId) -> JobModel {
+auto f_toDto(const ScheduleBlock &block, int impactId) -> JobModel {
     JobModel job;
     job.setAdditionalLoad(block.additionalLoad);
     job.setLocationId(block.location);
@@ -23,13 +23,13 @@ auto toDto(const ScheduleBlock &block, int impactId) -> JobModel {
     return job;
 }
 
-auto fromDto(const ImpactModel &impactDto) -> ScheduleImpact {
+auto f_fromDto(const ImpactModel &impactDto) -> ScheduleImpact {
     return {.carbon_intensity = impactDto.getValueOfCarbonIntensity(),
             .total_emissions = impactDto.getValueOfTotalEmissions(),
             .sci = impactDto.getValueOfSci()};
 }
 
-auto fromDto(const JobModel &jobDto) -> ScheduleBlock {
+auto f_fromDto(const JobModel &jobDto) -> ScheduleBlock {
     auto chronoTimestamp =
         scheduler::utils::trantorToChrono(jobDto.getValueOfTimeStamp());
     auto stringId =

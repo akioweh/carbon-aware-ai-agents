@@ -12,14 +12,30 @@ using ImpactModel = drogon_model::calendar_db::Impacts;
 using JobMapper = drogon::orm::Mapper<JobModel>;
 using ImpactMapper = drogon::orm::Mapper<ImpactModel>;
 
-auto toDto(ScheduleImpact) -> ImpactModel;
+auto f_toDto(ScheduleImpact) -> ImpactModel;
+auto f_toDto(const ScheduleBlock &, int) -> JobModel;
+auto f_fromDto(ImpactModel) -> ScheduleImpact;
+auto f_fromDto(JobModel) -> ScheduleBlock;
 
-auto toDto(const ScheduleBlock &, int) -> JobModel;
+struct FromDtoFn {
+    auto operator()(auto &&dto) const {
+        return f_fromDto(std::forward<decltype(dto)>(dto));
+    }
+};
 
-auto fromDto(ImpactModel) -> ScheduleImpact;
+struct ToDtoFn {
+    auto operator()(const ScheduleImpact &impact) const {
+        return f_toDto(impact);
+    }
 
-auto fromDto(JobModel) -> ScheduleBlock;
+    [[nodiscard]] auto withImpactId(int impactId) const {
+        return [impactId](const ScheduleBlock &block) {
+            return f_toDto(block, impactId);
+        };
+    }
+};
 
+inline constexpr FromDtoFn fromDto{};
+inline constexpr ToDtoFn toDto{};
 }; // namespace mappers
-
 #endif
