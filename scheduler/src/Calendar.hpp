@@ -4,6 +4,8 @@
 
 #include <Scheduler.hpp>
 #include <expected>
+#include <models/Impacts.h>
+#include <models/Jobs.h>
 #include <shared_mutex>
 #include <structs/ScheduleBlock.hpp>
 
@@ -11,10 +13,10 @@ class CalendarService {
   public:
     using Schedule = std::pair<ScheduleImpact, std::set<ScheduleBlock>>;
     using Calendar = std::map<std::string, Schedule>;
-    auto add(const std::string &jobId, Schedule schedule) -> void;
+    auto add(Schedule schedule) -> void;
 
     auto get(const std::string &jobId) const
-        -> std::expected<Schedule, std::string>;
+        -> drogon::Task<std::expected<ScheduleResult, std::string>>;
 
     auto get() const -> Calendar;
 

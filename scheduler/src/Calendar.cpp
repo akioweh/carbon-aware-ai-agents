@@ -1,66 +1,75 @@
+#include "structs/ScheduleBlock.hpp"
 #include <Calendar.hpp>
+#include <DtoMappers/Mappers.h>
+#include <Scheduler.hpp>
 #include <expected>
-#include <models/Impacts.h>
-#include <models/Jobs.h>
 #include <mutex>
-#include <trantor/utils/Date.h>
-#include <trantor/utils/Logger.h>
+#include <ranges>
 #include <utils/Utils.hpp>
 
-using JobModel = drogon_model::calendar_db::Jobs;
-using ImpactModel = drogon_model::calendar_db::Impacts;
-
-using JobMapper = drogon::orm::Mapper<JobModel>;
-using ImpactMapper = drogon::orm::Mapper<ImpactModel>;
-
-auto CalendarService::add(const std::string &jobId, Schedule schedule) -> void {
+auto CalendarService::add(Schedule schedule) -> void {
     std::unique_lock lock(mutex);
 
-    const auto transaction = drogon::app().getDbClient()->newTransaction(
-        [jobId](bool success) -> void {
+    const auto transaction =
+        drogon::app().getDbClient()->newTransaction([](bool success) -> void {
             if (!success) {
-                LOG_ERROR << "Transaction failed! With jobId: " << jobId
-                          << '\n';
+                LOG_ERROR << "Transaction failed!" << '\n';
             }
         });
-    ImpactMapper impactMapper(transaction);
-    JobMapper jobsMapper(transaction);
+    mappers::ImpactMapper impactMapper(transaction);
+    mappers::JobMapper jobsMapper(transaction);
 
     const auto &[impact, intervals] = schedule;
 
-    ImpactModel impactDB;
-    impactDB.setCarbonIntensity(impact.carbon_intensity);
-    impactDB.setSci(impact.sci);
-    impactDB.setTotalEmissions(impact.total_emissions);
-    // can refactor this later to other function
+    auto impactModel = mappers::toDto(impact);
 
-    impactMapper.insert(impactDB);
-    const int impactId = *impactDB.getId();
+    impactMapper.insert(impactModel);
+    const int impactId = impactModel.getValueOfId();
 
-    for (const auto &interval : intervals) {
-        JobModel job;
-        job.setAdditionalLoad(interval.additionalLoad);
-        job.setLocationId(interval.location);
-        job.setImpactId(impactId);
-        job.setTimeStamp(
-            scheduler::utils::getPostGreDateFormat(interval.timestamp));
-        jobsMapper.insert(job);
-        /// this can also be refactored
+    for (auto &&jobModel :
+         intervals |
+             std::views::transform(mappers::toDto.withImpactId(impactId))) {
+        jobsMapper.insert(jobModel);
     }
 
-    calendar[jobId] = std::move(schedule);
+    calendar[scheduler::utils::parseIntToStringID(impactId)] =
+        std::move(schedule);
 }
 
-auto CalendarService::get(const std::string &jobId) const
-    -> std::expected<Schedule, std::string> {
+auto CalendarService::get(const std::string &jobIdString) const
+    -> drogon::Task<std::expected<ScheduleResult, std::string>> {
     std::shared_lock lock(mutex);
 
-    auto result = calendar.find(jobId);
-    if (result == calendar.end()) {
-        return std::unexpected("trying to read a jobId that doesnt exist in "
-                               "CalendarService get(jobId)");
+    auto result = calendar.find(jobIdString);
+    if (result != calendar.end()) {
+        auto [impact, schedule] = result->second;
+        co_return ScheduleResult{.jobId = jobIdString,
+                                 .schedule = {schedule.begin(), schedule.end()},
+                                 .impact = impact};
     }
-    return result->second;
+
+    auto dbPtr = drogon::app().getDbClient();
+    mappers::ImpactMapper impactMapper(dbPtr);
+    mappers::JobMapper jobsMapper(dbPtr);
+
+    const int jobIdInt = scheduler::utils::parseStringIDtoInt(jobIdString);
+    try {
+        auto impact = mappers::fromDto(impactMapper.findByPrimaryKey(jobIdInt));
+        auto jobsModels = jobsMapper.findBy(
+            drogon::orm::Criteria(mappers::JobModel::Cols::_impact_id,
+                                  drogon::orm::CompareOperator::EQ, jobIdInt));
+        auto jobs = jobsModels | std::views::transform(mappers::fromDto) |
+                    std::ranges::to<std::vector>();
+
+        co_return ScheduleResult{
+            .jobId = scheduler::utils::parseIntToStringID(jobIdInt),
+            .schedule = jobs,
+            .impact = impact};
+
+    } catch (const drogon::orm::DrogonDbException &e) {
+        // Exceptions replace the error callback
+        LOG_ERROR << "DB Error: " << e.base().what();
+    }
 }
 
 auto CalendarService::get() const -> Calendar {
