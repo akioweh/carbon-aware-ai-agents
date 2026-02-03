@@ -2,6 +2,7 @@
 import sqlite3
 import json
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
@@ -9,10 +10,74 @@ DB_FILE = 'cache.db'
 
 
 def get_connection():
-    """Get a database connection with WAL mode enabled."""
+    """Get a database connection."""
     conn = sqlite3.connect(DB_FILE)
-    conn.execute('PRAGMA journal_mode=WAL')
     return conn
+
+
+def initialize_db():
+    """Initialize the SQLite database for caching and historical data."""
+    with sqlite3.connect(DB_FILE) as conn:
+        # Enable WAL mode for better concurrent access
+        conn.execute('PRAGMA journal_mode=WAL')
+        
+        # Predictions cache table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS predictions (
+                key TEXT PRIMARY KEY,
+                data TEXT,
+                timestamp REAL
+            )
+        """)
+        
+        # Historical time-series data table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS historical_data (
+                location TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                load REAL NOT NULL,
+                greenness REAL NOT NULL,
+                PRIMARY KEY (location, timestamp)
+            )
+        """)
+        
+        # Create indexes for efficient querying
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_historical_timestamp 
+            ON historical_data(timestamp)
+        """)
+
+
+def get_cached_prediction(key: str) -> Optional[dict]:
+    """Get cached prediction if it exists and is less than 5 minutes old."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                'SELECT data, timestamp FROM predictions WHERE key = ?', (key,)
+            )
+            row = cursor.fetchone()
+
+            if row:
+                data_json, timestamp = row
+                # Check if cache is fresh (less than 5 minutes old)
+                if time.time() - timestamp < 300:  # 300 seconds = 5 minutes
+                    return json.loads(data_json)
+    except sqlite3.Error as e:
+        print(f'Cache read error: {e}')
+    return None
+
+
+def save_prediction(key: str, data: dict):
+    """Save prediction to cache with current timestamp."""
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                'INSERT OR REPLACE INTO predictions (key, data, timestamp) VALUES (?, ?, ?)',
+                (key, json.dumps(data), time.time()),
+            )
+    except sqlite3.Error as e:
+        print(f'Cache write error: {e}')
+
 
 
 def insert_historical_data(location: str, timestamp: datetime, load: float, greenness: float):

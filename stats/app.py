@@ -1,9 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import Optional
-import sqlite3
-import json
 import time
 import threading
 import yaml
@@ -66,74 +63,6 @@ class ErrorResponse(BaseModel):
     error: str
 
 
-def init_db():
-    """Initialize the SQLite database for caching and historical data."""
-    with sqlite3.connect(DB_FILE) as conn:
-        # Enable WAL mode for better concurrent access
-        conn.execute('PRAGMA journal_mode=WAL')
-        
-        # Predictions cache table
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS predictions (
-                key TEXT PRIMARY KEY,
-                data TEXT,
-                timestamp REAL
-            )
-        """)
-        
-        # Historical time-series data table
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS historical_data (
-                location TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                load REAL NOT NULL,
-                greenness REAL NOT NULL,
-                PRIMARY KEY (location, timestamp)
-            )
-        """)
-        
-        # Create indexes for efficient querying
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_historical_timestamp 
-            ON historical_data(timestamp)
-        """)
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_historical_location_timestamp 
-            ON historical_data(location, timestamp)
-        """)
-
-
-def get_cached_prediction(key: str) -> Optional[dict]:
-    """Get cached prediction if it exists and is less than 5 minutes old."""
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            cursor = conn.execute(
-                'SELECT data, timestamp FROM predictions WHERE key = ?', (key,)
-            )
-            row = cursor.fetchone()
-
-            if row:
-                data_json, timestamp = row
-                # Check if cache is fresh (less than 5 minutes old)
-                if time.time() - timestamp < 300:  # 300 seconds = 5 minutes
-                    return json.loads(data_json)
-    except sqlite3.Error as e:
-        print(f'Cache read error: {e}')
-    return None
-
-
-def save_prediction(key: str, data: dict):
-    """Save prediction to cache with current timestamp."""
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            conn.execute(
-                'INSERT OR REPLACE INTO predictions (key, data, timestamp) VALUES (?, ?, ?)',
-                (key, json.dumps(data), time.time()),
-            )
-    except sqlite3.Error as e:
-        print(f'Cache write error: {e}')
-
-
 def prediction_loop():
     """Background loop to update predictions every 5 minutes."""
     while True:
@@ -141,10 +70,10 @@ def prediction_loop():
         for dc in DATA_CENTRES:
             try:
                 load_data = generate_next_week_load_prediction(dc)
-                save_prediction(f'load_forecast_{dc}', load_data)
+                db_utils.save_prediction(f'load_forecast_{dc}', load_data)
 
                 greenness_data = generate_next_week_greenness_prediction(dc)
-                save_prediction(f'greenness_forecast_{dc}', greenness_data)
+                db_utils.save_prediction(f'greenness_forecast_{dc}', greenness_data)
             except Exception as e:
                 print(f'Error updating predictions for {dc}: {e}')
 
@@ -155,7 +84,7 @@ def prediction_loop():
 # generating history and auto-updating the api schema file
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    db_utils.initialize_db()
 
     # Migrate existing history.json to database if it exists and DB is empty
     if os.path.exists(HISTORY_FILE) and db_utils.count_historical_data() == 0:
@@ -197,7 +126,7 @@ app = FastAPI(
 def get_load_forecast(location: str):
     try:
         cache_key = f'load_forecast_{location}'
-        cached_result = get_cached_prediction(cache_key)
+        cached_result = db_utils.get_cached_prediction(cache_key)
         if cached_result:
             return cached_result
         else:
@@ -206,7 +135,7 @@ def get_load_forecast(location: str):
             # 2. return 404/503.
             # for now, we generate on-demand so the endpint is always "reliable"
             data = generate_next_week_load_prediction(location)
-            save_prediction(cache_key, data)
+            db_utils.save_prediction(cache_key, data)
             return data
 
     except ValueError as e:
@@ -233,12 +162,12 @@ def get_carbon_forecast(location: str):
     """
     try:
         cache_key = f'greenness_forecast_{location}'
-        cached_result = get_cached_prediction(cache_key)
+        cached_result = db_utils.get_cached_prediction(cache_key)
         if cached_result:
             return cached_result
         else:
             data = generate_next_week_greenness_prediction(location)
-            save_prediction(cache_key, data)
+            db_utils.save_prediction(cache_key, data)
             return data
     except ValueError as e:
         return JSONResponse(status_code=404, content={'error': str(e)})

@@ -135,4 +135,6 @@ def generate_history():
 
 
 if __name__ == '__main__':
+    # ensure database is initialized
+    db_utils.initialize_db()
     generate_history()
