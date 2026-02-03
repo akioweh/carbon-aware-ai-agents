@@ -1,8 +1,10 @@
-from datetime import datetime, timedelta
-from prophet import Prophet as p
-import pandas as pd
-import db_utils
 import json
+from datetime import datetime, timedelta
+
+import pandas as pd
+from prophet import Prophet as p
+
+import db_utils
 
 
 def generate_next_week_load_prediction(location):

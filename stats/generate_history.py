@@ -1,6 +1,7 @@
 import math
 import random
 from datetime import datetime, timedelta
+
 import db_utils
 
 MAX_CAPACITY = 50

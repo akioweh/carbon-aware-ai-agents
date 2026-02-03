@@ -1,10 +1,10 @@
 """Database utilities for managing historical time-series data."""
-import sqlite3
 import json
 import os
+import sqlite3
 import time
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 DB_FILE = 'cache.db'
 

@@ -1,18 +1,19 @@
+import os
+import threading
+import time
+from contextlib import asynccontextmanager
+
+import yaml
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-import time
-import threading
-import yaml
-import os
-from contextlib import asynccontextmanager
 
+import db_utils
 from generate_history import DATA_CENTRES, generate_history
 from predictor import (
-    generate_next_week_load_prediction,
     generate_next_week_greenness_prediction,
+    generate_next_week_load_prediction,
 )
-import db_utils
 
 DB_FILE = 'cache.db'
 HISTORY_FILE = 'history.json'
