@@ -1,3 +1,4 @@
+#include "structs/ScheduleBlock.hpp"
 #include <Calendar.hpp>
 #include <Scheduler.hpp>
 #include <StatsAPIClient.hpp>
@@ -22,20 +23,15 @@ auto operator<=>(const LoadBlock &lhs, const LoadBlock &rhs) -> auto {
 // transform from { jobId: {impact, set<ScheduleBlock>} }
 // to dense vector (with implicitly continous timestamps) of loadvalues within
 // the given interval.
-auto flatten_calendar(const calendarService::Calendar &calendar,
+auto flatten_calendar(const vector<ScheduleBlock> &blocks,
                       const chrono::system_clock::time_point start_time,
                       const chrono::system_clock::time_point end_time)
     -> map<std::string, vector<double>> {
+
     auto tmp_res = map<string, set<LoadBlock>>{};
-    for (const auto &[jobId, item] : calendar) {
-        const auto &[impact, scheduleBlocks] = item;
-        for (const auto &block :
-             scheduleBlocks | views::filter([&](const auto &block) -> auto {
-                 return block.timestamp >= start_time &&
-                        block.timestamp <= end_time;
-             }))
-            tmp_res[block.location].insert(LoadBlock{
-                .timestamp = block.timestamp, .load = block.additionalLoad});
+    for (const auto &block : blocks) {
+        tmp_res[block.location].insert(LoadBlock{.timestamp = block.timestamp,
+                                                 .load = block.additionalLoad});
     }
 
     const auto n_intervals =
@@ -82,7 +78,8 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
         max(std::chrono::system_clock::now(), job.earliest_start);
     const auto time_window_end = job.latest_finish;
     auto datacenter_loads = flatten_calendar(
-        co_await calendarService::get(), time_window_start, time_window_end);
+        co_await calendarService::get(time_window_start, time_window_end),
+        time_window_start, time_window_end);
 
     // call dp1 in parallel for each location
     // then, merge results using mega dp (multiple-choice knapsack)

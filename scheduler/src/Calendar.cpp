@@ -28,9 +28,11 @@ auto jobImpactIdEqualityCriteria(const int impactId) {
 
 auto jobTimestampInsideTimeIntervalCriteria(time_point start, time_point end) {
     return drogon::orm::Criteria(mappers::JobModel::Cols::_time_stamp,
-                                 drogon::orm::CompareOperator::GE, start) &&
+                                 drogon::orm::CompareOperator::GE,
+                                 scheduler::utils::chronoToTrantor(start)) &&
            drogon::orm::Criteria(mappers::JobModel::Cols::_time_stamp,
-                                 drogon::orm::CompareOperator::LT, end);
+                                 drogon::orm::CompareOperator::LT,
+                                 scheduler::utils::chronoToTrantor(end));
 }
 
 // I will add criteria for the timestamps here
