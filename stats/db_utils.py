@@ -4,9 +4,23 @@ import os
 import sqlite3
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional
 
 DB_FILE = 'cache.db'
+CARBON_DB_FILE = Path(os.environ.get(
+    "CARBON_DB_PATH",
+    Path(__file__).parent / "carbon_intensity.db"
+))
+
+# Map UK regions to Data Center locations
+UK_REGION_TO_DC = {
+    13: "Data-Center-1",  # London
+    1: "Data-Center-2",   # North Scotland
+    2: "Data-Center-3",   # South Scotland
+    3: "Data-Center-4",   # North West England
+    4: "Data-Center-5",   # North East England
+}
 
 
 def get_connection():
@@ -265,3 +279,150 @@ def count_historical_data() -> int:
     except sqlite3.Error as e:
         print(f'Error counting historical data: {e}')
         return 0
+
+
+# --- Carbon Intensity Database Functions ---
+
+def get_carbon_db_connection():
+    """Get a connection to the carbon intensity database."""
+    if not CARBON_DB_FILE.exists():
+        raise FileNotFoundError(f"Carbon intensity database not found: {CARBON_DB_FILE}")
+    conn = sqlite3.connect(CARBON_DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def carbon_intensity_to_greenness(intensity: int) -> float:
+    """Convert carbon intensity (gCO2/kWh) to greenness score (0-100).
+
+    UK carbon intensity typically ranges from ~50 (very green) to ~400+ (high carbon).
+    We map this to a 0-100 greenness score where:
+    - 100 = very green (low carbon, ~50 gCO2/kWh or less)
+    - 0 = high carbon (~400+ gCO2/kWh)
+    """
+    if intensity is None:
+        return 50.0  # Default to middle if no data
+
+    # Clamp intensity to expected range
+    intensity = max(0, min(500, intensity))
+
+    # Linear mapping: 50 -> 100, 400 -> 0
+    # greenness = 100 - ((intensity - 50) / 350) * 100
+    greenness = 100 - ((intensity - 50) / 3.5)
+    return max(0.0, min(100.0, greenness))
+
+
+def get_carbon_readings(
+    region_id: Optional[int] = None,
+    since: Optional[datetime] = None,
+    limit: int = 10000
+) -> List[Dict]:
+    """Get carbon intensity readings from the collector database.
+
+    Args:
+        region_id: Optional filter by UK region ID
+        since: Optional filter for readings after this time
+        limit: Maximum number of readings to return
+
+    Returns:
+        List of reading dicts with region_id, timestamp_from, actual, index_value
+    """
+    try:
+        with get_carbon_db_connection() as conn:
+            query = "SELECT * FROM carbon_readings"
+            params = []
+            conditions = []
+
+            if region_id is not None:
+                conditions.append("region_id = ?")
+                params.append(region_id)
+
+            if since:
+                conditions.append("timestamp_from >= ?")
+                params.append(since.isoformat())
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY timestamp_from DESC LIMIT ?"
+            params.append(limit)
+
+            cursor = conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+    except (sqlite3.Error, FileNotFoundError) as e:
+        print(f'Error reading carbon database: {e}')
+        return []
+
+
+def sync_carbon_to_historical(days_back: int = 30) -> int:
+    """Sync carbon intensity data to historical_data table.
+
+    Reads from carbon_intensity.db, converts intensity to greenness,
+    maps UK regions to Data Center locations, and inserts into cache.db.
+
+    Args:
+        days_back: How many days of data to sync
+
+    Returns:
+        Number of records synced
+    """
+    since = datetime.now() - timedelta(days=days_back)
+    readings = get_carbon_readings(since=since, limit=50000)
+
+    if not readings:
+        print("No carbon readings found to sync")
+        return 0
+
+    # Convert readings to historical data format
+    bulk_data = []
+    for reading in readings:
+        region_id = reading.get("region_id")
+        if region_id not in UK_REGION_TO_DC:
+            continue
+
+        location = UK_REGION_TO_DC[region_id]
+        intensity = reading.get("actual")
+        greenness = carbon_intensity_to_greenness(intensity)
+
+        # Parse timestamp
+        ts_str = reading.get("timestamp_from", "")
+        try:
+            # Handle ISO format with or without Z suffix
+            ts_str = ts_str.replace("Z", "+00:00")
+            timestamp = datetime.fromisoformat(ts_str)
+        except ValueError:
+            continue
+
+        bulk_data.append({
+            "location": location,
+            "timestamp": timestamp,
+            "load": 25.0,  # Default load - carbon API doesn't provide this
+            "greenness": greenness
+        })
+
+    if bulk_data:
+        insert_historical_data_bulk(bulk_data)
+        print(f"Synced {len(bulk_data)} carbon readings to historical data")
+
+    return len(bulk_data)
+
+
+def get_carbon_reading_count() -> int:
+    """Get total count of carbon intensity readings collected."""
+    try:
+        with get_carbon_db_connection() as conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM carbon_readings")
+            return cursor.fetchone()[0]
+    except (sqlite3.Error, FileNotFoundError) as e:
+        print(f'Error counting carbon readings: {e}')
+        return 0
+
+
+def has_carbon_data() -> bool:
+    """Check if carbon intensity database exists and has data."""
+    if not CARBON_DB_FILE.exists():
+        return False
+    try:
+        return get_carbon_reading_count() > 0
+    except Exception:
+        return False
