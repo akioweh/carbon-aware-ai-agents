@@ -22,7 +22,7 @@ auto operator<=>(const LoadBlock &lhs, const LoadBlock &rhs) -> auto {
 // transform from { jobId: {impact, set<ScheduleBlock>} }
 // to dense vector (with implicitly continous timestamps) of loadvalues within
 // the given interval.
-auto flatten_calendar(const CalendarService::Calendar &calendar,
+auto flatten_calendar(const calendarService::Calendar &calendar,
                       const chrono::system_clock::time_point start_time,
                       const chrono::system_clock::time_point end_time)
     -> map<std::string, vector<double>> {
@@ -82,7 +82,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
         max(std::chrono::system_clock::now(), job.earliest_start);
     const auto time_window_end = job.latest_finish;
     auto datacenter_loads = flatten_calendar(
-        calendarService.get(), time_window_start, time_window_end);
+        co_await calendarService::get(), time_window_start, time_window_end);
 
     // call dp1 in parallel for each location
     // then, merge results using mega dp (multiple-choice knapsack)

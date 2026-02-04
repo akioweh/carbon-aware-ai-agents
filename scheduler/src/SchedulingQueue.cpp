@@ -34,13 +34,13 @@ start:;
         auto res = co_await scheduler.scheduleJob(task->jobRequest);
         auto schedule = std::set<ScheduleBlock>{};
 
-        auto persist = [impact = res.impact, schedule]() mutable -> void {
+        auto persist = [impact = res.impact, schedule]() mutable -> drogon::Task<> {
             if (schedule.size() == 0) {
                 LOG_WARN
                     << "the size of a scheduled job is zero - not persisiting"; 
-                return;
+                co_return;
             }
-            calendarService.add({impact, std::move(schedule)});
+            co_await calendarService::add({impact, std::move(schedule)});
         };
 
         task->setValue(res);
@@ -52,7 +52,7 @@ start:;
         // cause then even the coroutine handle is bad, and its a pointer
         // so we cant know it points to garbage.
         drogon::async_run([persist]() mutable -> drogon::Task<> {
-            persist();
+            co_await persist();
             co_return;
         });
     }
