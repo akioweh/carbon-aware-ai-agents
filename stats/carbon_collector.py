@@ -3,7 +3,9 @@
 Carbon Intensity Data Collector
 
 Collects carbon intensity data from the UK Carbon Intensity API
-every 5 minutes for a week, storing results in SQLite database.
+every 5 minutes, storing results in SQLite database.
+
+Designed to run indefinitely on a server (e.g., Oracle Cloud VM).
 """
 
 import sqlite3
@@ -11,7 +13,9 @@ import requests
 import time
 import shutil
 import schedule
-from datetime import datetime, timedelta
+import signal
+import os
+from datetime import datetime
 from pathlib import Path
 
 # Configuration
@@ -23,9 +27,11 @@ REGIONS = {
     4: "North East England",
     13: "London",
 }
-DB_PATH = Path(__file__).parent / "carbon_intensity.db"
-INTERVAL_SECONDS = 5 * 60  # 5 minutes
-DURATION_SECONDS = 7 * 24 * 60 * 60  # 1 week
+DB_PATH = Path(os.environ.get("CARBON_DB_PATH", Path(__file__).parent / "carbon_intensity.db"))
+INTERVAL_MINUTES = int(os.environ.get("CARBON_INTERVAL_MINUTES", 5))
+
+# Graceful shutdown flag
+_shutdown_requested = False
 
 
 def init_database(db_path: Path) -> sqlite3.Connection:
@@ -157,43 +163,51 @@ def get_reading_count(conn: sqlite3.Connection) -> int:
     return cursor.fetchone()[0]
 
 
+def _signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    global _shutdown_requested
+    sig_name = signal.Signals(signum).name
+    print(f"\n\nReceived {sig_name}, shutting down gracefully...")
+    _shutdown_requested = True
+
+
 def run_collector():
-    """Main collection loop."""
+    """Main collection loop - runs indefinitely until stopped."""
+    global _shutdown_requested
+
     print("Carbon Intensity Data Collector")
     print(f"Database: {DB_PATH}")
-    print(f"Interval: {INTERVAL_SECONDS // 60} minutes")
-    print(f"Duration: {DURATION_SECONDS // 86400} days")
+    print(f"Interval: {INTERVAL_MINUTES} minutes")
+    print(f"Mode: Continuous (runs indefinitely)")
     print(f"Regions: {', '.join(REGIONS.values())}")
+
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
 
     conn = init_database(DB_PATH)
     start_time = datetime.now()
-    end_time = start_time + timedelta(seconds=DURATION_SECONDS)
 
     print(f"\nStarted at: {start_time}")
-    print(f"Will end at: {end_time}")
-    print("Press Ctrl+C to stop early and dump database.\n")
+    print("Send SIGTERM or press Ctrl+C to stop.\n")
 
     def job():
         collect_all_regions(conn)
         print(f"  Total readings: {get_reading_count(conn)}")
 
-    # Run immediately, then schedule every 5 minutes
+    # Run immediately, then schedule at interval
     job()
-    schedule.every(5).minutes.do(job)
+    schedule.every(INTERVAL_MINUTES).minutes.do(job)
 
-    try:
-        while datetime.now() < end_time:
-            schedule.run_pending()
-            time.sleep(1)
+    # Main loop - runs until shutdown requested
+    while not _shutdown_requested:
+        schedule.run_pending()
+        time.sleep(1)
 
-    except KeyboardInterrupt:
-        print("\n\nCollection stopped by user.")
-
-    finally:
-        print(f"\nTotal readings collected: {get_reading_count(conn)}")
-        dump_path = dump_database(DB_PATH)
-        conn.close()
-        print(f"\nFinal database dump: {dump_path}")
+    # Cleanup
+    print(f"\nTotal readings collected: {get_reading_count(conn)}")
+    conn.close()
+    print("Database connection closed. Goodbye!")
 
 
 if __name__ == "__main__":
