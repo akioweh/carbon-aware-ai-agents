@@ -18,6 +18,11 @@ from predictor import (
 DB_FILE = 'cache.db'
 HISTORY_FILE = 'history.json'
 
+# Configuration for Oracle/server deployment
+HOST = os.environ.get('STATS_HOST', '127.0.0.1')
+PORT = int(os.environ.get('STATS_PORT', 5000))
+CARBON_SYNC_INTERVAL = int(os.environ.get('CARBON_SYNC_INTERVAL', 1800))  # 30 min
+
 
 class Location(BaseModel):
     id: str = Field(..., description='Location identifier')
@@ -81,22 +86,51 @@ def prediction_loop():
         time.sleep(300)
 
 
+def carbon_sync_loop():
+    """Background loop to sync carbon intensity data periodically."""
+    while True:
+        try:
+            if db_utils.has_carbon_data():
+                count = db_utils.sync_carbon_to_historical(days_back=7)
+                print(f'Carbon sync: {count} records updated')
+        except Exception as e:
+            print(f'Error syncing carbon data: {e}')
+        time.sleep(CARBON_SYNC_INTERVAL)
+
+
 # does some housekeeping stuff including
 # generating history and auto-updating the api schema file
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db_utils.initialize_db()
 
-    # Migrate existing history.json to database if it exists and DB is empty
-    if os.path.exists(HISTORY_FILE) and db_utils.count_historical_data() == 0:
-        print('Migrating history.json to database...')
-        db_utils.migrate_json_to_db(HISTORY_FILE)
-    elif db_utils.count_historical_data() == 0:
-        print('No historical data found, generating initial data...')
-        generate_history()
+    # Try to use real carbon data if available
+    if db_utils.has_carbon_data():
+        print('Carbon intensity database found, syncing real data...')
+        try:
+            count = db_utils.sync_carbon_to_historical(days_back=30)
+            print(f'Synced {count} carbon readings to historical data')
+        except Exception as e:
+            print(f'Failed to sync carbon data: {e}')
 
-    thread = threading.Thread(target=prediction_loop, daemon=True)
-    thread.start()
+    # Fall back to other data sources if no historical data
+    if db_utils.count_historical_data() == 0:
+        if os.path.exists(HISTORY_FILE):
+            print('Migrating history.json to database...')
+            db_utils.migrate_json_to_db(HISTORY_FILE)
+        else:
+            print('No historical data found, generating initial data...')
+            generate_history()
+
+    # Start background threads
+    prediction_thread = threading.Thread(target=prediction_loop, daemon=True)
+    prediction_thread.start()
+
+    # Start carbon sync thread if carbon data exists
+    if db_utils.has_carbon_data():
+        carbon_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
+        carbon_thread.start()
+        print('Carbon sync background thread started')
 
     openapi_data = app.openapi()
     with open('openapi.yaml', 'w') as f:
@@ -208,4 +242,5 @@ def get_locations() -> list[Location]:
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, port=5000)
+    print(f'Starting Stats API on {HOST}:{PORT}')
+    uvicorn.run(app, host=HOST, port=PORT)
