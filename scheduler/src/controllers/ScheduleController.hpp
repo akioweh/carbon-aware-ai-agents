@@ -20,11 +20,11 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
     METHOD_LIST_END
 
     [[nodiscard]] auto calculateSchedule(drogon::HttpRequestPtr,
-                                         std::optional<JobRequest>) const
+                                         JobRequest) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 
     [[nodiscard]] auto getSchedule(drogon::HttpRequestPtr,
-                                   std::optional<TimeIntervalParams>) const
+                                   TimeIntervalParams) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
 

@@ -2,6 +2,7 @@
 #define JOB_REQUEST
 #pragma once
 
+#include "exceptions/ValidationException.hpp"
 #include "utils/Utils.hpp"
 #include <Serializable.hpp>
 #include <chrono>
@@ -20,15 +21,14 @@ struct JobRequest {
 };
 
 namespace drogon {
-template <>
-inline auto fromRequest(const HttpRequest &req) -> std::optional<JobRequest> {
+template <> inline auto fromRequest(const HttpRequest &req) -> JobRequest {
     const auto &json_ptr = req.getJsonObject();
     if (!json_ptr)
-        return {};
+        throw ValidationException("Invalid JSON");
     const auto &json = *json_ptr;
     if (!json.isMember("job_type") || !json.isMember("workload_amount") ||
         !json.isMember("earliest_start") || !json.isMember("latest_finish"))
-        return {};
+        throw ValidationException("Missing required fields");
     try {
         return JobRequest{
             .job_type = json["job_type"].asString(),
@@ -40,7 +40,8 @@ inline auto fromRequest(const HttpRequest &req) -> std::optional<JobRequest> {
                 scheduler::utils::parseIso8601(json["latest_finish"].asString())
                     .value()};
     } catch (const std::exception &e) {
-        return {};
+        throw ValidationException("Failed to parse JSON field: " +
+                                  std::string(e.what()));
     }
 }
 } // namespace drogon
