@@ -19,7 +19,7 @@ struct Context {
         : impactMapper(db), jobsMapper(db) {}
 };
 
-auto getContex() { return Context(drogon::app().getDbClient()); }
+auto getContext() { return Context(drogon::app().getDbClient()); }
 
 auto jobImpactIdEqualityCriteria(const int impactId) {
     return drogon::orm::Criteria(mappers::JobModel::Cols::_impact_id,
@@ -35,8 +35,6 @@ auto jobTimestampInsideTimeIntervalCriteria(time_point start, time_point end) {
                                  scheduler::utils::chronoToTrantor(end));
 }
 
-// I will add criteria for the timestamps here
-
 } // namespace
 
 auto add(Schedule schedule) -> drogon::Task<> {
@@ -46,7 +44,7 @@ auto add(Schedule schedule) -> drogon::Task<> {
     const auto &[impact, intervals] = schedule;
 
     auto impactModel = mappers::toDto(impact);
-    co_await context.impactMapper.insert(impactModel);
+    impactModel = co_await context.impactMapper.insert(impactModel);
     const int impactId = impactModel.getValueOfId();
 
     for (auto &&jobModel :
@@ -57,7 +55,7 @@ auto add(Schedule schedule) -> drogon::Task<> {
 }
 
 auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
-    auto context = getContex();
+    auto context = getContext();
 
     const int jobIdInt = scheduler::utils::parseStringIDtoInt(jobIdString);
 
@@ -76,14 +74,14 @@ auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
 
 auto get(time_point start, time_point end)
     -> drogon::Task<std::vector<ScheduleBlock>> {
-    auto context = getContex();
+    auto context = getContext();
 
     co_return mappers::fromDtoAll(co_await context.jobsMapper.findBy(
         jobTimestampInsideTimeIntervalCriteria(start, end)));
 }
 
 auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
-    auto context = getContex();
+    auto context = getContext();
     co_await context.impactMapper.deleteByPrimaryKey(
         scheduler::utils::parseStringIDtoInt(jobId));
     // we have cascade on delete, so no need to delete the children manually
