@@ -5,6 +5,7 @@
 #include <DatacenterSpecificInformation.hpp>
 #include <PredictedDatacenterInformation.hpp>
 #include <chrono>
+#include <cstdlib>
 #include <drogon/drogon.h>
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
@@ -12,10 +13,15 @@
 #include <string>
 #include <vector>
 
+inline std::string getStatsHost() {
+    const char* env = std::getenv("STATS_API_URL");
+    return env ? std::string(env) : "http://127.0.0.1:5000";
+}
+
 class PredictionApi {
 
   private:
-    const std::string host = "http://127.0.0.1:5000";
+    const std::string host = getStatsHost();
 
     auto parseJsonForLoad(const Json::Value &respJson) -> std::vector<
         std::pair<std::chrono::system_clock::time_point, double>>;
