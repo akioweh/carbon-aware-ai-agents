@@ -38,6 +38,9 @@ inline auto fromRequest(const HttpRequest &req) -> TimeIntervalParams {
                                       parse_res.error());
         end = parse_res.value();
     }
+    // if both start and end are provided, validate that start <= end
+    if (start && end && *start > *end)
+        throw ValidationException("Start time must be before end time");
     return TimeIntervalParams{.start = start, .end = end};
 }
 } // namespace drogon

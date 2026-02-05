@@ -1,5 +1,6 @@
 #include "Calendar.hpp"
 #include "structs/TimeIntervalParams.hpp"
+#include <chrono>
 #include <controllers/ScheduleController.hpp>
 #include <drogon/HttpResponse.h>
 #include <drogon/HttpTypes.h>
@@ -10,11 +11,12 @@
 using namespace std;
 using namespace drogon;
 
-auto ScheduleController::getSchedule(
-    HttpRequestPtr /*req*/, const TimeIntervalParams /*time_interval*/) const
+auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
+                                     const TimeIntervalParams interval) const
     -> Task<HttpResponsePtr> {
-    // TODO: use time_interval to filter results once calendar supports it
-    const auto res = co_await calendarService::get();
+    const auto res = co_await calendarService::get(
+        interval.start.value_or(chrono::system_clock::time_point::min()),
+        interval.end.value_or(chrono::system_clock::time_point::max()));
     auto ret = Json::Value(Json::arrayValue);
     for (const auto &block : res)
         ret.append(toJson(block));
