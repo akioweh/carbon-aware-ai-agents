@@ -72,6 +72,10 @@ auto flatten_calendar(const vector<ScheduleBlock> &blocks,
     return res;
 }
 
+using CostVector = vector<double>;
+using ChoiceVector = vector<vector<array<pair<int, int>, 2>>>;
+using SingleResult = pair<CostVector, ChoiceVector>;
+
 /*
  * Algorithmic Analysis:
  *
@@ -107,9 +111,10 @@ auto flatten_calendar(const vector<ScheduleBlock> &blocks,
  * Now, we minimize the cost over E instead of sum(w_i).
  *
  */
-auto dp1(const vector<double> &load_f, const vector<double> &capacity_f,
-         const CostFunction<double> auto &cost_f, const double tot_work_f,
-         const double penalty_f, const int resolution = 1000) -> auto {
+auto calc_single(const vector<double> &load_f, const vector<double> &capacity_f,
+                 const CostFunction<double> auto &cost_f,
+                 const double penalty_f, const double tot_work_f,
+                 const int resolution = 1000) -> SingleResult {
     const auto n = static_cast<int>(load_f.size());
     // discretization
     const auto e_work = tot_work_f / resolution;
@@ -138,52 +143,67 @@ auto dp1(const vector<double> &load_f, const vector<double> &capacity_f,
     // blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
     constexpr auto inf = numeric_limits<double>::max() / 2;
-    auto dp = vector(n + 1, vector(tot_work + 1, array{inf, inf}));
-    for (auto &row : dp)
-        row[0][1] = 0.; // 0 cost for 0 work
-    // for {w_i} reconstruction; for W = w, w_i = res[i][w]
-    auto res = vector(n + 1, vector(tot_work + 1, array<pair<int, int>, 2>{}));
+    auto row = vector(tot_work + 1, array{inf, inf});
+    row[0][1] = 0.; // 0 cost for 0 work
+    // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
+    auto memo = vector(n + 1, vector(tot_work + 1, array<pair<int, int>, 2>{}));
 
     for (const auto i : views::iota(1, n + 1)) {
+        const auto prev_row = row;
+        row.assign(tot_work + 1, array{inf, inf});
         const auto cost_func = cost[i - 1];
         // do no work
-        for (const auto [w_prev, prev] : views::enumerate(dp[i - 1])) {
+        for (const auto [w_prev, prev] : views::enumerate(prev_row)) {
             const auto b = prev[0] < prev[1];
             const auto new_cost = b ? prev[0] : prev[1];
             const auto w = w_prev;
-            if (new_cost < dp[i][w][1]) {
-                dp[i][w][1] = new_cost;
-                res[i][w][1] = {0, b};
+            if (new_cost < row[w][1]) {
+                row[w][1] = new_cost;
+                memo[i][w][1] = {0, b};
             }
         }
         // do some work
         for (const auto wi :
              views::iota(1, capacity[i - 1] - load[i - 1] + 1)) {
             for (const auto w_prev : views::iota(0, tot_work + 1)) {
-                const auto &prev = dp[i - 1][w_prev];
+                const auto &prev = prev_row[w_prev];
                 const auto add_cost =
                     cost_func(wi + load[i - 1]) - cost_func(load[i - 1]);
                 { // extend run
                     const auto new_cost = prev[0] + add_cost;
                     const auto w = min(w_prev + wi, tot_work);
-                    if (new_cost < dp[i][w][0]) {
-                        dp[i][w][0] = new_cost;
-                        res[i][w][0] = {wi, 0};
+                    if (new_cost < row[w][0]) {
+                        row[w][0] = new_cost;
+                        memo[i][w][0] = {wi, 0};
                     }
                 }
                 { // start new run
                     const auto new_cost = prev[1] + add_cost;
                     const auto w = min(w_prev + wi - penalty, tot_work);
-                    if (w >= 0 && new_cost < dp[i][w][0]) {
-                        dp[i][w][0] = new_cost;
-                        res[i][w][0] = {wi, 1};
+                    if (w >= 0 && new_cost < row[w][0]) {
+                        row[w][0] = new_cost;
+                        memo[i][w][0] = {wi, 1};
                     }
                 }
             }
         }
     }
 
-    return pair{std::move(dp), std::move(res)};
+    auto res = vector<double>{};
+    res.reserve(tot_work + 1);
+    for (const auto &[w, costs] : views::enumerate(row)) {
+        // other than condensing the dp cost results,
+        // we also want to set the last memo entry based on our choices here
+        // (costs[0] vs costs[1]) for easier reconstruction later
+        if (costs[0] < costs[1]) {
+            res.push_back(costs[0]);
+            memo[n][w][1] = memo[n][w][0];
+        } else {
+            res.push_back(costs[1]);
+            memo[n][w][0] = memo[n][w][1];
+        }
+    }
+    return {std::move(res), std::move(memo)};
 }
 
 auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
