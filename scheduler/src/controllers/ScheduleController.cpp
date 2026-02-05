@@ -14,14 +14,10 @@ auto ScheduleController::getSchedule(
     HttpRequestPtr /*req*/, const TimeIntervalParams /*time_interval*/) const
     -> Task<HttpResponsePtr> {
     // TODO: use time_interval to filter results once calendar supports it
-    const auto res = calendarService.get();
+    const auto res = co_await calendarService::get();
     auto ret = Json::Value(Json::arrayValue);
-    for (const auto &[jobId, schedulePair] : res) {
-        const auto &[impact, scheduleBlocks] = schedulePair;
-        for (const auto &block : scheduleBlocks) {
-            ret.append(toJson(block));
-        }
-    }
+    for (const auto &block : res)
+        ret.append(toJson(block));
     const auto resp = HttpResponse::newHttpJsonResponse(ret);
     co_return resp;
 }
