@@ -112,7 +112,6 @@ auto dp1(const vector<double> &load_f, const vector<double> &capacity_f,
          const double penalty_f, const int resolution = 1000) -> auto {
     const auto n = static_cast<int>(load_f.size());
     // discretization
-    const auto max_capacity = *ranges::max_element(capacity_f);
     const auto e_work = tot_work_f / resolution;
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
     auto load = vector<int>(n);
