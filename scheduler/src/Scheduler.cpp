@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <drogon/HttpTypes.h>
+#include <execution>
 #include <map>
 #include <set>
 #include <structs/JobRequest.hpp>
@@ -114,15 +115,16 @@ auto dp1(const vector<double> &load_f, const vector<double> &capacity_f,
     const auto max_capacity = *ranges::max_element(capacity_f);
     const auto e_work = tot_work_f / resolution;
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
-    const auto load = load_f | views::transform([e_work](double x) -> int {
-                          return static_cast<int>(ceil(x / e_work));
-                      }) |
-                      ranges::to<vector>();
-    const auto capacity = capacity_f |
-                          views::transform([e_work](double x) -> int {
-                              return static_cast<int>(floor(x / e_work));
-                          }) |
-                          ranges::to<vector>();
+    auto load = vector<int>(n);
+    transform(execution::par, load_f.begin(), load_f.end(), load.begin(),
+              [e_work](double x) -> int {
+                  return static_cast<int>(ceil(x / e_work));
+              });
+    auto capacity = vector<int>(n);
+    transform(execution::par, capacity_f.begin(), capacity_f.end(),
+              capacity.begin(), [e_work](double x) -> int {
+                  return static_cast<int>(floor(x / e_work));
+              });
     const struct {
         decltype(cost_f) &cost_f;
         double e_work;
@@ -158,7 +160,8 @@ auto dp1(const vector<double> &load_f, const vector<double> &capacity_f,
         // do some work
         for (const auto wi :
              views::iota(1, capacity[i - 1] - load[i - 1] + 1)) {
-            for (const auto [w_prev, prev] : views::enumerate(dp[i - 1])) {
+            for (const auto w_prev : views::iota(0, tot_work + 1)) {
+                const auto &prev = dp[i - 1][w_prev];
                 const auto add_cost =
                     cost_func(wi + load[i - 1]) - cost_func(load[i - 1]);
                 { // extend run
