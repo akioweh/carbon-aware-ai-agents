@@ -160,8 +160,9 @@ cost while ensuring the total work done meets the requirement.
 
 **Discretization**:
 
-The most straightforward solution is to choose some resolution $r$ and
-discretize all work and load values to multiples of $r$.
+For some continuous variable $x \in [l, r]$, we can choose some resolution $s$
+to split the range into $s$ equal-sized intervals; we'd have some
+$e = \lceil (r - l) / s\rceil$ and deal with integer multiples of $e$.
 
 #### Parallelization
 
