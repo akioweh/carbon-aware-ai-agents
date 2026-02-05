@@ -3,32 +3,28 @@
 #pragma once
 
 #include <Scheduler.hpp>
-#include <expected>
-#include <shared_mutex>
+#include <models/Impacts.h>
+#include <models/Jobs.h>
 #include <structs/ScheduleBlock.hpp>
 
-class CalendarService {
-  public:
-    using Schedule = std::pair<ScheduleImpact, std::set<ScheduleBlock>>;
-    using Calendar = std::map<std::string, Schedule>;
-    auto add(const std::string &jobId, Schedule schedule) -> void;
+namespace calendarService {
 
-    auto get(const std::string &jobId) const
-        -> std::expected<Schedule, std::string>;
+template <typename T> auto to_task(auto awaitable) -> drogon::Task<T> {
+    co_return co_await awaitable;
+}
 
-    auto get() const -> Calendar;
+using Schedule = std::pair<ScheduleImpact, std::set<ScheduleBlock>>;
+using time_point = std::chrono::system_clock::time_point;
 
-    CalendarService() = default;
-    CalendarService(const CalendarService &) = delete;
-    CalendarService(CalendarService &&) = delete;
-    auto operator=(const CalendarService &) -> CalendarService & = delete;
-    auto operator=(CalendarService &&) -> CalendarService & = delete;
+auto add(Schedule schedule) -> drogon::Task<>;
 
-  private:
-    Calendar calendar;
-    mutable std::shared_mutex mutex;
-};
+auto get(const std::string &jobId) -> drogon::Task<ScheduleResult>;
 
-inline CalendarService calendarService;
+auto get(time_point start = time_point::min(),
+         time_point end = time_point::max()) -> drogon::Task<std::vector<ScheduleBlock>>;
+
+auto deleteSchedule(const std::string &jobId) -> drogon::Task<>;
+
+}; // namespace calendarService
 
 #endif
