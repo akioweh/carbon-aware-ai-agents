@@ -1,14 +1,17 @@
+#include "Scheduler.hpp"
+#include "Calendar.hpp"
+#include "StatsAPIClient.hpp"
+#include "structs/JobRequest.hpp"
 #include "structs/ScheduleBlock.hpp"
-#include <Calendar.hpp>
-#include <Scheduler.hpp>
-#include <StatsAPIClient.hpp>
 #include <algorithm>
 #include <cmath>
 #include <drogon/HttpTypes.h>
 #include <execution>
+#include <future>
+#include <limits>
 #include <map>
 #include <set>
-#include <structs/JobRequest.hpp>
+#include <vector>
 
 using namespace std;
 using namespace drogon;
@@ -206,28 +209,127 @@ auto calc_single(const vector<double> &load_f, const vector<double> &capacity_f,
     return {std::move(res), std::move(memo)};
 }
 
+/*
+ * Runs calc_single for each location in parallel, then merges results using a
+ * multiple-choice knapsack DP.
+ *
+ * Currently uses std::async(std::launch::async, ...) for expressive
+ * threading control.
+ */
 template <typename CostFunc>
     requires CostFunction<CostFunc, double>
 auto calc_multiple(const vector<vector<double>> &loads_f,
                    const vector<vector<double>> &capacities_f,
                    const vector<CostFunc> &costs_f,
                    const vector<double> &penalties_f, const double tot_work_f,
-                   const int resolution = 1000) -> auto {
-    const auto m = static_cast<int>(loads_f.size());
+                   const int resolution = 1000)
+    -> pair<double, vector<vector<double>>> {
+    const auto m = loads_f.size();
+    const auto n = m ? loads_f.front().size() : 0ULL;
+    // input validation
+    assert(tot_work_f >= 0.);
+    assert(resolution > 0);
+    assert(capacities_f.size() == m);
+    assert(costs_f.size() == m);
+    for (const auto i : views::iota(0ULL, m)) {
+        assert(loads_f[i].size() == n);
+        assert(capacities_f[i].size() == n);
+    }
     // for now as assume constant penalties across locations
     const auto penalty_f = penalties_f.empty() ? 0. : penalties_f.front();
 
     // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
     futures.reserve(m);
-    for (const auto i : views::iota(0, m))
+    for (const auto i : views::iota(0ULL, m))
         futures.push_back(async(launch::async, calc_single, loads_f[i],
                                 capacities_f[i], costs_f[i], penalty_f,
                                 tot_work_f, resolution));
 
-    auto location_results = vector<SingleResult>(m);
-    for (auto i : views::iota(0, m))
-        location_results[i] = futures[i].get();
+    auto locations_cost_vector = vector<SingleResult::first_type>(m);
+    auto locations_memo = vector<SingleResult::second_type>(m);
+    for (auto i : views::iota(0ULL, m))
+        tie(locations_cost_vector[i], locations_memo[i]) = futures[i].get();
+
+    const auto e_work = tot_work_f / resolution;
+    const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
+
+    // result validation
+    for (const auto i : views::iota(0ULL, m)) {
+        assert(locations_memo[i].size() == n + 1ULL);
+        assert(locations_cost_vector[i].size() == tot_work + 1ULL);
+    }
+
+    // multiple choice knapsack
+    constexpr auto inf = numeric_limits<double>::max() / 2;
+    // min cost for [work amount]
+    auto dp = vector<double>(tot_work + 1, inf);
+    dp[0] = 0.;
+    // memo[i][w] = work allocated to location i for total work w
+    auto memo = vector<vector<int>>(m, vector<int>(tot_work + 1, 0));
+
+    if (m > 0) {
+        const auto &costs = locations_cost_vector[0];
+        for (const auto w : views::iota(0, tot_work + 1)) {
+            dp[w] = costs[w];
+            memo[0][w] = w;
+        }
+    }
+    for (const auto i : views::iota(1ULL, m)) {
+        auto next_dp = vector(tot_work + 1, inf);
+        const auto &costs = locations_cost_vector[i];
+        for (const auto w : views::iota(0, tot_work + 1)) {
+            for (const auto k : views::iota(0, w + 1)) {
+                const auto prev_cost = dp[w - k];
+                if (prev_cost >= inf)
+                    continue;
+
+                const auto new_cost = prev_cost + costs[k];
+                if (new_cost < next_dp[w]) {
+                    next_dp[w] = new_cost;
+                    memo[i][w] = k;
+                }
+            }
+        }
+        dp = std::move(next_dp);
+    }
+
+    const auto final_cost = dp[tot_work];
+
+    // reconstruction
+    // res[i][j] = work allocated to location i in block j
+    auto res = vector<vector<double>>(m);
+    auto remaining_work = tot_work;
+
+    // reconstruct sum(res[i]) for each location i
+    auto location_w = vector<int>(m);
+    for (auto i = m; i--;) {
+        const auto alloc = memo[i][remaining_work];
+        location_w[i] = alloc;
+        remaining_work -= alloc;
+    }
+
+    // reconstruct the {w_j} work allocation vector for each location
+    for (const auto i : views::iota(0ULL, m)) {
+        const auto &loc_memo = locations_memo[i];
+        auto &loc_res = res[i];
+        loc_res.resize(n);
+
+        int cur_w = location_w[i];
+        // index 0 always holds the best path info at the end (see bottom of
+        // calc_single)
+        int cur_state = 0;
+        for (auto j = n; j--;) {
+            const auto &choice = loc_memo[j + 1][cur_w][cur_state];
+            const auto [alloc, prev_state] = choice;
+            loc_res[j] = static_cast<double>(alloc) * e_work;
+
+            cur_w -= alloc;
+            cur_state = prev_state;
+        }
+    }
+
+    return {final_cost, res};
 }
 
 auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
