@@ -206,6 +206,30 @@ auto calc_single(const vector<double> &load_f, const vector<double> &capacity_f,
     return {std::move(res), std::move(memo)};
 }
 
+template <typename CostFunc>
+    requires CostFunction<CostFunc, double>
+auto calc_multiple(const vector<vector<double>> &loads_f,
+                   const vector<vector<double>> &capacities_f,
+                   const vector<CostFunc> &costs_f,
+                   const vector<double> &penalties_f, const double tot_work_f,
+                   const int resolution = 1000) -> auto {
+    const auto m = static_cast<int>(loads_f.size());
+    // for now as assume constant penalties across locations
+    const auto penalty_f = penalties_f.empty() ? 0. : penalties_f.front();
+
+    // thread-parallism using std::async(std::launch::async, ...)
+    auto futures = vector<future<SingleResult>>{};
+    futures.reserve(m);
+    for (const auto i : views::iota(0, m))
+        futures.push_back(async(launch::async, calc_single, loads_f[i],
+                                capacities_f[i], costs_f[i], penalty_f,
+                                tot_work_f, resolution));
+
+    auto location_results = vector<SingleResult>(m);
+    for (auto i : views::iota(0, m))
+        location_results[i] = futures[i].get();
+}
+
 auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
     const auto time_window_start =
         max(std::chrono::system_clock::now(), job.earliest_start);
