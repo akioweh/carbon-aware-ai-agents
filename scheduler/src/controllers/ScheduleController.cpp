@@ -27,8 +27,27 @@ auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
 auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
                                            const JobRequest job_request) const
     -> Task<HttpResponsePtr> {
-    const auto res = co_await schedulingQueue.computeSchedule(job_request);
-    const auto ret = toJson(res);
-    const auto resp = HttpResponse::newHttpJsonResponse(ret);
-    co_return resp;
+    auto output = co_await schedulingQueue.computeSchedule(job_request);
+
+    // persist and get the DB-assigned job ID
+    const auto job_id = co_await calendarService::add(output);
+
+    // construct the API DTO with the real job ID
+    auto schedule = vector<ScheduleBlock>{};
+    schedule.reserve(output.blocks.size());
+    for (auto &block : output.blocks)
+        schedule.push_back({
+            .timestamp = block.timestamp,
+            .jobId = job_id,
+            .location = std::move(block.location),
+            .additionalLoad = block.additionalLoad,
+        });
+
+    const auto result = ScheduleResult{
+        .jobId = job_id,
+        .schedule = std::move(schedule),
+        .impact = output.impact,
+    };
+
+    co_return HttpResponse::newHttpJsonResponse(toJson(result));
 }

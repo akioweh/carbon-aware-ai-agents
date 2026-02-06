@@ -10,7 +10,9 @@
 
 /**
  * @class ScheduleImpact
- * @brief API DTO for the environmental impact of a schedule.
+ * @brief Environmental impact metrics for a schedule.
+ *
+ * Used by both internal scheduler output and API responses.
  */
 struct ScheduleImpact {
     double carbon_intensity{};
@@ -27,6 +29,34 @@ inline auto f_toJson(const ScheduleImpact &obj) -> Json::Value {
 }
 
 static_assert(Serializable<ScheduleImpact>);
+
+/**
+ * @class InternalBlock
+ * @brief The scheduler's output block — a unit of scheduled work with no
+ * persistence or API concerns.
+ *
+ * Unlike ScheduleBlock (the API DTO), this carries no jobId because the
+ * scheduler doesn't know it — the DB assigns it on persistence.
+ */
+struct InternalBlock {
+    std::chrono::system_clock::time_point timestamp;
+    std::string location;
+    double additionalLoad{};
+};
+
+/**
+ * @class SchedulerOutput
+ * @brief The complete output of the scheduling optimization engine.
+ *
+ * Contains the raw optimization results (scheduled blocks without job IDs)
+ * and the computed environmental impact. The controller layer is responsible
+ * for persisting this and constructing the API DTO (ScheduleResult) with
+ * the DB-assigned job ID.
+ */
+struct SchedulerOutput {
+    std::vector<InternalBlock> blocks;
+    ScheduleImpact impact{};
+};
 
 /**
  * @class ScheduleResult
@@ -54,7 +84,9 @@ static_assert(Serializable<ScheduleResult>);
  * @class Scheduler
  * @brief The main schedule optimization engine.
  *
- * The scheduler itself is stateless.
+ * The scheduler itself is stateless. It produces a SchedulerOutput
+ * containing the optimal allocation and impact metrics. It has no
+ * knowledge of persistence or API concerns.
  */
 class Scheduler {
   private:
@@ -63,7 +95,7 @@ class Scheduler {
     StatsAPIClient stats_api;
 
   public:
-    auto scheduleJob(JobRequest job) -> drogon::Task<ScheduleResult>;
+    auto scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput>;
 };
 
 #endif

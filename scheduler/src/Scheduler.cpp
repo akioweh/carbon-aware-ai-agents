@@ -3,12 +3,9 @@
 #include "StatsAPIClient.hpp"
 #include "exceptions/SchedulingException.hpp"
 #include "structs/JobRequest.hpp"
-#include "structs/ScheduleBlock.hpp"
 #include "utils/Coro.hpp"
 #include <algorithm>
 #include <cmath>
-#include <drogon/HttpTypes.h>
-#include <drogon/utils/Utilities.h>
 #include <execution>
 #include <future>
 #include <limits>
@@ -310,7 +307,7 @@ auto calc_multiple(const vector<vector<double>> &loads_f,
     return {final_cost, res};
 }
 
-auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
+auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     // JobRequest deserialization validates these, but just in case
     assert(job.workload_amount >= 0.);
     assert(job.earliest_start <= job.latest_finish);
@@ -404,12 +401,10 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
     auto [min_cost, optimal_schedule] = calc_multiple(
         loads_f, capacities_f, costs_f, penalties_f, job.workload_amount);
 
-    // transform data again
-    // TODO: fix this (db assigns id on persistence)
-    const auto job_id = drogon::utils::genRandomString(16);
+    // transform optimizer output into InternalBlocks + impact metrics
     auto total_emissions = 0.0;
     auto total_carbon_intensity_sum = 0.0;
-    auto schedule = vector<ScheduleBlock>{};
+    auto blocks = vector<InternalBlock>{};
     auto blocks_count = 0;
 
     for (size_t i = 0; i < optimal_schedule.size(); ++i) {
@@ -417,28 +412,26 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
         const auto &schedule_vec = optimal_schedule[i];
         const auto &greenness_vec = costs_f[i].greenness_scores;
 
-        for (int j = 0; j < n_intervals; ++j) {
-            double load = schedule_vec[j];
-            if (load < 1e-6) // Filter out negligible loads
+        for (const auto j : views::iota(0, n_intervals)) {
+            const auto load = schedule_vec[j];
+            if (load < 1e-6) // filter out negligible loads
                 continue;
-            schedule.push_back({
+            blocks.push_back({
                 .timestamp = time_window_start + chrono::minutes(j * 5),
-                .jobId = job_id,
                 .location = loc_id,
                 .additionalLoad = load,
             });
             ++blocks_count;
 
-            double g = std::max(greenness_vec[j], 0.01);
-            double ci = 1.0 / g;
+            const auto g = std::max(greenness_vec[j], 0.01);
+            const auto ci = 1.0 / g;
             total_emissions += load * ci;
             total_carbon_intensity_sum += ci;
         }
     }
 
     co_return {
-        .jobId = job_id,
-        .schedule = std::move(schedule),
+        .blocks = std::move(blocks),
         .impact = {
             .carbon_intensity = blocks_count > 0
                                     ? total_carbon_intensity_sum / blocks_count

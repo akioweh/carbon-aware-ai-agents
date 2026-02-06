@@ -14,7 +14,7 @@ auto f_toDto(const ScheduleImpact &impact) -> ImpactModel {
     return impactDB;
 }
 
-auto f_toDto(const ScheduleBlock &block, int impactId) -> JobModel {
+auto f_toDto(const InternalBlock &block, int impactId) -> JobModel {
     JobModel job;
     job.setAdditionalLoad(block.additionalLoad);
     job.setLocationId(block.location);

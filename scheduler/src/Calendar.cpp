@@ -37,21 +37,22 @@ auto jobTimestampInsideTimeIntervalCriteria(time_point start, time_point end) {
 
 } // namespace
 
-auto add(Schedule schedule) -> drogon::Task<> {
+auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
     auto transaction =
         co_await drogon::app().getDbClient()->newTransactionCoro();
     Context context(transaction);
-    const auto &[impact, intervals] = schedule;
 
-    auto impactModel = mappers::toDto(impact);
+    auto impactModel = mappers::toDto(output.impact);
     impactModel = co_await context.impactMapper.insert(impactModel);
-    const int impactId = impactModel.getValueOfId();
+    const auto impactId = impactModel.getValueOfId();
 
     for (auto &&jobModel :
-         intervals |
+         output.blocks |
              std::views::transform(mappers::toDto.withImpactId(impactId))) {
         co_await context.jobsMapper.insert(jobModel);
     }
+
+    co_return scheduler::utils::parseIntToStringID(impactId);
 }
 
 auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
