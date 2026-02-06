@@ -300,19 +300,24 @@ auto calc_multiple(const vector<vector<double>> &loads_f,
     for (const auto i : views::iota(1ULL, m)) {
         auto next_dp = vector(tot_work + 1, inf);
         const auto &costs = locations_cost_vector[i];
-        for (const auto w : views::iota(0, tot_work + 1)) {
-            for (const auto k : views::iota(0, w + 1)) {
-                const auto prev_cost = dp[w - k];
-                if (prev_cost >= inf)
-                    continue;
+        auto &memo_i = memo[i];
+        // each w is independent: reads dp (immutable this pass) and costs,
+        // writes only to next_dp[w] and memo_i[w]
+        auto w_range = views::iota(0, tot_work + 1);
+        for_each(execution::par, w_range.begin(), w_range.end(),
+                 [&dp, &costs, &next_dp, &memo_i, inf](const auto w) -> auto {
+                     for (const auto k : views::iota(0, w + 1)) {
+                         const auto prev_cost = dp[w - k];
+                         if (prev_cost >= inf)
+                             continue;
 
-                const auto new_cost = prev_cost + costs[k];
-                if (new_cost < next_dp[w]) {
-                    next_dp[w] = new_cost;
-                    memo[i][w] = k;
-                }
-            }
-        }
+                         const auto new_cost = prev_cost + costs[k];
+                         if (new_cost < next_dp[w]) {
+                             next_dp[w] = new_cost;
+                             memo_i[w] = k;
+                         }
+                     }
+                 });
         dp = std::move(next_dp);
     }
 
