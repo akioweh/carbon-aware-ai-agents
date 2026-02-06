@@ -4,7 +4,6 @@
 
 #include "exceptions/ValidationException.hpp"
 #include "utils/Utils.hpp"
-#include <Serializable.hpp>
 #include <chrono>
 #include <drogon/HttpRequest.h>
 #include <string>

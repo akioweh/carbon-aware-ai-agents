@@ -2,13 +2,13 @@
 #define STATS_API_CLIENT
 #pragma once
 
+#include "structs/Datacenter.hpp"
 #include <chrono>
 #include <drogon/drogon.h>
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
 #include <optional>
 #include <string>
-#include <structs/Datacenter.hpp>
 #include <vector>
 
 /// Location as returned by /locations endpoint

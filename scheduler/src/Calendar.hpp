@@ -2,10 +2,8 @@
 #define CALENDAR
 #pragma once
 
-#include <Scheduler.hpp>
-#include <models/Impacts.h>
-#include <models/Jobs.h>
-#include <structs/ScheduleBlock.hpp>
+#include "structs/ScheduleResult.hpp"
+#include "structs/SchedulerOutput.hpp"
 
 namespace calendarService {
 

@@ -20,7 +20,7 @@ struct TimeIntervalParams {
 namespace drogon {
 template <>
 inline auto fromRequest(const HttpRequest &req) -> TimeIntervalParams {
-    auto params = req.getParameters();
+    const auto &params = req.getParameters();
     auto start = std::optional<std::chrono::system_clock::time_point>{};
     auto end = std::optional<std::chrono::system_clock::time_point>{};
     if (params.contains("start")) {

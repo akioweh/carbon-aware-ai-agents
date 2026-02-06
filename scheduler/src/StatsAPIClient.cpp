@@ -1,5 +1,7 @@
-#include <StatsAPIClient.hpp>
-#include <structs/Datacenter.hpp>
+#include "StatsAPIClient.hpp"
+#include "structs/Datacenter.hpp"
+#include "utils/Coro.hpp"
+#include "utils/Utils.hpp"
 #include <algorithm>
 #include <drogon/HttpClient.h>
 #include <drogon/HttpRequest.h>
@@ -10,8 +12,6 @@
 #include <map>
 #include <optional>
 #include <trantor/utils/Logger.h>
-#include <utils/Coro.hpp>
-#include <utils/Utils.hpp>
 
 using namespace std;
 using namespace drogon;

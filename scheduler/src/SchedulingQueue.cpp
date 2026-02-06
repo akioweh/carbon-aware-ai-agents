@@ -1,3 +1,4 @@
+#include "Scheduler.hpp"
 #include "SchedulingQueue.hpp"
 #include "structs/JobRequest.hpp"
 #include <drogon/utils/coroutine.h>

@@ -2,8 +2,8 @@
 #define SCHEDULING_QUEUE
 #pragma once
 
-#include "Scheduler.hpp"
 #include "structs/JobRequest.hpp"
+#include "structs/SchedulerOutput.hpp"
 #include <atomic>
 #include <boost/lockfree/queue.hpp>
 #include <coroutine>

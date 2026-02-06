@@ -1,12 +1,12 @@
+#include "controllers/ScheduleController.hpp"
 #include "Calendar.hpp"
+#include "SchedulingQueue.hpp"
+#include "structs/JobRequest.hpp"
+#include "structs/ScheduleBlock.hpp"
 #include "structs/TimeIntervalParams.hpp"
 #include <chrono>
-#include <controllers/ScheduleController.hpp>
 #include <drogon/HttpResponse.h>
 #include <drogon/HttpTypes.h>
-#include <structs/JobRequest.hpp>
-#include <structs/ScheduleBlock.hpp>
-#include <utils/Utils.hpp>
 
 using namespace std;
 using namespace drogon;

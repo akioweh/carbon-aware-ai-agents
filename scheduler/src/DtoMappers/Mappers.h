@@ -1,11 +1,11 @@
 #ifndef MAPPERS
 #define MAPPERS
 
+#include "models/Impacts.h"
+#include "models/Jobs.h"
 #include "structs/ScheduleBlock.hpp"
-#include <Scheduler.hpp>
+#include "structs/SchedulerOutput.hpp"
 #include <concepts>
-#include <models/Impacts.h>
-#include <models/Jobs.h>
 
 namespace mappers {
 using JobModel = drogon_model::calendar_db::Jobs;

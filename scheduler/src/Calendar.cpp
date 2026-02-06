@@ -1,12 +1,10 @@
-#include "structs/ScheduleBlock.hpp"
-#include <Calendar.hpp>
-#include <DtoMappers/Mappers.h>
-#include <Scheduler.hpp>
+#include "Calendar.hpp"
+#include "DtoMappers/Mappers.h"
+#include "utils/Coro.hpp"
+#include "utils/Utils.hpp"
 #include <drogon/orm/Criteria.h>
 #include <drogon/orm/Exception.h>
 #include <ranges>
-#include <utils/Coro.hpp>
-#include <utils/Utils.hpp>
 
 namespace calendarService {
 

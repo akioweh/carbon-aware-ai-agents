@@ -1,6 +1,5 @@
 #include "utils/Utils.hpp"
 #include <DtoMappers/Mappers.h>
-#include <Scheduler.hpp>
 #include <models/Impacts.h>
 #include <models/Jobs.h>
 #include <structs/ScheduleBlock.hpp>
