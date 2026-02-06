@@ -189,3 +189,272 @@ throughput.
 
 The implementation should use an efficient thread polling strategy and place
 care in minimizing data flow (memory bandwidth) and synchronization overhead.
+
+## System Design
+
+This section documents the scheduler component's internal architecture, data
+flows, and the engineering rationale behind key design decisions.
+
+For the broader multi-component system design (Scheduler, Stats, UI), see
+[`docs/system_component_design.md`](../docs/system_component_design.md).
+
+### Architecture Overview
+
+```
+src/
+├── controllers/
+│   └── ScheduleController       # HTTP layer: request routing + orchestration
+├── SchedulingQueue               # Lock-free coroutine task queue
+├── Scheduler                     # Pure optimization engine (stateless)
+├── Calendar                      # Persistence service (Drogon ORM)
+├── StatsAPIClient                # External data fetching (Stats component)
+├── structs/                      # Domain types and API DTOs
+├── DtoMappers/                   # DB model <-> domain type conversions
+├── exceptions/                   # Domain exceptions + global handler
+├── models/                       # Auto-generated Drogon ORM models
+└── utils/
+    ├── Coro                      # Custom coroutine combinator (when_all)
+    └── Utils                     # Time parsing, HTTP helpers
+```
+
+The scheduler is a Drogon HTTP server (C++23, coroutine-based) that exposes a
+REST API for carbon-aware workload scheduling. Internally, it is structured as a
+layered pipeline:
+
+```
+HTTP Request
+    │
+    ▼
+Controller ──► SchedulingQueue ──► Scheduler ──► StatsAPIClient
+    │                                  │              │
+    │                                  │         Stats component
+    │                                  │         (external, Python)
+    │                                  │
+    │              SchedulerOutput ◄───┘
+    │              (InternalBlock[] + ScheduleImpact)
+    │
+    ├──► CalendarService::add(output) ──► PostgreSQL
+    │         │
+    │         └── returns DB-assigned job ID
+    │
+    ├──  Constructs ScheduleResult (API DTO) with real job ID
+    │
+    ▼
+HTTP Response
+```
+
+Each layer has a single, well-defined responsibility. The boundaries are
+enforced through distinct types at each interface (internal types for
+computation, DTOs for API responses, ORM models for persistence).
+
+### Type System and Layered Boundaries
+
+The system uses distinct types at each architectural boundary to enforce
+separation of concerns:
+
+| Type                       | Layer          | Purpose                                           |
+| -------------------------- | -------------- | ------------------------------------------------- |
+| `JobRequest`               | API input      | Deserialized from HTTP request body               |
+| `InternalBlock`            | Core Optimizer | Represents a work allocation in `SchedulerOutput` |
+| `SchedulerOutput`          | Core Optimizer | Aggregates work allocations and impact metrics    |
+| `ScheduleBlock`            | API DTO        | Analogous to `InternalBlock` but in API format    |
+| `ScheduleResult`           | API DTO        | Analogous to `ScheduleBlock` but in API format    |
+| `JobModel` / `ImpactModel` | ORM            | Auto-generated Drogon ORM for PostgreSQL          |
+
+The key distinction is between `InternalBlock` (what the optimizer produces) and
+`ScheduleBlock` (what the API returns). The optimizer has no knowledge of
+persistence or job IDs — it produces raw allocation results. The controller is
+responsible for persisting, obtaining the DB-assigned ID, and constructing the
+API response. This prevents the optimizer from being coupled to persistence and
+the external API (that requires stability).  
+Moreover, the optimizer does not directly work on API structures because a
+terse, linearized format allows for higher computational efficiency from higher
+data locality reduced memory bandwidth.
+
+The `DtoMappers` layer (niebloid pattern via `fromDto`/`toDto`) bridges the ORM
+models and domain types, keeping conversion logic isolated from both business
+logic and persistence code.
+
+### Data Flows
+
+#### 1. Schedule Creation (`POST /api/schedule`)
+
+This is the primary flow. A user submits a job specification, and the system
+returns an optimized schedule with a real, DB-assigned identifier.
+
+```
+Client
+  │
+  │  POST /api/schedule { job_type, workload_amount, earliest_start, latest_finish }
+  ▼
+ScheduleController::calculateSchedule
+  │
+  │  1. Enqueue job via SchedulingQueue
+  ▼
+SchedulingQueue::computeSchedule
+  │  Suspends caller coroutine, pushes SchedulerTask onto lock-free queue.
+  │  Consumer loop (runTasks) pops and runs tasks serially.
+  ▼
+Scheduler::scheduleJob
+  │
+  │  2a. Fetch data (concurrent via when_all):
+  │      ├── StatsAPIClient::getAllDatacenters()
+  │      │     ├── GET /locations                  → location list
+  │      │     └── for each location (concurrent via when_all):
+  │      │           ├── GET /locations/{id}/metrics/forecast_load
+  │      │           └── GET /locations/{id}/metrics/forecast_greenness
+  │      │
+  │      └── CalendarService::get(start, end)      → existing schedule blocks
+  │
+  │  2b. Run optimization:
+  │      ├── calc_single() per location (parallel via std::async)
+  │      └── calc_multiple() merges via knapsack DP (parallel via std::for_each)
+  │
+  │  Returns SchedulerOutput { InternalBlock[], ScheduleImpact }
+  │  (no job ID — the optimizer doesn't know about persistence)
+  ▼
+ScheduleController (resumed)
+  │
+  │  3. Persist: CalendarService::add(output)
+  │     └── INSERT impact row → DB returns auto-increment ID
+  │     └── INSERT block rows with foreign key to impact
+  │     └── Returns job ID as string
+  │
+  │  4. Construct API DTO:
+  │     └── InternalBlock[] + job ID → ScheduleBlock[]
+  │     └── SchedulerOutput + job ID → ScheduleResult
+  │
+  ▼
+Client receives ScheduleResult { schedule_id, schedule[], impact }
+```
+
+#### 2. Schedule Query (`GET /api/schedule`)
+
+```
+Client
+  │
+  │  GET /api/schedule?start_time=...&end_time=...
+  ▼
+ScheduleController::getSchedule
+  │
+  │  CalendarService::get(start, end)
+  │  └── SELECT from Jobs WHERE timestamp in [start, end)
+  │  └── ORM models → ScheduleBlock[] via DtoMappers::fromDto
+  │
+  ▼
+Client receives ScheduleBlock[] (each block carries its job ID from the DB)
+```
+
+This read path goes directly from the controller to the calendar service — no
+queue or optimizer involvement, as it's a pure DB lookup.
+
+#### 3. Schedule Deletion (`DELETE /api/schedule/{schedule_id}`)
+
+```
+Client
+  │
+  │  DELETE /api/schedule/{schedule_id}
+  ▼
+CalendarService::deleteSchedule(id)
+  │
+  │  DELETE FROM Impacts WHERE id = ?
+  │  (cascade deletes associated Jobs rows)
+  │
+  ▼
+Client receives 200 OK
+```
+
+### Component Design Notes
+
+#### SchedulingQueue: Thread-safe Serialized Execution Queueing
+
+The scheduling queue serializes scheduling tasks so that only one optimization
+runs at a time. This is a deliberate design choice, not a limitation.
+
+**Serial execution?**: see above discussion on the scheduling algorithm on why
+we chose to parallelize the algorithm itself instead of allowing concurrent
+execution.
+
+**Lock-free queue?**: because why not :)
+
+**Coroutines?**: using vanilla functions would require the queue to explicitly
+store and manage the input data each yet-to-run task. This would create
+mandatory coupling between the queue and the scheduler's data structures.
+Instead, by using coroutines that are constructed eagerly (but with immediate
+suspension), we can abstract away the input data in the coroutine frame. Thus,
+the queue manages coroutines, through their standard interface, without coupling
+against the exact functions it must execute.
+
+> [TODO]  
+> currently the queue code does couple somewhat with the scheduler functions...
+> it should be made fully generic as a "serial task queue".
+
+#### Scheduler: Stateless Optimization Engine
+
+The scheduler is deliberately stateless — it receives all necessary data as
+inputs (from `StatsAPIClient` and `CalendarService`) and returns a pure result.
+This makes it testable in isolation and ensures no hidden state leaks between
+scheduling runs.
+
+**Data fetching is concurrent**: `StatsAPIClient::getAllDatacenters()` fans out
+to all locations concurrently using `scheduler::coro::when_all` .
+
+**Computation is parallel**: the per-location DP (`calc_single`) runs each
+location on a separate thread via `std::async`. The knapsack merge
+(`calc_multiple`) parallelizes across work amounts via
+`std::for_each(execution::par, ...)`.
+
+#### CalendarService: Thin Persistence Layer
+
+The calendar service is a thin wrapper over Drogon's ORM (`CoroMapper`). It
+handles transactional writes (impact + blocks in one transaction) and
+query-by-criteria reads. It does not perform business logic or data
+transformations beyond what the `DtoMappers` provide.
+
+`add()` returns the DB-assigned job ID as `std::string`, enabling the controller
+to construct API DTOs with stable identifiers.
+
+#### StatsAPIClient: External Data Gateway
+
+The stats API client fetches load forecasts, greenness forecasts, and location
+metadata from the external Stats component (a Python FastAPI service at
+`http://127.0.0.1:5000`).
+
+It produces `Datacenter` structs (a denormalized view combining load, greenness,
+and capacity data per location) which the scheduler consumes directly. Load and
+greenness data for each location are fetched concurrently (`when_all`), then
+joined by timestamp.
+
+#### Exception Handling
+
+Domain exceptions are mapped to HTTP status codes via a global exception handler
+registered at startup (`scheduler::exceptions::registerExceptionHandler()`):
+
+| Exception             | HTTP Status | Meaning                                           |
+| --------------------- | ----------- | ------------------------------------------------- |
+| `ValidationException` | 422         | Malformed or semantically invalid request         |
+| `SchedulingException` | 409         | Valid request, but infeasible given current state |
+| (anything else)       | 500         | Unexpected internal error (drogon default)        |
+
+`ValidationException` is thrown during request deserialization (in the
+`drogon::fromRequest` specializations). `SchedulingException` is thrown by the
+optimizer when the request is valid but the constraints cannot be satisfied
+(e.g. insufficient capacity, empty time window, no available locations).
+
+#### Coroutine Infrastructure (`utils/Coro.hpp`)
+
+`scheduler::coro::when_all` is a custom coroutine combinator that runs multiple
+`drogon::Task<T>` coroutines concurrently and suspends the caller until all
+complete. It supports both variadic (heterogeneous types via `tuple`) and
+homogeneous (`vector<Task<T>>`) overloads.
+
+Key implementation details:
+
+- Each child task runs via `drogon::async_run` (scheduled on the event loop's
+  thread pool)
+- A shared `ResultContext` tracks completion via `atomic<size_t> remaining`
+- The last task to complete resumes the caller via
+  `continuation.exchange(WAITING_CONTINUATION)`, handling the race where the
+  caller hasn't suspended yet
+- Exceptions are captured lock-free (first-writer-wins via
+  `atomic<char> exceptionState`) and rethrown in `await_resume`
