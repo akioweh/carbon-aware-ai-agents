@@ -8,4 +8,4 @@ pytest
 schemathesis
 requests
 schedule
-univorn
+uvicorn
