@@ -231,20 +231,25 @@ auto calc_multiple(const vector<vector<double>> &loads_f,
     assert(resolution > 0);
     assert(capacities_f.size() == m);
     assert(costs_f.size() == m);
+    assert(penalties_f.size() == m);
     for (const auto i : views::iota(0ULL, m)) {
         assert(loads_f[i].size() == n);
         assert(capacities_f[i].size() == n);
     }
-    // for now as assume constant penalties across locations
-    const auto penalty_f = penalties_f.empty() ? 0. : penalties_f.front();
 
     // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
     futures.reserve(m);
     for (const auto i : views::iota(0ULL, m))
-        futures.push_back(async(launch::async, calc_single, loads_f[i],
-                                capacities_f[i], costs_f[i], penalty_f,
-                                tot_work_f, resolution));
+        futures.push_back(async(
+            launch::async,
+            // wrapped in lambda due to template
+            // instantiation issues with CostFunc
+            [i, &loads_f, &capacities_f, &costs_f, &penalties_f, tot_work_f,
+             resolution]() -> auto {
+                return calc_single(loads_f[i], capacities_f[i], costs_f[i],
+                                   penalties_f[i], tot_work_f, resolution);
+            }));
 
     auto locations_cost_vector = vector<SingleResult::first_type>(m);
     auto locations_memo = vector<SingleResult::second_type>(m);
