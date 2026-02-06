@@ -11,71 +11,15 @@
 #include <execution>
 #include <future>
 #include <limits>
-#include <map>
-#include <set>
 #include <vector>
 
 using namespace std;
 using namespace drogon;
 
-struct LoadBlock {
-    std::chrono::system_clock::time_point timestamp;
-    double load{};
-};
-
-auto operator<=>(const LoadBlock &lhs, const LoadBlock &rhs) -> auto {
-    return lhs.timestamp <=> rhs.timestamp;
-}
-
 template <typename Self, typename T>
 concept CostFunction = requires(Self &f, int i, T load) {
     { f[i](load) } -> std::convertible_to<double>;
 };
-
-// transform from { jobId: {impact, set<ScheduleBlock>} }
-// to dense vector (with implicitly continous timestamps) of loadvalues within
-// the given interval.
-auto flatten_calendar(const vector<ScheduleBlock> &blocks,
-                      const chrono::system_clock::time_point start_time,
-                      const chrono::system_clock::time_point end_time)
-    -> map<std::string, vector<double>> {
-
-    auto tmp_res = map<string, set<LoadBlock>>{};
-    for (const auto &block : blocks) {
-        tmp_res[block.location].insert(LoadBlock{.timestamp = block.timestamp,
-                                                 .load = block.additionalLoad});
-    }
-
-    const auto n_intervals =
-        chrono::duration_cast<chrono::minutes>(end_time - start_time).count() /
-        5;
-    auto res = map<string, vector<double>>{};
-    for (auto &[location, loadBlocksSet] : tmp_res) {
-        res[location].assign(n_intervals, 0.);
-
-        // chunk by same timestamp, summing loads
-        auto rn = loadBlocksSet |
-                  views::chunk_by([](const auto &a, const auto &b) -> auto {
-                      return a.timestamp == b.timestamp;
-                  }) |
-                  views::transform([](auto chunk) -> auto {
-                      double totalLoad = 0.;
-                      for (const auto &lb : chunk)
-                          totalLoad += lb.load;
-                      return LoadBlock{.timestamp = chunk.front().timestamp,
-                                       .load = totalLoad};
-                  });
-        for (const auto &lb : rn) {
-            const auto index = chrono::duration_cast<chrono::minutes>(
-                                   lb.timestamp - start_time)
-                                   .count() /
-                               5;
-            res[location].at(index) = lb.load;
-        }
-    }
-
-    return res;
-}
 
 using CostVector = vector<double>;
 using ChoiceVector = vector<vector<array<pair<int, int>, 2>>>;
