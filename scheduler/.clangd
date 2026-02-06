@@ -5,3 +5,9 @@ CompileFlags:
     - -fmodules-ts
     - -fmodule-mapper=*
     - -fdeps-format=*
+---
+If:
+  PathMatch: tests/.*
+Diagnostics:
+  ClangTidy:
+    Remove: "readability-magic-numbers"
