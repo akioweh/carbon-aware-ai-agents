@@ -1,6 +1,7 @@
 #include "Scheduler.hpp"
 #include "Calendar.hpp"
 #include "StatsAPIClient.hpp"
+#include "exceptions/SchedulingException.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleBlock.hpp"
 #include "utils/Coro.hpp"
@@ -267,6 +268,11 @@ auto calc_multiple(const vector<vector<double>> &loads_f,
 
     const auto final_cost = dp[tot_work];
 
+    if (final_cost >= inf)
+        throw SchedulingException(
+            "Infeasible: insufficient capacity across all locations to "
+            "satisfy the requested workload within the given time window");
+
     // reconstruction
     // res[i][j] = work allocated to location i in block j
     auto res = vector<vector<double>>(m);
@@ -305,9 +311,18 @@ auto calc_multiple(const vector<vector<double>> &loads_f,
 }
 
 auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
+    // JobRequest deserialization validates these, but just in case
+    assert(job.workload_amount >= 0.);
+    assert(job.earliest_start <= job.latest_finish);
+
     const auto time_window_start =
         max(std::chrono::system_clock::now(), job.earliest_start);
     const auto time_window_end = job.latest_finish;
+
+    if (time_window_end <= time_window_start)
+        throw SchedulingException(
+            "Effective scheduling window is empty: latest_finish is in "
+            "the past or too close to the current time");
 
     const auto total_minutes = chrono::duration_cast<chrono::minutes>(
                                    time_window_end - time_window_start)
@@ -315,7 +330,9 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
     const auto n_intervals = total_minutes / 5; // 5 minute intervals
 
     if (n_intervals <= 0)
-        co_return ScheduleResult{};
+        throw SchedulingException(
+            "Scheduling window too narrow: must span at least one "
+            "5-minute interval");
 
     // fetch data
     const auto [locations, existing_schedule] =
@@ -379,11 +396,9 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
     auto penalties_f =
         vector(location_ids.size(), 1.); // currently assuming invariant penalty
 
-    if (location_ids.empty()) {
-        LOG_WARN << "No locations with valid data for the scheduling window, "
-                    "unable to schedule.";
-        co_return ScheduleResult{};
-    }
+    if (location_ids.empty())
+        throw SchedulingException(
+            "No data center locations available for scheduling");
 
     // calculate
     auto [min_cost, optimal_schedule] = calc_multiple(
