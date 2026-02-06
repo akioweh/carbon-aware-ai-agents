@@ -25,8 +25,8 @@ auto operator<=>(const LoadBlock &lhs, const LoadBlock &rhs) -> auto {
     return lhs.timestamp <=> rhs.timestamp;
 }
 
-template <typename T, typename Func>
-concept CostFunction = requires(Func &f, int i, T load) {
+template <typename Self, typename T>
+concept CostFunction = requires(Self &f, int i, T load) {
     { f[i](load) } -> std::convertible_to<double>;
 };
 
