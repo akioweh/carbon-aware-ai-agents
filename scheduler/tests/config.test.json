@@ -1,0 +1,21 @@
+{
+  "listeners": [
+    {
+      "address": "127.0.0.1",
+      "port": 6969,
+      "https": false
+    }
+  ],
+  "db_clients": [
+    {
+      "name": "default",
+      "rdbms": "sqlite3",
+      "filename": "scheduler_test.db",
+      "is_fast": false
+    }
+  ],
+  "app": {
+    "number_of_threads": 1,
+    "client_max_body_size": "10M"
+  }
+}
