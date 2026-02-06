@@ -14,6 +14,13 @@ from predictor import (
     generate_next_week_greenness_prediction,
     generate_next_week_load_prediction,
 )
+from carbon_collector import (
+    init_database as init_carbon_db,
+    collect_all_regions,
+    get_reading_count,
+    DB_PATH as CARBON_DB_PATH,
+    INTERVAL_MINUTES as CARBON_INTERVAL_MINUTES,
+)
 
 DB_FILE = 'cache.db'
 HISTORY_FILE = 'history.json'
@@ -22,6 +29,7 @@ HISTORY_FILE = 'history.json'
 HOST = os.environ.get('STATS_HOST', '127.0.0.1')
 PORT = int(os.environ.get('STATS_PORT', 5000))
 CARBON_SYNC_INTERVAL = int(os.environ.get('CARBON_SYNC_INTERVAL', 1800))  # 30 min
+CARBON_COLLECTION_ENABLED = os.environ.get('CARBON_COLLECTION_ENABLED', '1') == '1'
 
 
 class Location(BaseModel):
@@ -98,6 +106,22 @@ def carbon_sync_loop():
         time.sleep(CARBON_SYNC_INTERVAL)
 
 
+def carbon_collector_loop():
+    """Background loop to collect carbon intensity data from UK API."""
+    print(f'Carbon collector starting (interval: {CARBON_INTERVAL_MINUTES} min)')
+    print(f'Database: {CARBON_DB_PATH}')
+
+    conn = init_carbon_db(CARBON_DB_PATH)
+
+    while True:
+        try:
+            collect_all_regions(conn)
+            print(f'Carbon readings total: {get_reading_count(conn)}')
+        except Exception as e:
+            print(f'Error collecting carbon data: {e}')
+        time.sleep(CARBON_INTERVAL_MINUTES * 60)
+
+
 # does some housekeeping stuff including
 # generating history and auto-updating the api schema file
 @asynccontextmanager
@@ -126,10 +150,19 @@ async def lifespan(app: FastAPI):
     prediction_thread = threading.Thread(target=prediction_loop, daemon=True)
     prediction_thread.start()
 
-    # Start carbon sync thread if carbon data exists
-    if db_utils.has_carbon_data():
-        carbon_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
-        carbon_thread.start()
+    # Start carbon collector and sync threads if enabled
+    if CARBON_COLLECTION_ENABLED:
+        collector_thread = threading.Thread(target=carbon_collector_loop, daemon=True)
+        collector_thread.start()
+        print('Carbon collector background thread started')
+
+        sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
+        sync_thread.start()
+        print('Carbon sync background thread started')
+    elif db_utils.has_carbon_data():
+        # If not collecting but have existing data, still sync it
+        sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
+        sync_thread.start()
         print('Carbon sync background thread started')
 
     openapi_data = app.openapi()
