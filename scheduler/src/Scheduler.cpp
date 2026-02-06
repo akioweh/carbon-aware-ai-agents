@@ -3,9 +3,11 @@
 #include "StatsAPIClient.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleBlock.hpp"
+#include "utils/Coro.hpp"
 #include <algorithm>
 #include <cmath>
 #include <drogon/HttpTypes.h>
+#include <drogon/utils/Utilities.h>
 #include <execution>
 #include <future>
 #include <limits>
@@ -78,6 +80,21 @@ auto flatten_calendar(const vector<ScheduleBlock> &blocks,
 using CostVector = vector<double>;
 using ChoiceVector = vector<vector<array<pair<int, int>, 2>>>;
 using SingleResult = pair<CostVector, ChoiceVector>;
+
+struct LocationCost {
+    vector<double> &capacities;
+    vector<double> &greenness_scores;
+
+    auto operator[](int i) const {
+        const auto g = greenness_scores.at(i);
+        const auto c = capacities.at(i);
+        return [g, c](double load) -> double {
+            // cost increases with load and decreases with greenness.
+            // 0.01 to avoid div by zero
+            return load / c / std::max(g, 0.01);
+        };
+    }
+};
 
 /*
  * Algorithmic Analysis:
@@ -341,13 +358,120 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
     const auto time_window_start =
         max(std::chrono::system_clock::now(), job.earliest_start);
     const auto time_window_end = job.latest_finish;
-    auto datacenter_loads = flatten_calendar(
-        co_await calendarService::get(time_window_start, time_window_end),
-        time_window_start, time_window_end);
 
-    // call dp1 in parallel for each location
-    // then, merge results using mega dp (multiple-choice knapsack)
+    const auto total_minutes = chrono::duration_cast<chrono::minutes>(
+                                   time_window_end - time_window_start)
+                                   .count();
+    const auto n_intervals = total_minutes / 5; // 5 minute intervals
 
-    // TODO
-    co_return ScheduleResult{};
+    if (n_intervals <= 0)
+        co_return ScheduleResult{};
+
+    // fetch data
+    const auto [locations, existing_schedule] =
+        co_await scheduler::coro::when_all(
+            stats_api.getAllDatacenters(),
+            calendarService::get(time_window_start, time_window_end));
+    const auto n_locations = locations.size();
+
+    // transform data into format for optimizer
+    auto location_ids = vector<string>();
+    auto loads_f = vector<vector<double>>();
+    auto capacities_f = vector<vector<double>>();
+    auto costs_f = vector<LocationCost>();
+    auto greennesses = vector<vector<double>>(); // owning vecs for CostFunction
+
+    for (const auto &loc : locations) {
+        location_ids.push_back(loc.id);
+
+        // right now, capacity is constant across time
+        capacities_f.emplace_back(n_intervals, loc.maxLoad);
+
+        auto load = vector(n_intervals, 0.);
+        auto greenness = vector(n_intervals, 1.);
+        const auto &data = loc.timeSeries;
+        for (const auto &tp : data) {
+            if (tp.timestamp < time_window_start ||
+                tp.timestamp >= time_window_end)
+                continue;
+            const auto index = chrono::duration_cast<chrono::minutes>(
+                                   tp.timestamp - time_window_start)
+                                   .count() /
+                               5;
+            load[index] = tp.predictedLoad;
+            greenness[index] = tp.predictedGreenness;
+        }
+        greennesses.push_back(std::move(greenness));
+        loads_f.push_back(std::move(load));
+        costs_f.emplace_back(capacities_f.back(), greennesses.back());
+    }
+    // add loads from existing schedule
+    for (const auto &block : existing_schedule) {
+        assert(block.timestamp >= time_window_start &&
+               block.timestamp < time_window_end);
+        auto loc_it = ranges::find(location_ids, block.location);
+        if (loc_it == location_ids.end())
+            continue;
+        const auto loc_index = distance(location_ids.begin(), loc_it);
+        const auto time_index = chrono::duration_cast<chrono::minutes>(
+                                    block.timestamp - time_window_start)
+                                    .count() /
+                                5;
+        loads_f[loc_index][time_index] += block.additionalLoad;
+    }
+    auto penalties_f =
+        vector(location_ids.size(), 1.); // currently assuming invariant penalty
+
+    if (location_ids.empty()) {
+        LOG_WARN << "No locations with valid data for the scheduling window, "
+                    "unable to schedule.";
+        co_return ScheduleResult{};
+    }
+
+    // calculate
+    auto [min_cost, optimal_schedule] = calc_multiple(
+        loads_f, capacities_f, costs_f, penalties_f, job.workload_amount);
+
+    // transform data again
+    // TODO: fix this (db assigns id on persistence)
+    const auto job_id = drogon::utils::genRandomString(16);
+    auto total_emissions = 0.0;
+    auto total_carbon_intensity_sum = 0.0;
+    auto schedule = vector<ScheduleBlock>{};
+    auto blocks_count = 0;
+
+    for (size_t i = 0; i < optimal_schedule.size(); ++i) {
+        const auto &loc_id = location_ids[i];
+        const auto &schedule_vec = optimal_schedule[i];
+        const auto &greenness_vec = costs_f[i].greenness_scores;
+
+        for (int j = 0; j < n_intervals; ++j) {
+            double load = schedule_vec[j];
+            if (load < 1e-6) // Filter out negligible loads
+                continue;
+            schedule.push_back({
+                .timestamp = time_window_start + chrono::minutes(j * 5),
+                .jobId = job_id,
+                .location = loc_id,
+                .additionalLoad = load,
+            });
+            ++blocks_count;
+
+            double g = std::max(greenness_vec[j], 0.01);
+            double ci = 1.0 / g;
+            total_emissions += load * ci;
+            total_carbon_intensity_sum += ci;
+        }
+    }
+
+    co_return {
+        .jobId = job_id,
+        .schedule = std::move(schedule),
+        .impact = {
+            .carbon_intensity = blocks_count > 0
+                                    ? total_carbon_intensity_sum / blocks_count
+                                    : 0.0,
+            .total_emissions = total_emissions,
+            .sci = min_cost,
+        }};
 }
