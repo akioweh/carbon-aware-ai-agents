@@ -164,31 +164,31 @@ auto calc_single(const vector<double> &load_f, const vector<double> &capacity_f,
     // last block is not
     constexpr auto inf = numeric_limits<double>::max() / 2;
     auto row = vector(tot_work + 1, array{inf, inf});
+    auto prev_row = vector(tot_work + 1, array{inf, inf});
     row[0][1] = 0.; // 0 cost for 0 work
     // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
     auto memo = vector(n + 1, vector(tot_work + 1, array<pair<int, int>, 2>{}));
 
     for (const auto i : views::iota(1, n + 1)) {
-        const auto prev_row = row;
-        row.assign(tot_work + 1, array{inf, inf});
+        swap(row, prev_row);
+        ranges::fill(row, array{inf, inf});
         const auto cost_func = cost[i - 1];
-        // do no work
-        for (const auto [w_prev, prev] : views::enumerate(prev_row)) {
-            const auto b = prev[0] < prev[1];
-            const auto new_cost = b ? prev[0] : prev[1];
-            const auto w = w_prev;
-            if (new_cost < row[w][1]) {
-                row[w][1] = new_cost;
-                memo[i][w][1] = {0, b};
+        const auto max_wi = capacity[i - 1] - load[i - 1];
+        const auto base_cost = cost_func(load[i - 1]);
+        for (const auto w_prev : views::iota(0, tot_work + 1)) {
+            const auto &prev = prev_row[w_prev];
+            // do no work (propagate to same w)
+            {
+                const auto b = prev[0] < prev[1];
+                const auto new_cost = b ? prev[0] : prev[1];
+                if (new_cost < row[w_prev][1]) {
+                    row[w_prev][1] = new_cost;
+                    memo[i][w_prev][1] = {0, b};
+                }
             }
-        }
-        // do some work
-        for (const auto wi :
-             views::iota(1, capacity[i - 1] - load[i - 1] + 1)) {
-            for (const auto w_prev : views::iota(0, tot_work + 1)) {
-                const auto &prev = prev_row[w_prev];
-                const auto add_cost =
-                    cost_func(wi + load[i - 1]) - cost_func(load[i - 1]);
+            // do some work
+            for (const auto wi : views::iota(1, max_wi + 1)) {
+                const auto add_cost = cost_func(wi + load[i - 1]) - base_cost;
                 { // extend run
                     const auto new_cost = prev[0] + add_cost;
                     const auto w = min(w_prev + wi, tot_work);
@@ -349,6 +349,7 @@ auto calc_multiple(const vector<vector<double>> &loads_f,
             cur_w -= alloc;
             cur_state = prev_state;
         }
+        assert(cur_w == 0);
     }
 
     return {final_cost, res};
