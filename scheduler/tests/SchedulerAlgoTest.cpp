@@ -4,6 +4,9 @@
 #include <cmath>
 #include <numeric>
 
+using namespace scheduler;
+using namespace scheduler::exceptions;
+
 // =============================================================================
 // Helpers
 // =============================================================================

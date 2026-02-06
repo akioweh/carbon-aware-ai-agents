@@ -6,6 +6,8 @@
 #include "structs/JobRequest.hpp"
 #include "structs/SchedulerOutput.hpp"
 
+namespace scheduler {
+
 /**
  * @class Scheduler
  * @brief The main schedule optimization engine.
@@ -23,5 +25,7 @@ class Scheduler {
   public:
     auto scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput>;
 };
+
+} // namespace scheduler
 
 #endif

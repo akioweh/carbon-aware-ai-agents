@@ -6,6 +6,8 @@
 #include <string>
 #include <utility>
 
+namespace scheduler::exceptions {
+
 class ValidationException : public std::exception {
   public:
     explicit ValidationException(std::string message)
@@ -18,5 +20,7 @@ class ValidationException : public std::exception {
   private:
     std::string message_;
 };
+
+} // namespace scheduler::exceptions
 
 #endif

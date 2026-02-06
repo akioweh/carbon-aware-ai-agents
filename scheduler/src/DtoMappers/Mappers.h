@@ -7,16 +7,16 @@
 #include "structs/SchedulerOutput.hpp"
 #include <concepts>
 
-namespace mappers {
+namespace scheduler::mappers {
 using JobModel = drogon_model::calendar_db::Jobs;
 using ImpactModel = drogon_model::calendar_db::Impacts;
 using JobMapper = drogon::orm::CoroMapper<JobModel>;
 using ImpactMapper = drogon::orm::CoroMapper<ImpactModel>;
 
-auto f_toDto(const ScheduleImpact &) -> ImpactModel;
-auto f_toDto(const InternalBlock &, int) -> JobModel;
-auto f_fromDto(const ImpactModel &) -> ScheduleImpact;
-auto f_fromDto(const JobModel &) -> ScheduleBlock;
+auto f_toDto(const scheduler::ScheduleImpact &) -> ImpactModel;
+auto f_toDto(const scheduler::InternalBlock &, int) -> JobModel;
+auto f_fromDto(const ImpactModel &) -> scheduler::ScheduleImpact;
+auto f_fromDto(const JobModel &) -> scheduler::ScheduleBlock;
 
 struct FromDtoFn {
     auto operator()(auto &&dto) const {
@@ -25,12 +25,12 @@ struct FromDtoFn {
 };
 
 struct ToDtoFn {
-    auto operator()(const ScheduleImpact &impact) const {
+    auto operator()(const scheduler::ScheduleImpact &impact) const {
         return f_toDto(impact);
     }
 
     [[nodiscard]] auto withImpactId(int impactId) const {
-        return [impactId](const InternalBlock &block) {
+        return [impactId](const scheduler::InternalBlock &block) {
             return f_toDto(block, impactId);
         };
     }
@@ -48,5 +48,5 @@ template <MappableModel T> auto fromDtoAll(const std::vector<T> &models) {
            std::ranges::to<std::vector>();
 }
 
-}; // namespace mappers
+} // namespace scheduler::mappers
 #endif

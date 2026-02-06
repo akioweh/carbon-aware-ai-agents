@@ -7,6 +7,8 @@
 #include <string>
 #include <utils/Utils.hpp>
 
+namespace scheduler {
+
 /**
  * @class ScheduleBlock
  * @brief The atomic unit of a schedule, representing an amount of load at a
@@ -35,5 +37,7 @@ inline auto f_toJson(const ScheduleBlock &obj) -> Json::Value {
 }
 
 static_assert(Serializable<ScheduleBlock>);
+
+} // namespace scheduler
 
 #endif // SCHEDULE_BLOCK

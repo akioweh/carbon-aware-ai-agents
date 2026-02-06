@@ -13,14 +13,15 @@
 #include <optional>
 #include <trantor/utils/Logger.h>
 
+namespace scheduler {
+
 using namespace std;
 using namespace drogon;
 
 StatsAPIClient::StatsAPIClient(string host) : host(std::move(host)) {}
 
 auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
-    auto jsonPtr =
-        co_await scheduler::utils::makeGetRequest(host, getLocationsPath());
+    auto jsonPtr = co_await utils::makeGetRequest(host, getLocationsPath());
     if (!jsonPtr) {
         LOG_ERROR << "Failed to get locations";
         co_return {};
@@ -37,8 +38,7 @@ auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
 
 auto StatsAPIClient::getLoadForecast(const string &location)
     -> Task<std::optional<LoadForecast>> {
-    auto jsonPtr =
-        co_await scheduler::utils::makeGetRequest(host, getLoadPath(location));
+    auto jsonPtr = co_await utils::makeGetRequest(host, getLoadPath(location));
     if (!jsonPtr) {
         LOG_ERROR << "Failed to get load forecast for " << location;
         co_return std::nullopt;
@@ -60,7 +60,7 @@ auto StatsAPIClient::getLoadForecast(const string &location)
         data.reserve(json["data"].size());
         for (const auto &item : json["data"]) {
             const auto tsOpt =
-                scheduler::utils::parseIso8601(item["timestamp"].asString());
+                utils::parseIso8601(item["timestamp"].asString());
             if (tsOpt) {
                 data.emplace_back(tsOpt.value(), item["value"].asDouble(),
                                   item["is_forecast"].asBool(),
@@ -82,8 +82,8 @@ auto StatsAPIClient::getLoadForecast(const string &location)
 
 auto StatsAPIClient::getGreennessForecast(const string &location)
     -> Task<std::optional<GreennessForecast>> {
-    auto jsonPtr = co_await scheduler::utils::makeGetRequest(
-        host, getGreennessPath(location));
+    auto jsonPtr =
+        co_await utils::makeGetRequest(host, getGreennessPath(location));
     if (!jsonPtr) {
         LOG_ERROR << "Failed to get greenness forecast for " << location;
         co_return std::nullopt;
@@ -95,7 +95,7 @@ auto StatsAPIClient::getGreennessForecast(const string &location)
         data.reserve(json["data"].size());
         for (const auto &item : json["data"]) {
             const auto tsOpt =
-                scheduler::utils::parseIso8601(item["timestamp"].asString());
+                utils::parseIso8601(item["timestamp"].asString());
             if (tsOpt) {
                 data.emplace_back(tsOpt.value(), item["value"].asDouble(),
                                   item["is_forecast"].asBool());
@@ -114,7 +114,7 @@ auto StatsAPIClient::getGreennessForecast(const string &location)
 
 auto StatsAPIClient::getDatacenter(const string &datacenterName)
     -> Task<Datacenter> {
-    auto [loadOpt, greennessOpt] = co_await scheduler::coro::when_all(
+    auto [loadOpt, greennessOpt] = co_await coro::when_all(
         getLoadForecast(datacenterName), getGreennessForecast(datacenterName));
     if (!loadOpt || !greennessOpt) {
         LOG_ERROR << "Failed to get complete data for " << datacenterName;
@@ -155,9 +155,11 @@ auto StatsAPIClient::getAllDatacenters() -> Task<vector<Datacenter>> {
         co_return {};
     }
 
-    co_return co_await scheduler::coro::when_all(
+    co_return co_await coro::when_all(
         locations | views::transform([this](const auto &loc) -> auto {
             return getDatacenter(loc.id);
         }) |
         ranges::to<vector>());
 }
+
+} // namespace scheduler

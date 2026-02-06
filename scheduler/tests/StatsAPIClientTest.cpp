@@ -5,6 +5,8 @@
 #include <boost/test/included/unit_test.hpp>
 #include <drogon/drogon.h>
 
+using namespace scheduler;
+
 // NOTE: All tests assume the stats API is running on localhost:5000
 
 // =============================================================================

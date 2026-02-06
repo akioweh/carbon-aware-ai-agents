@@ -8,13 +8,16 @@
 #include <drogon/HttpResponse.h>
 #include <drogon/HttpTypes.h>
 
+namespace scheduler::controllers {
+
 using namespace std;
 using namespace drogon;
+using namespace scheduler;
 
 auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
                                      const TimeIntervalParams interval) const
     -> Task<HttpResponsePtr> {
-    const auto res = co_await calendarService::get(
+    const auto res = co_await calendar::get(
         interval.start.value_or(chrono::system_clock::time_point::min()),
         interval.end.value_or(chrono::system_clock::time_point::max()));
     auto ret = Json::Value(Json::arrayValue);
@@ -30,7 +33,7 @@ auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
     auto output = co_await schedulingQueue.computeSchedule(job_request);
 
     // persist and get the DB-assigned job ID
-    const auto job_id = co_await calendarService::add(output);
+    const auto job_id = co_await calendar::add(output);
 
     // construct the API DTO with the real job ID
     auto schedule = vector<ScheduleBlock>{};
@@ -51,3 +54,5 @@ auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
 
     co_return HttpResponse::newHttpJsonResponse(toJson(result));
 }
+
+} // namespace scheduler::controllers

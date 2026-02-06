@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+namespace scheduler {
+
 /**
  * @class TimeSlot
  * @brief used in \ref Datacenter
@@ -41,5 +43,7 @@ struct Datacenter {
     int totalGpus;
     std::vector<TimeSlot> timeSeries;
 };
+
+} // namespace scheduler
 
 #endif // DATACENTER_HPP

@@ -4,7 +4,9 @@
 #include <models/Jobs.h>
 #include <structs/ScheduleBlock.hpp>
 
-namespace mappers {
+namespace scheduler::mappers {
+using namespace scheduler;
+
 auto f_toDto(const ScheduleImpact &impact) -> ImpactModel {
     ImpactModel impactDB;
     impactDB.setCarbonIntensity(impact.carbon_intensity);
@@ -39,4 +41,4 @@ auto f_fromDto(const JobModel &jobDto) -> ScheduleBlock {
                          .additionalLoad = jobDto.getValueOfAdditionalLoad()};
 }
 
-}; // namespace mappers
+} // namespace scheduler::mappers

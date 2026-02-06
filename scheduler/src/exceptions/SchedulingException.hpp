@@ -6,6 +6,8 @@
 #include <string>
 #include <utility>
 
+namespace scheduler::exceptions {
+
 /**
  * @class SchedulingException
  * @brief Thrown when a valid scheduling request cannot be fulfilled due to
@@ -27,5 +29,7 @@ class SchedulingException : public std::exception {
   private:
     std::string message_;
 };
+
+} // namespace scheduler::exceptions
 
 #endif

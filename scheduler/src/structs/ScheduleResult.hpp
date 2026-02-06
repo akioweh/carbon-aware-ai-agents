@@ -5,6 +5,8 @@
 #include "Serializable.hpp"
 #include "structs/ScheduleBlock.hpp"
 
+namespace scheduler {
+
 /**
  * @class ScheduleImpact
  * @brief Environmental impact metrics for a schedule.
@@ -48,5 +50,7 @@ inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
 }
 
 static_assert(Serializable<ScheduleResult>);
+
+} // namespace scheduler
 
 #endif // SCHEDULE_RESULT_HPP

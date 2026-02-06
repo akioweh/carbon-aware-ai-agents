@@ -8,6 +8,8 @@
 #include <boost/lockfree/queue.hpp>
 #include <coroutine>
 
+namespace scheduler {
+
 class SchedulerTask {
     std::atomic<std::coroutine_handle<>> taskHandle{nullptr};
     SchedulerOutput value;
@@ -55,5 +57,7 @@ class SchedulingQueue {
 };
 
 inline SchedulingQueue schedulingQueue{};
+
+} // namespace scheduler
 
 #endif

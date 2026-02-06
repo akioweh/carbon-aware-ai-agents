@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+namespace scheduler {
+
 /**
  * @class InternalBlock
  * @brief The scheduler's output block — a unit of scheduled work with no
@@ -34,5 +36,7 @@ struct SchedulerOutput {
     std::vector<InternalBlock> blocks;
     ScheduleImpact impact{};
 };
+
+} // namespace scheduler
 
 #endif // SCHEDULER_OUTPUT_HPP

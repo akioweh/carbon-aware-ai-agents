@@ -7,6 +7,8 @@
 #include <chrono>
 #include <drogon/HttpRequest.h>
 
+namespace scheduler {
+
 /**
  * @class TimeIntervalParams
  * @brief DTO for time interval parameters in API requests.
@@ -17,9 +19,12 @@ struct TimeIntervalParams {
     std::optional<std::chrono::system_clock::time_point> end;
 };
 
+} // namespace scheduler
+
 namespace drogon {
 template <>
-inline auto fromRequest(const HttpRequest &req) -> TimeIntervalParams {
+inline auto fromRequest(const HttpRequest &req)
+    -> scheduler::TimeIntervalParams {
     const auto &params = req.getParameters();
     auto start = std::optional<std::chrono::system_clock::time_point>{};
     auto end = std::optional<std::chrono::system_clock::time_point>{};
@@ -27,21 +32,22 @@ inline auto fromRequest(const HttpRequest &req) -> TimeIntervalParams {
         const auto parse_res =
             scheduler::utils::parseIso8601(params.at("start"));
         if (!parse_res)
-            throw ValidationException("Invalid start time format: " +
-                                      parse_res.error());
+            throw scheduler::exceptions::ValidationException(
+                "Invalid start time format: " + parse_res.error());
         start = parse_res.value();
     }
     if (params.contains("end")) {
         const auto parse_res = scheduler::utils::parseIso8601(params.at("end"));
         if (!parse_res)
-            throw ValidationException("Invalid end time format: " +
-                                      parse_res.error());
+            throw scheduler::exceptions::ValidationException(
+                "Invalid end time format: " + parse_res.error());
         end = parse_res.value();
     }
     // if both start and end are provided, validate that start <= end
     if (start && end && *start > *end)
-        throw ValidationException("Start time must be before end time");
-    return TimeIntervalParams{.start = start, .end = end};
+        throw scheduler::exceptions::ValidationException(
+            "Start time must be before end time");
+    return scheduler::TimeIntervalParams{.start = start, .end = end};
 }
 } // namespace drogon
 

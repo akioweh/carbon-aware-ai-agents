@@ -8,6 +8,8 @@
 #include <drogon/HttpResponse.h>
 #include <drogon/utils/coroutine.h>
 
+namespace scheduler::controllers {
+
 class ScheduleController : public drogon::HttpController<ScheduleController> {
   public:
     METHOD_LIST_BEGIN
@@ -25,5 +27,7 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                                    TimeIntervalParams) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
+
+} // namespace scheduler::controllers
 
 #endif

@@ -14,6 +14,8 @@
 #include <utility>
 #include <vector>
 
+namespace scheduler {
+
 template <typename Self, typename T>
 concept CostFunction = requires(Self &f, int i, T load) {
     { f[i](load) } -> std::convertible_to<double>;
@@ -288,7 +290,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     const auto final_cost = dp[tot_work];
 
     if (final_cost >= inf)
-        throw SchedulingException(
+        throw exceptions::SchedulingException(
             "Infeasible: insufficient capacity across all locations to "
             "satisfy the requested workload within the given time window");
 
@@ -327,5 +329,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
 
     return {final_cost, res};
 }
+
+} // namespace scheduler
 
 #endif

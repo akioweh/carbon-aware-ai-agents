@@ -3,6 +3,8 @@
 #include "structs/JobRequest.hpp"
 #include <drogon/utils/coroutine.h>
 
+namespace scheduler {
+
 auto SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
     (void)queueSize.fetch_add(1, std::memory_order_release);
     while (!Q.push(schedulerTask))
@@ -47,3 +49,5 @@ start:;
 
     co_return;
 }
+
+} // namespace scheduler

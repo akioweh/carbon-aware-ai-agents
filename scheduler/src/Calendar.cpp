@@ -6,7 +6,9 @@
 #include <drogon/orm/Exception.h>
 #include <ranges>
 
-namespace calendarService {
+namespace scheduler::calendar {
+
+using namespace scheduler;
 
 namespace {
 
@@ -86,4 +88,4 @@ auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
     // we have cascade on delete, so no need to delete the children manually
 }
 
-} // namespace calendarService
+} // namespace scheduler::calendar

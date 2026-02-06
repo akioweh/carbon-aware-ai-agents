@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+namespace scheduler {
+
 /// Location as returned by /locations endpoint
 struct Location {
     std::string id;
@@ -75,5 +77,7 @@ class StatsAPIClient {
         -> drogon::Task<Datacenter>;
     auto getAllDatacenters() -> drogon::Task<std::vector<Datacenter>>;
 };
+
+} // namespace scheduler
 
 #endif // STATS_API_CLIENT

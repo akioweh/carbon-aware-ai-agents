@@ -5,7 +5,7 @@
 #include "structs/ScheduleResult.hpp"
 #include "structs/SchedulerOutput.hpp"
 
-namespace calendarService {
+namespace scheduler::calendar {
 
 template <typename T> auto to_task(auto awaitable) -> drogon::Task<T> {
     co_return co_await awaitable;
@@ -27,6 +27,6 @@ auto get(time_point start = time_point::min(),
 
 auto deleteSchedule(const std::string &jobId) -> drogon::Task<>;
 
-}; // namespace calendarService
+}; // namespace scheduler::calendar
 
 #endif

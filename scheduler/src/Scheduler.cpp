@@ -8,6 +8,8 @@
 
 using namespace std;
 using namespace drogon;
+using namespace scheduler;
+using namespace scheduler::exceptions;
 
 auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     // JobRequest deserialization validates these, but just in case
@@ -34,10 +36,9 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
             "5-minute interval");
 
     // fetch data
-    const auto [locations, existing_schedule] =
-        co_await scheduler::coro::when_all(
-            stats_api.getAllDatacenters(),
-            calendarService::get(time_window_start, time_window_end));
+    const auto [locations, existing_schedule] = co_await coro::when_all(
+        stats_api.getAllDatacenters(),
+        calendar::get(time_window_start, time_window_end));
     const auto n_locations = locations.size();
 
     // transform data into format for optimizer
