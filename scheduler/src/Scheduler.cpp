@@ -380,6 +380,13 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<ScheduleResult> {
     auto capacities_f = vector<vector<double>>();
     auto costs_f = vector<LocationCost>();
     auto greennesses = vector<vector<double>>(); // owning vecs for CostFunction
+    // reserve to prevent reallocation — LocationCost holds references into
+    // capacities_f and greennesses, which would dangle on realloc.
+    location_ids.reserve(n_locations);
+    loads_f.reserve(n_locations);
+    capacities_f.reserve(n_locations);
+    costs_f.reserve(n_locations);
+    greennesses.reserve(n_locations);
 
     for (const auto &loc : locations) {
         location_ids.push_back(loc.id);
