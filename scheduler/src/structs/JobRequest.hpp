@@ -24,24 +24,42 @@ namespace drogon {
 template <> inline auto fromRequest(const HttpRequest &req) -> JobRequest {
     const auto &json_ptr = req.getJsonObject();
     if (!json_ptr)
-        throw ValidationException("Invalid JSON");
+        throw ValidationException("JSON body is required");
     const auto &json = *json_ptr;
-    if (!json.isMember("job_type") || !json.isMember("workload_amount") ||
-        !json.isMember("earliest_start") || !json.isMember("latest_finish"))
-        throw ValidationException("Missing required fields");
+    for (const auto &field :
+         {"job_type", "workload_amount", "earliest_start", "latest_finish"}) {
+        if (json[field].isNull())
+            throw ValidationException("Field '" + std::string(field) +
+                                      "' cannot be null");
+    }
+    if (!json["job_type"].isString())
+        throw ValidationException("Field 'job_type' must be a string");
+    if (!json["workload_amount"].isNumeric())
+        throw ValidationException("Field 'workload_amount' must be a number");
+    if (!json["earliest_start"].isString())
+        throw ValidationException("Field 'earliest_start' must be a string");
+    if (!json["latest_finish"].isString())
+        throw ValidationException("Field 'latest_finish' must be a string");
+    const auto earliest_start_opt =
+        scheduler::utils::parseIso8601(json["earliest_start"].asString());
+    if (!earliest_start_opt)
+        throw ValidationException("Invalid earliest_start time format: " +
+                                  earliest_start_opt.error());
+    const auto latest_finish_opt =
+        scheduler::utils::parseIso8601(json["latest_finish"].asString());
+    if (!latest_finish_opt)
+        throw ValidationException("Invalid latest_finish time format: " +
+                                  latest_finish_opt.error());
     try {
-        return JobRequest{
-            .job_type = json["job_type"].asString(),
-            .workload_amount = json["workload_amount"].asDouble(),
-            .earliest_start = scheduler::utils::parseIso8601(
-                                  json["earliest_start"].asString())
-                                  .value(),
-            .latest_finish =
-                scheduler::utils::parseIso8601(json["latest_finish"].asString())
-                    .value()};
+        const auto workload_amount = json["workload_amount"].asDouble();
+        if (workload_amount < 0.)
+            throw ValidationException("workload_amount must be non-negative");
+        return JobRequest{.job_type = json["job_type"].asString(),
+                          .workload_amount = workload_amount,
+                          .earliest_start = earliest_start_opt.value(),
+                          .latest_finish = latest_finish_opt.value()};
     } catch (const std::exception &e) {
-        throw ValidationException("Failed to parse JSON field: " +
-                                  std::string(e.what()));
+        throw ValidationException("Invalid body");
     }
 }
 } // namespace drogon
