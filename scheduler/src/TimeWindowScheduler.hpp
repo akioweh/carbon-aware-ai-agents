@@ -213,6 +213,12 @@ class TimeWindowScheduler {
     auto query(size_t start_offset, size_t end_offset, double target_work)
         -> double;
 
+    // Returns the full cost curve (index i = cost for i work units) for the
+    // given range. Used for multi-location aggregation.
+    [[nodiscard]] auto getCostCurve(size_t start_offset,
+                                    size_t end_offset) const
+        -> std::vector<double>;
+
     // Allocates/Reserves the optimal work distribution.
     // Modifies the underlying blocks' load.
     // Returns the scheduled blocks if successful, empty if infeasible.

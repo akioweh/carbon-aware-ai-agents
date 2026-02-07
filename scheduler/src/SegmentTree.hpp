@@ -78,7 +78,7 @@ struct PURQ {
         pull(i + N);
     }
 
-    auto query(const size_t l, const size_t r) -> T {
+    auto query(const size_t l, const size_t r) const -> T {
         return std::ranges::fold_left(
             collect(l, r) | std::views::transform([this](const auto i) -> auto {
                 return data[i];

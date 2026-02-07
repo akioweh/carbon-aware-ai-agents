@@ -73,6 +73,44 @@ auto TimeWindowScheduler::query(size_t start_offset, size_t end_offset,
                                                                : min_cost;
 }
 
+auto TimeWindowScheduler::getCostCurve(size_t start_offset,
+                                       size_t end_offset) const
+    -> std::vector<double> {
+    size_t l = head_ + start_offset;
+    size_t r = head_ + end_offset; // inclusive
+
+    if (l >= tail_ || r >= tail_ || l > r) {
+        return {};
+    }
+
+    size_t phys_l = l % MAX_BLOCKS;
+    size_t phys_r = r % MAX_BLOCKS;
+
+    ProfileMatrix result;
+
+    if (phys_l <= phys_r) {
+        result = tree_.query(phys_l, phys_r + 1);
+    } else {
+        auto part1 = tree_.query(phys_l, MAX_BLOCKS);
+        auto part2 = tree_.query(0, phys_r + 1);
+        result = part1 * part2;
+    }
+
+    std::vector<double> costs;
+    costs.reserve(MAX_WORK_RESOLUTION + 1);
+
+    for (int w = 0; w <= MAX_WORK_RESOLUTION; ++w) {
+        double min_val = std::numeric_limits<double>::infinity();
+        for (int u = 0; u < 2; ++u) {
+            for (int v = 0; v < 2; ++v) {
+                min_val = std::min(min_val, result.data[u][v][w]);
+            }
+        }
+        costs.push_back(min_val);
+    }
+    return costs;
+}
+
 // Stateful Reservation
 auto TimeWindowScheduler::reserve(size_t start_offset, size_t end_offset,
                                   double target_work)
