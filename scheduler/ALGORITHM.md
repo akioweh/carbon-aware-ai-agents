@@ -1,10 +1,8 @@
 # Advanced Time-Window Scheduling Algorithm
 
-This document details the implementation of the `TimeWindowScheduler`, a
-high-performance, carbon-aware scheduling engine designed for streaming
-time-series data. It solves the resource allocation problem with non-convex
-costs (specifically, startup penalties) using a Rolling-Window Segment Tree over
-the $(\min, +)$-semiring.
+segment tree go brrr. This solves the resource allocation problem with any
+non-decreasing cost function and _startup penalties_ using a Rolling-Window
+Segment Tree over the $(\min, +)$-semiring.
 
 ## Overview
 
@@ -13,9 +11,9 @@ intervals). It allows users to:
 
 1. **Stream Data**: continuously add new forecast blocks (rolling window).
 2. **Query Costs**: Calculate the optimal cost to schedule a job $W$ over a
-    specific time range $[T_{start}, T_{end}]$ without modifying state.
+   specific time range $[T_{start}, T_{end}]$ without modifying state.
 3. **Reserve Resources**: Permanently allocate work to the optimal blocks,
-    updating the state for future queries.
+   updating the state for future queries.
 
 ### Key Features
 
@@ -29,14 +27,16 @@ intervals). It allows users to:
 
 ## Core Concepts
 
-### 1. The Profile Matrix (Algebraic Structure)
+### 1. Profile Matrix
 
 The fundamental unit of computation is the **Profile Matrix** ($\mathcal{M}$).
 It encapsulates the cost function of a time interval, parameterized by the state
 of the system at the interval boundaries.
 
-$$ \mathcal{M} = \begin{bmatrix} f_{00}(w) & f_{01}(w) \\ f_{10}(w) & f_{11}(w)
-\end{bmatrix} $$
+$$
+\mathcal{M} = \begin{bmatrix} f_{00}(w) & f_{01}(w) \\ f_{10}(w) & f_{11}(w)
+\end{bmatrix}
+$$
 
 - **States**:
   - `0`: **Inactive** (Work $w=0$).
@@ -46,24 +46,26 @@ $$ \mathcal{M} = \begin{bmatrix} f_{00}(w) & f_{01}(w) \\ f_{10}(w) & f_{11}(w)
 - **Work Resolution**: The work $w$ is discretized (integer steps up to
   `MAX_WORK_RESOLUTION`).
 
-### 2. Min-Plus Convolution (`operator*`)
+### 2. Matrix Multiplication (in a $(\min, +)$ Semiring)
 
 Merging two adjacent time intervals (Interval $A$ followed by Interval $B$) is
 equivalent to matrix multiplication over the Min-Plus semiring.
 
-$$ (A * B)_{uv}(w) = \min_{k \in \{0,1\}} \min_{0 \le i \le w} \left(
-A_{uk}(i) + B_{kv}(w-i) \right) $$
+$$
+(A * B)_{uv}(w) = \min_{k \in \{0,1\}} \min_{0 \le i \le w} \left(
+A_{uk}(i) + B_{kv}(w-i) \right)
+$$
 
 - **Associativity**: This operation is associative, allowing us to use a Segment
   Tree to combine arbitrary ranges efficiently.
 - **Complexity**: $O(W^2)$ per merge, where $W$ is `MAX_WORK_RESOLUTION`.
 
-### 3. Iterative Segment Tree (PURQ)
+### 3. Iterative Segment Tree
 
 The system uses a **Point Update Range Query (PURQ)** Segment Tree
 implementation.
 
-- **Structure**: Iterative (non-recursive), array-based for cache locality.
+- **Structure**: Iterative (non-recursive), array-based for tighter looping.
 - **Mapping**: A logical rolling window `[head, tail]` is mapped modulo
   `MAX_BLOCKS` to the physical leaves of the tree.
 - **Updates**: When a block is added or modified (reserved), only the affected
@@ -75,43 +77,43 @@ implementation.
 
 When a new 5-minute block arrives:
 
-1.  If the buffer is full, the `head` pointer advances (effectively popping the
-    oldest block).
-2.  The new block data is written to `block_store_[tail % MAX]`.
-3.  A `ProfileMatrix` is computed for the leaf node:
-    - Applies the startup penalty $P$ for transitions from Inactive $\to$ Active
-      ($0 \to 1$).
-    - Calculates linear costs based on `(Load + w) / Capacity / Greenness`.
-4.  The Segment Tree updates the leaf and re-merges up to the root.
+1. If the buffer is full, the `head` pointer advances (effectively popping the
+   oldest block).
+2. The new block data is written to `block_store_[tail % MAX]`.
+3. A `ProfileMatrix` is computed for the leaf node:
+   - Applies the startup penalty $P$ for transitions from Inactive $\to$ Active
+     ($0 \to 1$).
+   - Calculates linear costs based on `(Load + w) / Capacity / Greenness`.
+4. The Segment Tree updates the leaf and re-merges up to the root.
 
 ### Querying Cost
 
 To find the minimum cost for work $W$ in range $[L, R]$:
 
-1.  Identify the $O(\log N)$ nodes covering $[L, R]$ in the Segment Tree.
-2.  Multiply their matrices sequentially using `operator*`.
-3.  The result is a single matrix representing the entire range.
-4.  The answer is $\min_{u,v} \text{Result}_{uv}(W)$.
+1. Identify the $O(\log N)$ nodes covering $[L, R]$ in the Segment Tree.
+2. Multiply their matrices sequentially using `operator*`.
+3. The result is a single matrix representing the entire range.
+4. The answer is $\min_{u,v} \text{Result}_{uv}(W)$.
 
 ### Reserving Resources (Solve-Commit)
 
 Reservation is a two-phase process:
 
-1.  **Solve (Forward Pass)**:
-    - Compute the prefix products of the matrices covering the range.
-    - Determine the global minimum cost and the optimal **End State**
-      ($v_{opt}$) and **Start State** ($u_{opt}$).
+1. **Solve (Forward Pass)**:
+   - Compute the prefix products of the matrices covering the range.
+   - Determine the global minimum cost and the optimal **End State** ($v_{opt}$)
+     and **Start State** ($u_{opt}$).
 
-2.  **Commit (Backward Pass)**:
-    - Drill down from the last node to the first.
-    - At each step, find the "split point" $(w_{left}, w_{right})$ and
-      intermediate state $k$ that produced the optimal cost.
-    - Recursively descend to leaf nodes.
-    - **Update**: At the leaf level, convert the assigned Net Work back to
-      Physical Work (adding penalties if applicable), update the `initial_load`
-      of the block, and refresh the leaf matrix.
-    - **Refresh**: Recompute the tree nodes on the path back up to reflect the
-      increased load (capacity consumption).
+2. **Commit (Backward Pass)**:
+   - Drill down from the last node to the first.
+   - At each step, find the "split point" $(w_{left}, w_{right})$ and
+     intermediate state $k$ that produced the optimal cost.
+   - Recursively descend to leaf nodes.
+   - **Update**: At the leaf level, convert the assigned Net Work back to
+     Physical Work (adding penalties if applicable), update the `initial_load`
+     of the block, and refresh the leaf matrix.
+   - **Refresh**: Recompute the tree nodes on the path back up to reflect the
+     increased load (capacity consumption).
 
 ## Configuration & Complexity
 
@@ -128,8 +130,10 @@ Reservation is a two-phase process:
 
 - **Update**: $O(\log N \cdot W^2)$
 - **Query**: $O(\log N \cdot W^2)$
-- **Reserve**: $O((K + \log N) \cdot W^2)$, where $K$ is the number of blocks modified.
-  - Efficiently updates only the affected leaves and the minimal set of ancestors (boundaries).
+- **Reserve**: $O((K + \log N) \cdot W^2)$, where $K$ is the number of blocks
+  modified.
+  - Efficiently updates only the affected leaves and the minimal set of
+    ancestors (boundaries).
 
 _Note: Since $W$ is small constant (200), these operations are very fast in
 practice._
