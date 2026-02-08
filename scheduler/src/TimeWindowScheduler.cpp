@@ -50,7 +50,7 @@ auto TimeWindowScheduler::query(const size_t start_offset,
     }
 
     // Extract min cost
-    auto w_idx = int(std::round(target_work));
+    auto w_idx = static_cast<int>(std::round(target_work / work_unit_));
     if (w_idx < 0 || w_idx > MAX_WORK_RESOLUTION)
         return -1.0;
 
@@ -104,7 +104,7 @@ auto TimeWindowScheduler::computeReservation(const size_t start_offset,
     const auto r = size_t(head_ + end_offset); // Inclusive
     if (l >= tail_ || r >= tail_ || l > r)
         return {};
-    const auto w_idx = int(std::round(target_work));
+    const auto w_idx = static_cast<int>(std::round(target_work / work_unit_));
     if (w_idx < 0 || w_idx > MAX_WORK_RESOLUTION)
         return {};
     const auto phys_l = size_t(l % MAX_BLOCKS);
