@@ -1,5 +1,5 @@
-#ifndef DATACENTER_HPP
-#define DATACENTER_HPP
+#ifndef SCHEDULER_DATACENTER_HPP
+#define SCHEDULER_DATACENTER_HPP
 #pragma once
 
 #include <chrono>
@@ -46,4 +46,4 @@ struct Datacenter {
 
 } // namespace scheduler
 
-#endif // DATACENTER_HPP
+#endif // SCHEDULER_DATACENTER_HPP

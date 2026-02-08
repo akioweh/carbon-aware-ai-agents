@@ -1,5 +1,5 @@
-#ifndef DROGON_TEST_UTILS_HPP
-#define DROGON_TEST_UTILS_HPP
+#ifndef SCHEDULER_DROGON_TEST_UTILS_HPP
+#define SCHEDULER_DROGON_TEST_UTILS_HPP
 #pragma once
 
 #include <drogon/drogon.h>
@@ -75,4 +75,4 @@ auto run_coro_in_drogon(std::function<drogon::Task<T>()> coroFunc) -> T {
     return DrogonTestRunner::instance().run<T>(std::move(coroFunc));
 }
 
-#endif // DROGON_TEST_UTILS_HPP
+#endif // SCHEDULER_DROGON_TEST_UTILS_HPP

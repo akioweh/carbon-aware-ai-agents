@@ -1,5 +1,5 @@
-#ifndef EXCEPTION_HANDLER_HPP
-#define EXCEPTION_HANDLER_HPP
+#ifndef SCHEDULER_EXCEPTION_HANDLER_HPP
+#define SCHEDULER_EXCEPTION_HANDLER_HPP
 #pragma once
 
 #include "SchedulingException.hpp"
@@ -54,4 +54,4 @@ inline void registerExceptionHandler() {
 
 } // namespace scheduler::exceptions
 
-#endif
+#endif // SCHEDULER_EXCEPTION_HANDLER_HPP

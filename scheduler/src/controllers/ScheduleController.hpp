@@ -1,5 +1,5 @@
-#ifndef SCHEDULE_CONTROLLER_HPP
-#define SCHEDULE_CONTROLLER_HPP
+#ifndef SCHEDULER_SCHEDULE_CONTROLLER_HPP
+#define SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #pragma once
 
 #include "structs/JobRequest.hpp"
@@ -30,4 +30,4 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
 
 } // namespace scheduler::controllers
 
-#endif
+#endif // SCHEDULER_SCHEDULE_CONTROLLER_HPP

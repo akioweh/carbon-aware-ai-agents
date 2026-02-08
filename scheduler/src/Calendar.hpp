@@ -1,5 +1,5 @@
-#ifndef CALENDAR
-#define CALENDAR
+#ifndef SCHEDULER_CALENDAR_HPP
+#define SCHEDULER_CALENDAR_HPP
 #pragma once
 
 #include "structs/ScheduleResult.hpp"
@@ -29,4 +29,4 @@ auto deleteSchedule(const std::string &jobId) -> drogon::Task<>;
 
 }; // namespace scheduler::calendar
 
-#endif
+#endif // SCHEDULER_CALENDAR_HPP

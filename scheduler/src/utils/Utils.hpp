@@ -1,5 +1,6 @@
-#ifndef UTILS
-#define UTILS
+#ifndef SCHEDULER_UTILS_HPP
+#define SCHEDULER_UTILS_HPP
+#pragma once
 
 #include <chrono>
 #include <drogon/drogon.h>
@@ -29,4 +30,4 @@ auto parseIntToStringID(int jobId) -> std::string;
 
 }; // namespace scheduler::utils
 
-#endif
+#endif // SCHEDULER_UTILS_HPP

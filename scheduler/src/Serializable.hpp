@@ -1,5 +1,5 @@
-#ifndef SERIALIZABLE_HPP
-#define SERIALIZABLE_HPP
+#ifndef SCHEDULER_SERIALIZABLE_HPP
+#define SCHEDULER_SERIALIZABLE_HPP
 #pragma once
 
 #include <json/value.h>
@@ -29,4 +29,4 @@ struct toJsonFn {
  */
 inline constexpr scheduler::serialization::impl::toJsonFn toJson{};
 
-#endif
+#endif // SCHEDULER_SERIALIZABLE_HPP

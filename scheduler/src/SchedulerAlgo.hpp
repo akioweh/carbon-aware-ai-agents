@@ -1,5 +1,5 @@
-#ifndef SCHEDULER_ALGO_HPP
-#define SCHEDULER_ALGO_HPP
+#ifndef SCHEDULER_SCHEDULER_ALGO_HPP
+#define SCHEDULER_SCHEDULER_ALGO_HPP
 #pragma once
 
 #include "exceptions/SchedulingException.hpp"
@@ -333,4 +333,4 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
 
 } // namespace scheduler
 
-#endif
+#endif // SCHEDULER_SCHEDULER_ALGO_HPP

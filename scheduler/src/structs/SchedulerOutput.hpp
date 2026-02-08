@@ -1,5 +1,5 @@
-#ifndef SCHEDULER_OUTPUT_HPP
-#define SCHEDULER_OUTPUT_HPP
+#ifndef SCHEDULER_SCHEDULER_OUTPUT_HPP
+#define SCHEDULER_SCHEDULER_OUTPUT_HPP
 #pragma once
 
 #include "structs/ScheduleResult.hpp"
@@ -39,4 +39,4 @@ struct SchedulerOutput {
 
 } // namespace scheduler
 
-#endif // SCHEDULER_OUTPUT_HPP
+#endif // SCHEDULER_SCHEDULER_OUTPUT_HPP
