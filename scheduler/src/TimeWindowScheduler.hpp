@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AlgoUtils.hpp"
 #include "SegmentTree.hpp"
 #include "structs/SchedulerOutput.hpp"
 #include <algorithm>
@@ -14,13 +15,15 @@
 namespace scheduler {
 
 /**
- * @brief Configuration constants for the TimeWindowScheduler.
- * MAX_WORK_RESOLUTION defines the discretization granularity for the Min-Plus
- * Convolution. It strictly limits the MAXIMUM TOTAL WORK that can be
- * queried/reserved in a single request. Increasing this increases memory usage
- * (ProfileMatrix size) and CPU time (O(W^2)).
+ * @brief Startup Penalty (P) expressed in equivalent work units.
+ *
+ * When switching from Inactive (0) to Active (1), the system "pays" this cost.
+ * In the Min-Plus model, we represent this by reducing the effective Net Work:
+ * NetWork = PhysicalWork - P.
+ *
+ * Example: If P=20, and we do 50 units of physical work, only 30 units of
+ * useful Net Work are produced. The 20 units are "lost" to startup overhead.
  */
-constexpr int MAX_WORK_RESOLUTION = 200;
 constexpr double PENALTY_WORK_P = 20.0;
 constexpr size_t MAX_BLOCKS = 16384;
 
@@ -30,14 +33,11 @@ constexpr size_t MAX_BLOCKS = 16384;
  */
 struct BlockData {
     double capacity;
-    double initial_load;
+    double load;
     double greenness;
     std::string location_id;
     std::chrono::system_clock::time_point timestamp;
 };
-
-// Use std::array for Structural Type support (required for NTTP in SegmentTree)
-using CostArray = std::array<double, MAX_WORK_RESOLUTION + 1>;
 
 /**
  * @struct ProfileMatrix
@@ -59,8 +59,8 @@ struct ProfileMatrix {
         // Initialize to infinity
         for (int u = 0; u < 2; ++u)
             for (int v = 0; v < 2; ++v)
-                for (int w = 0; w <= MAX_WORK_RESOLUTION; ++w)
-                    data[u][v][w] = std::numeric_limits<double>::infinity();
+                std::ranges::fill(data[u][v],
+                                  std::numeric_limits<double>::infinity());
 
         // Identity diagonals: State preserved with 0 work/cost
         data[0][0][0] = 0.0;
@@ -72,7 +72,8 @@ struct ProfileMatrix {
      * Computes costs for all possible work levels, applying startup penalties.
      */
     static constexpr auto fromBlock(const BlockData &block, double work_unit,
-                                    double penalty_work) -> ProfileMatrix {
+                                    const double penalty_work)
+        -> ProfileMatrix {
         ProfileMatrix m;
         // Reset to all-infinity to override default identity diagonals where
         // inappropriate (Though strictly, we only need to set valid entries)
@@ -86,30 +87,27 @@ struct ProfileMatrix {
         m.data[1][1][0] = std::numeric_limits<double>::infinity();
 
         // 2. State 1 (Active): Iterate valid physical work
-        double available = block.capacity - block.initial_load;
-        available = std::max(available, 0.);
-
-        int max_phys_idx = static_cast<int>(available / work_unit);
+        const auto available = std::max(block.capacity - block.load, 0.);
+        const auto max_phys_idx = static_cast<int>(available / work_unit);
 
         for (int w_idx = 1;
              w_idx <= max_phys_idx && w_idx <= MAX_WORK_RESOLUTION; ++w_idx) {
-            double w_val = w_idx * work_unit;
+            const auto w_val = w_idx * work_unit;
             // Linear cost model: (Load / Capacity) / Greenness
             // Marginal cost of adding w_val
-            double cost = (block.initial_load + w_val) / block.capacity /
-                              std::max(block.greenness, 0.01) -
-                          (block.initial_load / block.capacity /
-                           std::max(block.greenness, 0.01));
+            const auto cost =
+                ((block.load + w_val) / block.capacity /
+                 std::max(block.greenness, 0.01)) -
+                (block.load / block.capacity / std::max(block.greenness, 0.01));
 
-            // Case u=1 (Active -> Active): No penalty. Net Work = Physical
-            // Work.
+            // Case u=1 (Active -> Active): No penalty
             m.data[1][1][w_idx] = std::min(m.data[1][1][w_idx], cost);
 
             // Case u=0 (Inactive -> Active): Penalty P applies.
             // Net Work = Physical Work - Penalty.
-            double net_work = w_val - penalty_work;
+            const auto net_work = w_val - penalty_work;
             if (net_work >= 0) {
-                int net_idx =
+                const auto net_idx =
                     static_cast<int>(std::round(net_work / work_unit));
                 if (net_idx >= 0 && net_idx <= MAX_WORK_RESOLUTION)
                     m.data[0][1][net_idx] =
@@ -126,51 +124,26 @@ struct ProfileMatrix {
      */
     friend constexpr auto operator*(const ProfileMatrix &L,
                                     const ProfileMatrix &R) -> ProfileMatrix {
-        ProfileMatrix res;
-        // Reset accumulator to infinity
-        for (int u = 0; u < 2; ++u)
-            for (int v = 0; v < 2; ++v)
-                for (int w = 0; w <= MAX_WORK_RESOLUTION; ++w)
-                    res.data[u][v][w] = std::numeric_limits<double>::infinity();
+        auto res = ProfileMatrix{};
+        // initialize everything to infinity (overriding default identity
+        // initialization)
+        for (auto &row : res.data)
+            for (auto &entry : row)
+                std::ranges::fill(entry,
+                                  std::numeric_limits<double>::infinity());
 
-        // Iterate boundary states
         for (int u = 0; u < 2; ++u) {     // Start state
             for (int v = 0; v < 2; ++v) { // End state
-                // Try split state k (Inactive=0, Active=1)
+                // Path via Inactive (k=0)
+                // L[u][0] * R[0][v]
+                auto path0 = min_plus_convolve(L.data[u][0], R.data[0][v]);
 
-                // k=0 (Mid state Inactive)
-                const auto &A0 = L.data[u][0];
-                const auto &B0 = R.data[0][v];
-                auto &C = res.data[u][v];
+                // Path via Active (k=1)
+                // L[u][1] * R[1][v]
+                auto path1 = min_plus_convolve(L.data[u][1], R.data[1][v]);
 
-                // Convolution
-                for (int i = 0; i <= MAX_WORK_RESOLUTION; ++i) {
-                    if (A0[i] == std::numeric_limits<double>::infinity())
-                        continue;
-                    int max_j = MAX_WORK_RESOLUTION - i;
-                    for (int j = 0; j <= max_j; ++j) {
-                        if (B0[j] == std::numeric_limits<double>::infinity())
-                            continue;
-                        double val = A0[i] + B0[j];
-                        C[i + j] = std::min(val, C[i + j]);
-                    }
-                }
-
-                // k=1 (Mid state Active)
-                const auto &A1 = L.data[u][1];
-                const auto &B1 = R.data[1][v];
-
-                for (int i = 0; i <= MAX_WORK_RESOLUTION; ++i) {
-                    if (A1[i] == std::numeric_limits<double>::infinity())
-                        continue;
-                    int max_j = MAX_WORK_RESOLUTION - i;
-                    for (int j = 0; j <= max_j; ++j) {
-                        if (B1[j] == std::numeric_limits<double>::infinity())
-                            continue;
-                        double val = A1[i] + B1[j];
-                        C[i + j] = std::min(val, C[i + j]);
-                    }
-                }
+                element_wise_min(path0, path1);
+                res.data[u][v] = path0;
             }
         }
         return res;
@@ -205,25 +178,97 @@ class TimeWindowScheduler {
     TimeWindowScheduler(TimeWindowScheduler &&) = default;
     auto operator=(TimeWindowScheduler &&) -> TimeWindowScheduler & = default;
 
-    void addBlock(const BlockData &block);
-    void popBlock(); // Rolls the window
+    /**
+     * @brief Adds a new time block to the rolling window.
+     *
+     * If the internal buffer is full (MAX_BLOCKS), the oldest block is
+     * automatically popped to make room.
+     *
+     * @param block The block data (capacity, load, greenness, etc.)
+     */
+    auto addBlock(const BlockData &block) -> void;
 
-    // Returns the min cost for target_work within range [start_offset,
-    // end_offset] Returns -1 if infeasible
+    /**
+     * @brief Removes the oldest block from the window.
+     *
+     * Advances the 'head' pointer, effectively shifting the window forward in
+     * time.
+     */
+    auto popBlock() -> void;
+
+    /**
+     * @brief Queries the minimum cost for a specific work amount in a time
+     * range.
+     *
+     * Does not modify state.
+     *
+     * @param start_offset Index relative to the current head (0 = now).
+     * @param end_offset Index relative to the current head (inclusive).
+     * @param target_work The amount of work to schedule.
+     * @return double The minimum cost (SCI score), or -1.0 if infeasible.
+     */
     auto query(size_t start_offset, size_t end_offset, double target_work)
         -> double;
 
-    // Returns the full cost curve (index i = cost for i work units) for the
-    // given range. Used for multi-location aggregation.
+    /**
+     * @brief Retrieves the full cost profile for a time range.
+     *
+     * Used by the MultiLocationScheduler to aggregate costs across locations.
+     *
+     * @param start_offset Index relative to the current head.
+     * @param end_offset Index relative to the current head.
+     * @return std::vector<double> A vector where index 'i' is the cost for 'i'
+     * work units.
+     */
     [[nodiscard]] auto getCostCurve(size_t start_offset,
                                     size_t end_offset) const
         -> std::vector<double>;
 
-    // Allocates/Reserves the optimal work distribution.
-    // Modifies the underlying blocks' load.
-    // Returns the scheduled blocks if successful, empty if infeasible.
+    /**
+     * @brief Orchestrates the full reservation process: Compute + Commit.
+     *
+     * This is the primary method for scheduling jobs. It calculates the optimal
+     * placement and immediately updates the internal state to reflect the
+     * increased load.
+     *
+     * @param start_offset Index relative to the current head.
+     * @param end_offset Index relative to the current head.
+     * @param target_work The amount of work to schedule.
+     * @return std::vector<InternalBlock> The list of allocated blocks with
+     * their specific load.
+     */
     auto reserve(size_t start_offset, size_t end_offset, double target_work)
         -> std::vector<InternalBlock>;
+
+    /**
+     * @brief Computes the optimal allocation plan WITHOUT modifying state.
+     *
+     * Performs the "Query" phase of the scheduling, reconstructing the path
+     * to find exactly where work should be placed.
+     *
+     * @return std::vector<InternalBlock> The proposed allocation plan.
+     */
+    auto computeReservation(size_t start_offset, size_t end_offset,
+                            double target_work) -> std::vector<InternalBlock>;
+
+    /**
+     * @brief Applies a previously computed allocation to the state.
+     *
+     * Updates the Segment Tree with the new loads. This is an O(K + log N)
+     * operation using the optimized batch update.
+     *
+     * @param blocks The blocks to commit (usually from computeReservation).
+     */
+    auto commitReservation(const std::vector<InternalBlock> &blocks) -> void;
+
+    /**
+     * @brief Reverses a previously computed allocation.
+     *
+     * Effectively "deletes" a job by subtracting its load from the tree.
+     *
+     * @param blocks The blocks to revert.
+     */
+    auto revertReservation(const std::vector<InternalBlock> &blocks) -> void;
 
   private:
     double work_unit_;
@@ -235,12 +280,15 @@ class TimeWindowScheduler {
     // Store block data for updates
     std::vector<BlockData> block_store_;
 
-    void updateTree(size_t logical_index, const BlockData &block);
+    auto updateTree(size_t logical_index, const BlockData &block) -> void;
 
     // Recursive reconstruction and update
     // Returns true if the node was successfully reconstructed
     auto reconstructNode(size_t node_idx, int w_target, int state_in,
                          int state_out, std::vector<InternalBlock> &out_blocks)
         -> bool;
+
+    auto modifyLoad(const std::vector<InternalBlock> &blocks,
+                    bool revert = false) -> void;
 };
 } // namespace scheduler

@@ -19,26 +19,73 @@ class MultiLocationScheduler {
   public:
     explicit MultiLocationScheduler(double work_unit_size);
 
-    // Adds a block to a specific location's timeline.
-    // If the location doesn't exist, it is created.
-    void addBlock(const std::string &location_id, const BlockData &block);
+    /**
+     * @brief Adds a block to a specific location's timeline.
+     *
+     * If the location doesn't exist, a new TimeWindowScheduler is created for
+     * it.
+     *
+     * @param location_id Unique identifier for the datacenter/location.
+     * @param block The block data to append.
+     */
+    auto addBlock(const std::string &location_id, const BlockData &block)
+        -> void;
 
-    // Rolls the window for ALL managed locations.
-    // Assumes synchronized time steps across locations.
-    void popBlock();
+    /**
+     * @brief Rolls the window for ALL managed locations.
+     *
+     * This assumes that all locations are synchronized to the same time grid.
+     * Calling this advances the head of every internal TimeWindowScheduler.
+     */
+    auto popBlock() -> void;
 
-    // Returns the global minimum cost to schedule 'target_work' across all
-    // locations within the specified time offset range. Returns -1 if
-    // infeasible.
+    /**
+     * @brief Returns the global minimum cost to schedule 'target_work' across
+     * all locations.
+     *
+     * @param start_offset Index relative to the current head.
+     * @param end_offset Index relative to the current head.
+     * @param target_work Total work amount to be distributed.
+     * @return double The global minimum SCI score, or -1.0 if infeasible.
+     */
     auto query(size_t start_offset, size_t end_offset, double target_work)
         -> double;
 
-    // Reserves resources optimally across locations.
-    // Performs the global optimization, then commits specific reservations to
-    // each underlying TimeWindowScheduler. Returns a list of all allocated
-    // blocks.
+    /**
+     * @brief Reserves resources optimally across multiple locations.
+     *
+     * 1. Aggregates cost curves from all locations.
+     * 2. Solves the global resource distribution problem (Knapsack-like).
+     * 3. Computes specific schedules for each location based on the
+     * distribution.
+     * 4. Commits the changes to all underlying schedulers.
+     *
+     * @return std::vector<InternalBlock> List of all allocated blocks across
+     * all locations.
+     */
     auto reserve(size_t start_offset, size_t end_offset, double target_work)
         -> std::vector<InternalBlock>;
+
+    /**
+     * @brief Computes the optimal allocation plan WITHOUT modifying state.
+     *
+     * Useful for "dry run" or "what-if" scenarios.
+     */
+    auto computeReservation(size_t start_offset, size_t end_offset,
+                            double target_work) -> std::vector<InternalBlock>;
+
+    /**
+     * @brief Applies a previously computed allocation to the state.
+     *
+     * Splits the block list by location and delegates to the respective
+     * TimeWindowScheduler.
+     */
+    auto commitReservation(const std::vector<InternalBlock> &blocks) -> void;
+
+    /**
+     * @brief Reverses a previously computed allocation (deletion).
+     */
+    auto revertReservation(const std::vector<InternalBlock> &blocks) -> void;
 
   private:
     double work_unit_;
