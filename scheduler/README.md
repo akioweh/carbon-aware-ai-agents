@@ -2,6 +2,8 @@
 
 ## Development Setup
 
+Please follow [the coding style guide](./CODING_STYLE.md)
+
 ### Software
 
 C++23!  
