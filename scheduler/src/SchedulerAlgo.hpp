@@ -1,5 +1,5 @@
-#ifndef SCHEDULER_ALGO_HPP
-#define SCHEDULER_ALGO_HPP
+#ifndef SCHEDULER_SCHEDULER_ALGO_HPP
+#define SCHEDULER_SCHEDULER_ALGO_HPP
 #pragma once
 
 #include "exceptions/SchedulingException.hpp"
@@ -101,12 +101,12 @@ inline auto calc_single(const std::vector<double> &load_f,
     const auto e_work = tot_work_f / resolution;
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
     auto load = vector<int>(n);
-    transform(execution::par, load_f.begin(), load_f.end(), load.begin(),
+    transform(execution::unseq, load_f.begin(), load_f.end(), load.begin(),
               [e_work](double x) -> int {
                   return static_cast<int>(ceil(x / e_work));
               });
     auto capacity = vector<int>(n);
-    transform(execution::par, capacity_f.begin(), capacity_f.end(),
+    transform(execution::unseq, capacity_f.begin(), capacity_f.end(),
               capacity.begin(), [e_work](double x) -> int {
                   return static_cast<int>(floor(x / e_work));
               });
@@ -265,14 +265,15 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         }
     }
     for (const auto i : views::iota(1ULL, m)) {
-        auto next_dp = vector(tot_work + 1, inf);
         const auto &costs = locations_cost_vector[i];
+        auto next_dp = vector(tot_work + 1, inf);
         auto &memo_i = memo[i];
-        // each w is independent: reads dp (immutable this pass) and costs,
+        // each w is independent: reads dp and costs,
         // writes only to next_dp[w] and memo_i[w]
-        auto w_range = views::iota(0, tot_work + 1);
-        for_each(execution::par, w_range.begin(), w_range.end(),
-                 [&dp, &costs, &next_dp, &memo_i, inf](const auto w) -> auto {
+        const auto w_range = views::iota(0, tot_work + 1);
+        for_each(execution::par_unseq, w_range.begin(), w_range.end(),
+                 [&dp = as_const(dp), &costs, &next_dp, &memo_i,
+                  inf](const auto w) -> auto {
                      for (const auto k : views::iota(0, w + 1)) {
                          const auto prev_cost = dp[w - k];
                          if (prev_cost >= inf)
@@ -333,4 +334,4 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
 
 } // namespace scheduler
 
-#endif
+#endif // SCHEDULER_SCHEDULER_ALGO_HPP

@@ -1,5 +1,5 @@
-#ifndef VALIDATION_EXCEPTION_HPP
-#define VALIDATION_EXCEPTION_HPP
+#ifndef SCHEDULER_VALIDATION_EXCEPTION_HPP
+#define SCHEDULER_VALIDATION_EXCEPTION_HPP
 #pragma once
 
 #include <exception>
@@ -23,4 +23,4 @@ class ValidationException : public std::exception {
 
 } // namespace scheduler::exceptions
 
-#endif
+#endif // SCHEDULER_VALIDATION_EXCEPTION_HPP

@@ -1,5 +1,5 @@
-#ifndef SCHEDULER
-#define SCHEDULER
+#ifndef SCHEDULER_SCHEDULER_HPP
+#define SCHEDULER_SCHEDULER_HPP
 #pragma once
 
 #include "StatsAPIClient.hpp"
@@ -28,4 +28,4 @@ class Scheduler {
 
 } // namespace scheduler
 
-#endif
+#endif // SCHEDULER_SCHEDULER_HPP

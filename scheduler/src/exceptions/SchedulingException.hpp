@@ -1,5 +1,5 @@
-#ifndef SCHEDULING_EXCEPTION_HPP
-#define SCHEDULING_EXCEPTION_HPP
+#ifndef SCHEDULER_SCHEDULING_EXCEPTION_HPP
+#define SCHEDULER_SCHEDULING_EXCEPTION_HPP
 #pragma once
 
 #include <exception>
@@ -32,4 +32,4 @@ class SchedulingException : public std::exception {
 
 } // namespace scheduler::exceptions
 
-#endif
+#endif // SCHEDULER_SCHEDULING_EXCEPTION_HPP

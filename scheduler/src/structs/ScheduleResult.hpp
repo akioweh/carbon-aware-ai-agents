@@ -1,5 +1,5 @@
-#ifndef SCHEDULE_RESULT_HPP
-#define SCHEDULE_RESULT_HPP
+#ifndef SCHEDULER_SCHEDULE_RESULT_HPP
+#define SCHEDULER_SCHEDULE_RESULT_HPP
 #pragma once
 
 #include "Serializable.hpp"
@@ -53,4 +53,4 @@ static_assert(Serializable<ScheduleResult>);
 
 } // namespace scheduler
 
-#endif // SCHEDULE_RESULT_HPP
+#endif // SCHEDULER_SCHEDULE_RESULT_HPP

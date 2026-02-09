@@ -1,5 +1,5 @@
-#ifndef JOB_REQUEST
-#define JOB_REQUEST
+#ifndef SCHEDULER_JOB_REQUEST_HPP
+#define SCHEDULER_JOB_REQUEST_HPP
 #pragma once
 
 #include "exceptions/ValidationException.hpp"
@@ -74,4 +74,4 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
 }
 } // namespace drogon
 
-#endif
+#endif // SCHEDULER_JOB_REQUEST_HPP

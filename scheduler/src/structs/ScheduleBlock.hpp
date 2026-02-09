@@ -1,5 +1,5 @@
-#ifndef SCHEDULE_BLOCK
-#define SCHEDULE_BLOCK
+#ifndef SCHEDULER_SCHEDULE_BLOCK_HPP
+#define SCHEDULER_SCHEDULE_BLOCK_HPP
 #pragma once
 
 #include "Serializable.hpp"
@@ -40,4 +40,4 @@ static_assert(Serializable<ScheduleBlock>);
 
 } // namespace scheduler
 
-#endif // SCHEDULE_BLOCK
+#endif // SCHEDULER_SCHEDULE_BLOCK_HPP

@@ -1,5 +1,5 @@
-#ifndef STATS_API_CLIENT
-#define STATS_API_CLIENT
+#ifndef SCHEDULER_STATS_API_CLIENT_HPP
+#define SCHEDULER_STATS_API_CLIENT_HPP
 #pragma once
 
 #include "structs/Datacenter.hpp"
@@ -80,4 +80,4 @@ class StatsAPIClient {
 
 } // namespace scheduler
 
-#endif // STATS_API_CLIENT
+#endif // SCHEDULER_STATS_API_CLIENT_HPP

@@ -1,5 +1,5 @@
-#ifndef TIME_INTERVAL_PARAMS_HPP
-#define TIME_INTERVAL_PARAMS_HPP
+#ifndef SCHEDULER_TIME_INTERVAL_PARAMS_HPP
+#define SCHEDULER_TIME_INTERVAL_PARAMS_HPP
 #pragma once
 
 #include "exceptions/ValidationException.hpp"
@@ -51,4 +51,4 @@ inline auto fromRequest(const HttpRequest &req)
 }
 } // namespace drogon
 
-#endif
+#endif // SCHEDULER_TIME_INTERVAL_PARAMS_HPP

@@ -1,5 +1,5 @@
-#ifndef SCHEDULING_QUEUE
-#define SCHEDULING_QUEUE
+#ifndef SCHEDULER_SCHEDULING_QUEUE_HPP
+#define SCHEDULER_SCHEDULING_QUEUE_HPP
 #pragma once
 
 #include "structs/JobRequest.hpp"
@@ -60,4 +60,4 @@ inline SchedulingQueue schedulingQueue{};
 
 } // namespace scheduler
 
-#endif
+#endif // SCHEDULER_SCHEDULING_QUEUE_HPP
