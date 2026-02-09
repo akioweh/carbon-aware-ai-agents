@@ -65,7 +65,7 @@ class StatsAPIClient {
     static auto getLocationsPath() -> std::string { return "/locations"; }
 
   public:
-    explicit StatsAPIClient(std::string host = "http://127.0.0.1:5000");
+    explicit StatsAPIClient(std::string host = "http://140.238.79.139:5000");
 
     auto getLocations() -> drogon::Task<std::vector<Location>>;
     auto getLoadForecast(const std::string &locationId)
