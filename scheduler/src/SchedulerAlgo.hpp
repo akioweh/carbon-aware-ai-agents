@@ -111,14 +111,14 @@ inline auto calc_single(const std::vector<double> &load_f,
                   return static_cast<int>(floor(x / e_work));
               });
     const struct {
-        decltype(cost_f) &cost_ff;
+        decltype(cost_f) &cost_f_;
         double e_work;
         auto operator[](int i) const {
             return [&, i](int load) -> double {
-                return cost_ff[i](load * e_work);
+                return cost_f_[i](load * e_work);
             };
         }
-    } cost{.cost_ff = cost_f, .e_work = e_work};
+    } cost{.cost_f_ = cost_f, .e_work = e_work};
     const auto penalty = static_cast<int>(round(penalty_f / e_work));
 
     // p = dp[i][w] = minimum cost to allocate w effective work in the first i
