@@ -27,6 +27,13 @@ auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
     co_return resp;
 }
 
+auto ScheduleController::deleteSchedule(HttpRequestPtr /*req*/,
+                                        std::string job_id) const
+    -> Task<HttpResponsePtr> {
+    co_await calendar::deleteSchedule(job_id);
+    co_return HttpResponse::newHttpResponse();
+}
+
 auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
                                            const JobRequest job_request) const
     -> Task<HttpResponsePtr> {

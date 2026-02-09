@@ -1,6 +1,7 @@
 #include "Calendar.hpp"
 #include "structs/ScheduleResult.hpp"
 #include "structs/SchedulerOutput.hpp"
+#include "utils/Utils.hpp"
 #include <atomic>
 #include <drogon/drogon.h>
 #include <map>
@@ -16,7 +17,7 @@ static std::map<std::string, ScheduleResult> g_storage;
 static std::atomic<int> g_id_counter{1};
 
 auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
-    std::string id = "sched-" + std::to_string(g_id_counter++);
+    std::string id = scheduler::utils::parseIntToStringID(g_id_counter++);
 
     // Convert InternalBlock to ScheduleBlock
     std::vector<ScheduleBlock> blocks;
@@ -62,6 +63,9 @@ auto get(time_point start, time_point end)
 }
 
 auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
+    // Validate ID format (mimic real implementation)
+    scheduler::utils::parseStringIDtoInt(jobId);
+
     std::lock_guard<std::mutex> lock(g_mutex);
     g_storage.erase(jobId);
     co_return;

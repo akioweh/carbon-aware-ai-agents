@@ -1,4 +1,5 @@
 #define BOOST_TEST_MODULE SchedulerIntegrationTest
+
 #include "exceptions/ExceptionHandler.hpp"
 #include "utils/Utils.hpp"
 #include <boost/test/included/unit_test.hpp>
@@ -6,18 +7,9 @@
 #include <drogon/HttpController.h>
 #include <drogon/drogon.h>
 #include <filesystem>
-#include <fstream>
 #include <thread>
 
 using namespace drogon;
-
-// Helper to read file content
-auto readFile(const std::string &path) -> std::string {
-    std::ifstream t(path);
-    std::stringstream buffer;
-    buffer << t.rdbuf();
-    return buffer.str();
-}
 
 struct SchedulerGlobalFixture {
     SchedulerGlobalFixture() {
@@ -33,19 +25,22 @@ struct SchedulerGlobalFixture {
         scheduler::exceptions::registerExceptionHandler();
 
         // Start the app in a thread
-        t = std::thread([]() -> void { drogon::app().run(); });
+        t = std::jthread([]() -> void { drogon::app().run(); });
 
         // Wait for server to start
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        using namespace std::chrono_literals;
+        auto start = std::chrono::steady_clock::now();
+        while (!drogon::app().isRunning()) {
+            if (std::chrono::steady_clock::now() - start > 10s) {
+                throw std::runtime_error("Timeout waiting for Drogon to start");
+            }
+            std::this_thread::sleep_for(10ms);
+        }
     }
 
-    ~SchedulerGlobalFixture() {
-        drogon::app().quit();
-        if (t.joinable())
-            t.join();
-    }
+    ~SchedulerGlobalFixture() { drogon::app().quit(); }
 
-    std::thread t;
+    std::jthread t;
 };
 
 BOOST_TEST_GLOBAL_FIXTURE(SchedulerGlobalFixture);
@@ -119,11 +114,33 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     BOOST_CHECK(getJson->size() > 0);
 
     // 3. Delete Schedule (Delete)
-    // /api/schedule/{schedule_id} is not standard REST, but usually DELETE
-    // /api/schedule/ID Let's check ScheduleController definition again. It
-    // doesn't seem to have DELETE exposed in METHOD_LIST_BEGIN! I checked
-    // ScheduleController.hpp and it only had ADD_METHOD_TO for POST and GET.
-    // Let me re-verify ScheduleController.hpp
+    auto deleteReq = HttpRequest::newHttpRequest();
+    deleteReq->setMethod(drogon::Delete);
+    deleteReq->setPath("/api/schedule/" + jobId);
+
+    auto deleteRespPair = client->sendRequest(deleteReq);
+    BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
+    auto deleteResponse = deleteRespPair.second;
+    BOOST_REQUIRE(deleteResponse);
+    BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k200OK);
+
+    // 4. Verify Deletion (GET should not return the deleted blocks)
+    auto verifyReq = HttpRequest::newHttpRequest();
+    verifyReq->setMethod(drogon::Get);
+    verifyReq->setPath("/api/schedule");
+    verifyReq->setParameter("start_time", scheduler::utils::toIso8601(tomorrow));
+    verifyReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
+
+    auto verifyRespPair = client->sendRequest(verifyReq);
+    BOOST_REQUIRE_EQUAL(verifyRespPair.first, ReqResult::Ok);
+    auto verifyResponse = verifyRespPair.second;
+    BOOST_REQUIRE(verifyResponse);
+
+    auto verifyJson = verifyResponse->getJsonObject();
+    BOOST_REQUIRE(verifyJson);
+    BOOST_CHECK(verifyJson->isArray());
+    // Should be empty now (assuming clean DB state at start and no other jobs)
+    BOOST_CHECK_EQUAL(verifyJson->size(), 0);
 }
 
 BOOST_AUTO_TEST_CASE(test_invalid_request) {
@@ -154,6 +171,34 @@ BOOST_AUTO_TEST_CASE(test_invalid_request) {
     // Should return 422 Unprocessable Entity or 400 Bad Request
     // The exception handler maps ValidationException to 422
     BOOST_CHECK_EQUAL(response->getStatusCode(), k422UnprocessableEntity);
+}
+
+BOOST_AUTO_TEST_CASE(test_delete_non_existent) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto deleteReq = HttpRequest::newHttpRequest();
+    deleteReq->setMethod(drogon::Delete);
+    deleteReq->setPath("/api/schedule/sched-99999999"); // Non-existent ID
+
+    auto deleteRespPair = client->sendRequest(deleteReq);
+    BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
+    auto deleteResponse = deleteRespPair.second;
+    BOOST_REQUIRE(deleteResponse);
+    // Should be 200 OK (idempotent)
+    BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k200OK);
+}
+
+BOOST_AUTO_TEST_CASE(test_delete_invalid_id) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto deleteReq = HttpRequest::newHttpRequest();
+    deleteReq->setMethod(drogon::Delete);
+    deleteReq->setPath("/api/schedule/invalidid"); // Invalid format (no dash)
+
+    auto deleteRespPair = client->sendRequest(deleteReq);
+    BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
+    auto deleteResponse = deleteRespPair.second;
+    BOOST_REQUIRE(deleteResponse);
+    // Should be 422 Unprocessable Entity (ValidationException)
+    BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k422UnprocessableEntity);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

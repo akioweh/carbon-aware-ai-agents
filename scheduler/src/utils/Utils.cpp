@@ -1,4 +1,5 @@
 #include "Utils.hpp"
+#include "exceptions/ValidationException.hpp"
 #include <expected>
 #include <sstream>
 
@@ -93,8 +94,14 @@ auto makeGetRequest(const string &host, const string &path)
 
 auto parseStringIDtoInt(const std::string &jobId) -> int {
     auto pos = jobId.find('-');
-    int value;
-    std::from_chars(jobId.data() + pos + 1, jobId.data() + jobId.size(), value);
+    if (pos == std::string::npos) {
+        throw exceptions::ValidationException("Invalid ID format: missing prefix separator");
+    }
+    int value = 0;
+    auto res = std::from_chars(jobId.data() + pos + 1, jobId.data() + jobId.size(), value);
+    if (res.ec != std::errc()) {
+        throw exceptions::ValidationException("Invalid ID format: invalid number");
+    }
     return value;
 }
 
