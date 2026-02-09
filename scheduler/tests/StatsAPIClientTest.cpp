@@ -7,7 +7,7 @@
 
 using namespace scheduler;
 
-// NOTE: All tests assume the stats API is running on localhost:5000
+// NOTE: All tests assume the stats API is running on 140.238.79.139:5000
 
 // =============================================================================
 // Test Suite: getLocations
@@ -516,7 +516,7 @@ BOOST_AUTO_TEST_CASE(accepts_custom_host) {
 }
 
 BOOST_AUTO_TEST_CASE(default_host_works) {
-    // Verify default host (localhost:5000) works
+    // Verify default host (140.238.79.139:5000) works
     auto locations =
         run_coro_in_drogon<std::vector<Location>>([]() -> drogon::Task<std::vector<Location>> {
             auto client = std::make_shared<StatsAPIClient>();

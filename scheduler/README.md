@@ -420,7 +420,7 @@ to construct API DTOs with stable identifiers.
 
 The stats API client fetches load forecasts, greenness forecasts, and location
 metadata from the external Stats component (a Python FastAPI service at
-`http://127.0.0.1:5000`).
+`http://140.238.79.139:5000`).
 
 It produces `Datacenter` structs (a denormalized view combining load, greenness,
 and capacity data per location) which the scheduler consumes directly. Load and
