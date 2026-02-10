@@ -1,7 +1,9 @@
 #include "Utils.hpp"
 #include "exceptions/ValidationException.hpp"
 #include <expected>
+#include <array>
 #include <sstream>
+#include <string_view>
 
 namespace scheduler::utils {
 using namespace std;
@@ -22,6 +24,13 @@ auto parseIso8601(const string &timestamp) -> expected<SysTime, string> {
 
     chrono::sys_seconds res;
     istringstream iss(timestamp);
+
+    constexpr auto formats = array{
+        "%FT%TZ"sv,
+        "%FT%T%Ez"sv,
+        "%FT%T%z"sv,
+        "%FT%T"sv,
+    };
 
     // with literal Z
     if (iss >> chrono::parse("%FT%TZ", res))
@@ -95,12 +104,15 @@ auto makeGetRequest(const string &host, const string &path)
 auto parseStringIDtoInt(const std::string &jobId) -> int {
     auto pos = jobId.find('-');
     if (pos == std::string::npos) {
-        throw exceptions::ValidationException("Invalid ID format: missing prefix separator");
+        throw exceptions::ValidationException(
+            "Invalid ID format: missing prefix separator");
     }
     int value = 0;
-    auto res = std::from_chars(jobId.data() + pos + 1, jobId.data() + jobId.size(), value);
+    auto res = std::from_chars(jobId.data() + pos + 1,
+                               jobId.data() + jobId.size(), value);
     if (res.ec != std::errc()) {
-        throw exceptions::ValidationException("Invalid ID format: invalid number");
+        throw exceptions::ValidationException(
+            "Invalid ID format: invalid number");
     }
     return value;
 }

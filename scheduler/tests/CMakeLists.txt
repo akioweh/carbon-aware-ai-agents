@@ -10,6 +10,10 @@ add_executable(scheduler_algo_test SchedulerAlgoTest.cpp)
 target_link_libraries(scheduler_algo_test PRIVATE scheduler_core Boost::unit_test_framework)
 add_test(NAME scheduler_algo_test COMMAND scheduler_algo_test)
 
+add_executable(controller_deserialization_test ControllerDeserializationTest.cpp)
+target_link_libraries(controller_deserialization_test PRIVATE scheduler_core Boost::unit_test_framework)
+add_test(NAME controller_deserialization_test COMMAND controller_deserialization_test)
+
 # Integration test with Mock Calendar
 # We cannot link scheduler_core because we want to replace Calendar.cpp
 # So we glob sources from src/ and exclude Calendar.cpp

@@ -14,6 +14,8 @@ namespace scheduler {
 struct JobIdentifierParam {
     std::string jobId;
 
+    JobIdentifierParam() = default;
+
     explicit JobIdentifierParam(const std::string &jobId) {
         if (jobId.empty())
             throw exceptions::ValidationException("job_id cannot be empty");
