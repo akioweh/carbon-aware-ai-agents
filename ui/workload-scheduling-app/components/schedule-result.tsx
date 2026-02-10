@@ -105,6 +105,15 @@ function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newJobId
   return intervals
 }
 
+// Align a Date to interval boundaries (ms)
+function floorToInterval(d: Date, ms: number) {
+  return new Date(Math.floor(d.getTime() / ms) * ms)
+}
+
+function ceilToInterval(d: Date, ms: number) {
+  return new Date(Math.ceil(d.getTime() / ms) * ms)
+}
+
 export function ScheduleResult({ result, earliestStart, latestFinish, onBack, onCancel }: ScheduleResultProps) {
   const [selectedDC, setSelectedDC] = useState(DATA_CENTERS[0].id)
   const [workloadData, setWorkloadData] = useState<WorkloadInterval[]>([])
@@ -159,9 +168,15 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
     const { start, end } = getTimeRange()
 
     try {
-      // Fetch all scheduled blocks in the time range
+      // Align requested window to 5-minute boundaries so backend (which filters by block start)
+      // returns the neighboring blocks even if the UI time range begins at an off-boundary.
+      const intervalMs = 5 * 60 * 1000
+      const fetchStart = floorToInterval(start, intervalMs)
+      const fetchEnd = ceilToInterval(end, intervalMs)
+
+      // Fetch all scheduled blocks in the time range (aligned to 5-min)
       const res = await fetch(
-        `/api/schedule?start_time=${start.toISOString()}&end_time=${end.toISOString()}`
+        `/api/schedule?start_time=${fetchStart.toISOString()}&end_time=${fetchEnd.toISOString()}`
       )
 
       if (!res.ok) {
