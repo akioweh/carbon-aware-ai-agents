@@ -28,6 +28,14 @@ auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
     co_return resp;
 }
 
+auto ScheduleController::getSpecificSchedule(
+    HttpRequestPtr /*req*/, const JobIdentifierParam job_id) const
+    -> Task<HttpResponsePtr> {
+    const auto res = co_await calendar::get(job_id.jobId);
+    const auto resp = HttpResponse::newHttpJsonResponse(toJson(res));
+    co_return resp;
+}
+
 auto ScheduleController::deleteSchedule(HttpRequestPtr /*req*/,
                                         const JobIdentifierParam job_id) const
     -> Task<HttpResponsePtr> {
