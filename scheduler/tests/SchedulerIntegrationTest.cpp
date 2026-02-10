@@ -128,7 +128,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     auto verifyReq = HttpRequest::newHttpRequest();
     verifyReq->setMethod(drogon::Get);
     verifyReq->setPath("/api/schedule");
-    verifyReq->setParameter("start_time", scheduler::utils::toIso8601(tomorrow));
+    verifyReq->setParameter("start_time",
+                            scheduler::utils::toIso8601(tomorrow));
     verifyReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
 
     auto verifyRespPair = client->sendRequest(verifyReq);
@@ -199,6 +200,88 @@ BOOST_AUTO_TEST_CASE(test_delete_invalid_id) {
     BOOST_REQUIRE(deleteResponse);
     // Should be 422 Unprocessable Entity (ValidationException)
     BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k422UnprocessableEntity);
+}
+
+BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    // Helper to create a job
+    auto createJob = [&](const std::string &type) -> std::string {
+        Json::Value job;
+        job["job_type"] = type;
+        job["workload_amount"] = 30.0;
+        auto now = std::chrono::system_clock::now();
+        auto start = now + std::chrono::hours(24);
+        auto end = start + std::chrono::hours(24);
+        job["earliest_start"] = scheduler::utils::toIso8601(start);
+        job["latest_finish"] = scheduler::utils::toIso8601(end);
+
+        auto req = HttpRequest::newHttpJsonRequest(job);
+        req->setMethod(drogon::Post);
+        req->setPath("/api/schedule");
+
+        auto respPair = client->sendRequest(req);
+        BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+        auto response = respPair.second;
+        BOOST_REQUIRE(response);
+        BOOST_REQUIRE_EQUAL(response->getStatusCode(), k200OK);
+
+        auto json = response->getJsonObject();
+        return (*json)["schedule_id"].asString();
+    };
+
+    // 1. Create two jobs
+    std::string id1 = createJob("batch");
+    std::string id2 = createJob("inference");
+
+    BOOST_TEST_MESSAGE("Created jobs: " << id1 << ", " << id2);
+
+    // 2. List Jobs (GET /api/schedule/jobs)
+    auto listReq = HttpRequest::newHttpRequest();
+    listReq->setMethod(drogon::Get);
+    listReq->setPath("/api/schedule/jobs");
+
+    auto listRespPair = client->sendRequest(listReq);
+    BOOST_REQUIRE_EQUAL(listRespPair.first, ReqResult::Ok);
+    auto listResponse = listRespPair.second;
+    BOOST_REQUIRE(listResponse);
+    BOOST_CHECK_EQUAL(listResponse->getStatusCode(), k200OK);
+
+    auto listJson = listResponse->getJsonObject();
+    BOOST_REQUIRE(listJson);
+    BOOST_CHECK(listJson->isArray());
+    BOOST_TEST_MESSAGE("List Jobs Response: " << listJson->toStyledString());
+
+    // Verify both IDs are present
+    bool found1 = false;
+    bool found2 = false;
+    for (const auto &id : *listJson) {
+        if (id.asString() == id1)
+            found1 = true;
+        if (id.asString() == id2)
+            found2 = true;
+    }
+    BOOST_CHECK(found1);
+    BOOST_CHECK(found2);
+
+    // 3. Get Specific Job (GET /api/schedule/{id})
+    auto getReq = HttpRequest::newHttpRequest();
+    getReq->setMethod(drogon::Get);
+    getReq->setPath("/api/schedule/" + id1);
+
+    auto getRespPair = client->sendRequest(getReq);
+    BOOST_REQUIRE_EQUAL(getRespPair.first, ReqResult::Ok);
+    auto getResponse = getRespPair.second;
+    BOOST_REQUIRE(getResponse);
+    BOOST_CHECK_EQUAL(getResponse->getStatusCode(), k200OK);
+
+    auto getJson = getResponse->getJsonObject();
+    BOOST_REQUIRE(getJson);
+    BOOST_CHECK((*getJson).isMember("schedule_id"));
+    BOOST_CHECK_EQUAL((*getJson)["schedule_id"].asString(), id1);
+    BOOST_CHECK((*getJson).isMember("schedule"));
+    BOOST_CHECK((*getJson)["schedule"].isArray());
+    BOOST_CHECK((*getJson).isMember("impact"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

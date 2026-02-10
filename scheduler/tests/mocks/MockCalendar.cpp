@@ -71,4 +71,14 @@ auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
     co_return;
 }
 
+auto listJobs() -> drogon::Task<std::vector<std::string>> {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    std::vector<std::string> ids;
+    ids.reserve(g_storage.size());
+    for (const auto &[id, _] : g_storage) {
+        ids.push_back(id);
+    }
+    co_return ids;
+}
+
 } // namespace scheduler::calendar
