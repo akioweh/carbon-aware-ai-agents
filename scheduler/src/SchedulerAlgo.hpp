@@ -135,7 +135,7 @@ inline auto calc_single(const std::vector<double> &load_f,
         swap(row, prev_row);
         ranges::fill(row, array{inf, inf});
         const auto cost_func = cost[i - 1];
-        const auto max_wi = capacity[i - 1] - load[i - 1];
+        const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
         const auto base_cost = cost_func(load[i - 1]);
         for (const auto w_prev : views::iota(0, tot_work + 1)) {
             const auto &prev = prev_row[w_prev];
