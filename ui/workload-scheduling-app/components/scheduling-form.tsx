@@ -43,11 +43,11 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
     e.preventDefault()
     setIsSubmitting(true)
 
-    const jobRequest = { 
-      job_type: jobType, 
-      workload_amount: Number.parseFloat(workload), 
-      earliest_start: new Date(earliestStart).toISOString(), 
-      latest_finish: new Date(latestFinish).toISOString(), 
+    const jobRequest = {
+      job_type: jobType,
+      workload_amount: Number.parseFloat(workload),
+      earliest_start: new Date(earliestStart).toISOString(),
+      latest_finish: new Date(latestFinish).toISOString(),
     }
 
     console.log("[v0] Submitting job request:", jobRequest)
@@ -88,9 +88,9 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
         </CardTitle>
         <CardDescription>Configure your computational workload and scheduling preferences</CardDescription>
         {onViewCalendar && (
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={onViewCalendar}
             className="mt-2 gap-2 bg-transparent"
           >
@@ -192,7 +192,7 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
             {/* Latest Finish */}
             <div className="space-y-2">
               <Label htmlFor="latest-finish" className="text-sm font-medium flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5" />
+                <Clock className="h-3.5 w-3.5" />
                 Latest Finish
               </Label>
               <Input
