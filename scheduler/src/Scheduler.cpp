@@ -4,6 +4,8 @@
 #include "StatsAPIClient.hpp"
 #include "structs/JobRequest.hpp"
 #include "utils/Coro.hpp"
+#include "utils/TimeGridder.hpp"
+#include <chrono>
 #include <vector>
 
 using namespace std;
@@ -11,34 +13,53 @@ using namespace drogon;
 using namespace scheduler;
 using namespace scheduler::exceptions;
 
+using FiveMinutes =
+    std::chrono::duration<int, ratio<300>>; // 5 minutes in seconds
+
+constexpr auto time_gridder = scheduler::utils::TimeGridder<FiveMinutes>{};
+
 auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     // JobRequest deserialization validates these, but just in case
     assert(job.workload_amount >= 0.);
     assert(job.earliest_start <= job.latest_finish);
 
-    const auto time_window_start =
-        max(std::chrono::system_clock::now(), job.earliest_start);
-    const auto time_window_end = job.latest_finish;
+    // GLOBAL index (since epoch) of earliest_start
+    const auto time_index_offset = time_gridder.toIndex(job.earliest_start);
 
-    if (time_window_end <= time_window_start)
+    // LOCAL index (to be used in dp): index(time) - time_index_offset
+    const auto time_to_index =
+        [&](const decltype(time_gridder)::time_point_t &tp) -> long long {
+        return time_gridder.toIndex(tp) - time_index_offset;
+    };
+    const auto index_to_time =
+        [&](const long long i) -> decltype(time_gridder)::time_point_t {
+        return time_gridder.toTimePoint(i + time_index_offset);
+    };
+
+    assert(time_to_index(job.earliest_start) == 0);
+    // index of end time is the number of intervals since start time is index 0
+    // we round up (inclusive-exclusive type indexing)
+    const auto n_intervals =
+        time_gridder.toIndexCeil(job.latest_finish) - time_index_offset;
+    if (n_intervals < 0)
         throw SchedulingException(
-            "Effective scheduling window is empty: latest_finish is in "
-            "the past or too close to the current time");
-
-    const auto total_minutes = chrono::duration_cast<chrono::minutes>(
-                                   time_window_end - time_window_start)
-                                   .count();
-    const auto n_intervals = total_minutes / 5; // 5 minute intervals
-
-    if (n_intervals <= 0)
-        throw SchedulingException(
-            "Scheduling window too narrow: must span at least one "
-            "5-minute interval");
+            "Invalid time window: latest_finish must be after earliest_start");
+    if (n_intervals == 0)
+        throw SchedulingException("Invalid time window: latest_finish is too "
+                                  "close to earliest_start.");
+    // real time points aligned to time grid
+    // "start" rounds down; "end" rounds up
+    const auto time_start = index_to_time(0);
+    const auto time_end = index_to_time(n_intervals);
+    // sanity check time gridder math
+    assert(time_start <= job.earliest_start);
+    assert(time_end >= job.latest_finish);
+    assert(index_to_time(1) > job.earliest_start);
+    assert(index_to_time(n_intervals - 1) < job.latest_finish);
 
     // fetch data
     const auto [locations, existing_schedule] = co_await coro::when_all(
-        stats_api.getAllDatacenters(),
-        calendar::get(time_window_start, time_window_end));
+        stats_api.getAllDatacenters(), calendar::get(time_start, time_end));
     const auto n_locations = locations.size();
 
     // transform data into format for optimizer
@@ -65,13 +86,10 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
         auto greenness = vector(n_intervals, 1.);
         const auto &data = loc.timeSeries;
         for (const auto &tp : data) {
-            if (tp.timestamp < time_window_start ||
-                tp.timestamp >= time_window_end)
+            // TODO: have stats api returns exactly the window we need
+            if (tp.timestamp < time_start || tp.timestamp >= time_end)
                 continue;
-            const auto index = chrono::duration_cast<chrono::minutes>(
-                                   tp.timestamp - time_window_start)
-                                   .count() /
-                               5;
+            const auto index = time_to_index(tp.timestamp);
             load[index] = tp.predictedLoad;
             greenness[index] = tp.predictedGreenness;
         }
@@ -81,16 +99,12 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     }
     // add loads from existing schedule
     for (const auto &block : existing_schedule) {
-        assert(block.timestamp >= time_window_start &&
-               block.timestamp < time_window_end);
+        assert(block.timestamp >= time_start && block.timestamp < time_end);
         auto loc_it = ranges::find(location_ids, block.location);
         if (loc_it == location_ids.end())
             continue;
         const auto loc_index = distance(location_ids.begin(), loc_it);
-        const auto time_index = chrono::duration_cast<chrono::minutes>(
-                                    block.timestamp - time_window_start)
-                                    .count() /
-                                5;
+        const auto time_index = time_to_index(block.timestamp);
         loads_f[loc_index][time_index] += block.additionalLoad;
     }
     auto penalties_f =
@@ -120,7 +134,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
             if (load < 1e-6) // filter out negligible loads
                 continue;
             blocks.push_back({
-                .timestamp = time_window_start + chrono::minutes(j * 5),
+                .timestamp = index_to_time(j),
                 .location = loc_id,
                 .additionalLoad = load,
             });

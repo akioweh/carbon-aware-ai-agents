@@ -14,10 +14,12 @@ namespace scheduler {
  * @brief Scheduler input parameters as per API definition.
  */
 struct JobRequest {
+    using time_t = std::chrono::sys_time<std::chrono::minutes>;
+
     std::string job_type;
     double workload_amount;
-    std::chrono::system_clock::time_point earliest_start;
-    std::chrono::system_clock::time_point latest_finish;
+    time_t earliest_start;
+    time_t latest_finish;
 };
 } // namespace scheduler
 

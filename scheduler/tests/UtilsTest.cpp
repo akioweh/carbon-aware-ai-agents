@@ -75,11 +75,10 @@ BOOST_AUTO_TEST_CASE(parse_invalid_date) {
 
 BOOST_AUTO_TEST_CASE(round_trip) {
     auto now = std::chrono::system_clock::now();
-    // Round down to seconds because toIso8601 drops sub-seconds
     auto now_sec = std::chrono::floor<std::chrono::seconds>(now);
 
     auto str = toIso8601(now_sec);
-    auto res = parseIso8601(str);
+    auto res = parseIso8601<decltype(now_sec)>(str);
 
     BOOST_CHECK(res.has_value());
     BOOST_CHECK(res.value() == now_sec);

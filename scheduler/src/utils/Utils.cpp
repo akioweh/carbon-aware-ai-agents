@@ -1,63 +1,9 @@
 #include "Utils.hpp"
 #include "exceptions/ValidationException.hpp"
-#include <array>
-#include <expected>
-#include <sstream>
-#include <string_view>
 
 namespace scheduler::utils {
 using namespace std;
 using namespace drogon;
-
-using SysTime = chrono::system_clock::time_point;
-
-auto toIso8601(const SysTime &timePoint) -> string {
-    // remove sub-second precision
-    auto tp_sec = chrono::floor<chrono::seconds>(timePoint);
-    // %F = YYYY-MM-DD
-    // %T = HH:MM:SS
-    // Z  = Literal Z suffix
-    return format("{:%FT%TZ}", tp_sec);
-}
-
-auto parseIso8601(const string &timestamp) -> expected<SysTime, string> {
-
-    constexpr auto formats = array{
-        "%FT%TZ"sv,   // with literal Z
-        "%FT%T%Ez"sv, // with explicit +hhmm offset
-        "%FT%T%z"sv,  // with explicit +hh:mm offset
-        "%FT%T"sv,    // no offset, assume UTC
-        "%c"sv,       "%Ec"sv,
-    };
-
-    chrono::sys_time<chrono::nanoseconds> res;
-    istringstream iss(timestamp);
-
-    for (const auto &fmt : formats) {
-        iss.clear();
-        iss.str(timestamp);
-        if (iss >> chrono::parse(string(fmt), res))
-            return static_cast<SysTime>(res);
-    }
-
-    return unexpected("Failed to parse ISO8601 string: " + timestamp);
-}
-
-auto trantorToChrono(const trantor::Date &tDate)
-    -> std::chrono::system_clock::time_point {
-    auto microseconds =
-        std::chrono::microseconds(tDate.microSecondsSinceEpoch());
-    return std::chrono::system_clock::time_point(microseconds);
-}
-
-auto chronoToTrantor(const std::chrono::system_clock::time_point &timestamp)
-    -> trantor::Date {
-    auto micro_since_epoch =
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            timestamp.time_since_epoch())
-            .count();
-    return trantor::Date(micro_since_epoch);
-}
 
 auto makeGetRequest(const string &host, const string &path)
     -> Task<shared_ptr<Json::Value>> {
