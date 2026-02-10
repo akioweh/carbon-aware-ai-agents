@@ -58,6 +58,9 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
     if (!latest_finish_opt)
         throw scheduler::exceptions::ValidationException(
             "Invalid latest_finish time format: " + latest_finish_opt.error());
+    if (latest_finish_opt.value() < earliest_start_opt.value())
+        throw scheduler::exceptions::ValidationException(
+            "latest_finish must be after earliest_start");
     try {
         const auto workload_amount = json["workload_amount"].asDouble();
         if (workload_amount < 0.)
