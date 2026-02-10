@@ -23,22 +23,21 @@ auto toIso8601(const SysTime &timePoint) -> string {
 auto parseIso8601(const string &timestamp) -> expected<SysTime, string> {
 
     constexpr auto formats = array{
-        "%FT%H:%M:%6SZ"sv,   // with literal Z
-        "%FT%H:%M:%6S%Ez"sv, // with explicit +hhmm offset
-        "%FT%H:%M:%6S%z"sv,  // with explicit +hh:mm offset
-        "%FT%H:%M:%6S"sv,    // no offset, assume UTC
-        "%c"sv,
-        "%Ec"sv,
+        "%FT%TZ"sv,   // with literal Z
+        "%FT%T%Ez"sv, // with explicit +hhmm offset
+        "%FT%T%z"sv,  // with explicit +hh:mm offset
+        "%FT%T"sv,    // no offset, assume UTC
+        "%c"sv,       "%Ec"sv,
     };
 
-    chrono::sys_seconds res;
+    chrono::sys_time<chrono::nanoseconds> res;
     istringstream iss(timestamp);
 
     for (const auto &fmt : formats) {
         iss.clear();
         iss.str(timestamp);
         if (iss >> chrono::parse(string(fmt), res))
-            return res;
+            return static_cast<SysTime>(res);
     }
 
     return unexpected("Failed to parse ISO8601 string: " + timestamp);
