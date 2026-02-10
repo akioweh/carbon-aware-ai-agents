@@ -2,6 +2,7 @@
 #define SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #pragma once
 
+#include "structs/JobIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/TimeIntervalParams.hpp"
 #include <drogon/HttpController.h>
@@ -30,7 +31,7 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
         -> drogon::Task<drogon::HttpResponsePtr>;
 
     [[nodiscard]] auto deleteSchedule(drogon::HttpRequestPtr,
-                                      std::string job_id) const
+                                      JobIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
 

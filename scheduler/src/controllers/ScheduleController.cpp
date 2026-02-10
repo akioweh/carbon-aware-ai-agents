@@ -1,6 +1,7 @@
 #include "controllers/ScheduleController.hpp"
 #include "Calendar.hpp"
 #include "SchedulingQueue.hpp"
+#include "structs/JobIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleBlock.hpp"
 #include "structs/TimeIntervalParams.hpp"
@@ -28,9 +29,9 @@ auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
 }
 
 auto ScheduleController::deleteSchedule(HttpRequestPtr /*req*/,
-                                        std::string job_id) const
+                                        const JobIdentifierParam job_id) const
     -> Task<HttpResponsePtr> {
-    co_await calendar::deleteSchedule(job_id);
+    co_await calendar::deleteSchedule(job_id.jobId);
     co_return HttpResponse::newHttpResponse();
 }
 
