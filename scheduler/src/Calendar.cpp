@@ -81,6 +81,17 @@ auto get(time_point start, time_point end)
         jobTimestampInsideTimeIntervalCriteria(start, end)));
 }
 
+auto listJobs() -> drogon::Task<std::vector<std::string>> {
+    auto context = getContext();
+    auto res = co_await context.impactMapper.findAll();
+    std::vector<std::string> jobIds;
+    jobIds.reserve(res.size());
+    for (const auto &item : res)
+        jobIds.push_back(
+            scheduler::utils::parseIntToStringID(item.getValueOfId()));
+    co_return jobIds;
+}
+
 auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
     auto context = getContext();
     co_await context.impactMapper.deleteByPrimaryKey(

@@ -22,6 +22,8 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                   drogon::Delete);
     ADD_METHOD_TO(ScheduleController::getSpecificSchedule,
                   "/api/schedule/{job_id}", drogon::Get);
+    ADD_METHOD_TO(ScheduleController::getScheduledJobs, "/api/schedule/jobs",
+                  drogon::Get);
     METHOD_LIST_END
 
     [[nodiscard]] auto calculateSchedule(drogon::HttpRequestPtr,
@@ -37,6 +39,8 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
         -> drogon::Task<drogon::HttpResponsePtr>;
     [[nodiscard]] auto getSpecificSchedule(drogon::HttpRequestPtr,
                                            JobIdentifierParam) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
+    [[nodiscard]] auto getScheduledJobs(drogon::HttpRequestPtr) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
 

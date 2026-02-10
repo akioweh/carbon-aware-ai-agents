@@ -27,6 +27,8 @@ auto get(time_point start = time_point::min(),
 
 auto deleteSchedule(const std::string &jobId) -> drogon::Task<>;
 
+auto listJobs() -> drogon::Task<std::vector<std::string>>;
+
 }; // namespace scheduler::calendar
 
 #endif // SCHEDULER_CALENDAR_HPP
