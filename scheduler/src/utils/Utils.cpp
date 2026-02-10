@@ -1,7 +1,7 @@
 #include "Utils.hpp"
 #include "exceptions/ValidationException.hpp"
-#include <expected>
 #include <array>
+#include <expected>
 #include <sstream>
 #include <string_view>
 
@@ -22,34 +22,24 @@ auto toIso8601(const SysTime &timePoint) -> string {
 
 auto parseIso8601(const string &timestamp) -> expected<SysTime, string> {
 
+    constexpr auto formats = array{
+        "%FT%H:%M:%6SZ"sv,   // with literal Z
+        "%FT%H:%M:%6S%Ez"sv, // with explicit +hhmm offset
+        "%FT%H:%M:%6S%z"sv,  // with explicit +hh:mm offset
+        "%FT%H:%M:%6S"sv,    // no offset, assume UTC
+        "%c"sv,
+        "%Ec"sv,
+    };
+
     chrono::sys_seconds res;
     istringstream iss(timestamp);
 
-    constexpr auto formats = array{
-        "%FT%TZ"sv,
-        "%FT%T%Ez"sv,
-        "%FT%T%z"sv,
-        "%FT%T"sv,
-    };
-
-    // with literal Z
-    if (iss >> chrono::parse("%FT%TZ", res))
-        return res;
-    // explicit +hhmm offset
-    iss.clear();
-    iss.str(timestamp);
-    if (iss >> chrono::parse("%FT%T%Ez", res))
-        return res;
-    // explicit +hh:mm offset
-    iss.clear();
-    iss.str(timestamp);
-    if (iss >> chrono::parse("%FT%T%z", res))
-        return res;
-    // no offset, assume UTC
-    iss.clear();
-    iss.str(timestamp);
-    if (iss >> chrono::parse("%FT%T", res))
-        return res;
+    for (const auto &fmt : formats) {
+        iss.clear();
+        iss.str(timestamp);
+        if (iss >> chrono::parse(string(fmt), res))
+            return res;
+    }
 
     return unexpected("Failed to parse ISO8601 string: " + timestamp);
 }
