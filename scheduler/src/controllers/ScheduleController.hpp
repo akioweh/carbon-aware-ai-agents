@@ -3,6 +3,7 @@
 #pragma once
 
 #include <Scheduler.hpp>
+#include <SchedulingQueue.hpp>
 #include <drogon/HttpController.h>
 #include <drogon/utils/coroutine.h>
 
