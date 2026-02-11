@@ -1,13 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, X, Loader2 } from "lucide-react"
-import { format } from "date-fns"
 
 interface ScheduleBlock {
   timestamp: string
@@ -16,9 +13,9 @@ interface ScheduleBlock {
   additional_load: number
 }
 
-interface WorkloadInterval {
-  time: string
-  existing: number
+interface AggregatedInterval {
+  time: Date
+  endTime: Date
   jobs: { job_id: string; load: number }[]
 }
 
@@ -35,101 +32,108 @@ const DATA_CENTERS = [
   { id: "dc5", name: "Data Centre 5", location: "sa-east-1" },
 ]
 
-// Mock data generator removed — component now relies solely on the `/api/schedule` endpoint for schedule blocks
-// (If you later want a local fallback for offline dev, we can add an explicit mock path or feature flag.)
+const BLOCK_DURATION_MS = 5 * 60 * 1000
+
+// Choose interval aggregation and bar width based on total time span
+function getDisplayParams(spanMs: number) {
+  const spanDays = spanMs / (1000 * 60 * 60 * 24)
+
+  const tiers = [
+    { maxDays: 1.5,      intervalMin: 5,   barWidth: 4 },
+    { maxDays: 3,        intervalMin: 5,   barWidth: 3 },
+    { maxDays: 7,        intervalMin: 15,  barWidth: 3 },
+    { maxDays: 14,       intervalMin: 30,  barWidth: 3 },
+    { maxDays: 30,       intervalMin: 60,  barWidth: 3 },
+    { maxDays: 60,       intervalMin: 120, barWidth: 2 },
+    { maxDays: Infinity, intervalMin: 360, barWidth: 2 },
+  ]
+
+  const tier = tiers.find(t => spanDays <= t.maxDays) || tiers[tiers.length - 1]
+
+  return {
+    intervalMs: tier.intervalMin * 60 * 1000,
+    barWidth: tier.barWidth,
+    gap: 1,
+  }
+}
 
 export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [selectedDC, setSelectedDC] = useState(DATA_CENTERS[0].id)
-  const [workloadData, setWorkloadData] = useState<WorkloadInterval[]>([])
+  const [blocks, setBlocks] = useState<ScheduleBlock[]>([])
   const [loading, setLoading] = useState(false)
-  const [calendarOpen, setCalendarOpen] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Fetch workload data when date or data center changes
+  // Fetch all blocks for this schedule once
   useEffect(() => {
     const fetchData = async () => {
       if (!scheduleId) {
-        setWorkloadData([])
+        setBlocks([])
         return
       }
-
       setLoading(true)
-
       try {
         const response = await fetch(`/api/schedule/${scheduleId}`)
-
         if (!response.ok) {
-          console.error("[calendar] API call failed:", response.status, await response.text())
-          setWorkloadData([])
+          setBlocks([])
           return
         }
-
         const data = await response.json()
-
-        // GET /api/schedule/{schedule_id} returns a ScheduleCreationResponse
-        // with a scheduled_blocks array (per openapi.yaml)
-        const blocks: ScheduleBlock[] = Array.isArray(data.scheduled_blocks) ? data.scheduled_blocks : []
-
-        console.log("[calendar] Fetched schedule blocks:", blocks)
-
-        // Process blocks into intervals with real data
-        const intervals = processScheduleBlocks(selectedDate, selectedDC, blocks)
-        setWorkloadData(intervals)
-      } catch (error) {
-        console.log("[calendar] Error fetching schedule:", error)
-        setWorkloadData([])
+        setBlocks(Array.isArray(data.scheduled_blocks) ? data.scheduled_blocks : [])
+      } catch {
+        setBlocks([])
       } finally {
         setLoading(false)
       }
     }
-
     fetchData()
-  }, [selectedDate, selectedDC, scheduleId])
+  }, [scheduleId])
 
-  // Process schedule blocks into interval data structure using real API schedule blocks
-  function processScheduleBlocks(
-    date: Date,
-    dcId: string,
-    blocks: ScheduleBlock[]
-  ): WorkloadInterval[] {
-    const intervals: WorkloadInterval[] = []
-    const dcIndex = parseInt(dcId.slice(-1)) - 1
-    const dcLocation = DATA_CENTERS[dcIndex]?.location
-
-    if (!dcLocation) {
-      console.warn("Unknown data centre id:", dcId)
-      return intervals
+  // Derive time range, display params, and aggregated intervals
+  const { intervals, rangeStart, rangeEnd, displayParams } = useMemo(() => {
+    if (blocks.length === 0) {
+      return {
+        intervals: [] as AggregatedInterval[],
+        rangeStart: new Date(),
+        rangeEnd: new Date(),
+        displayParams: getDisplayParams(0),
+      }
     }
 
-    // Create intervals for the entire day (288 x 5-minute intervals)
-    const totalIntervals = 288
-    const intervalMs = 5 * 60 * 1000
+    // Time range from ALL blocks (consistent across DC tabs)
+    const allTimestamps = blocks.map(b => new Date(b.timestamp).getTime())
+    const minTime = Math.min(...allTimestamps)
+    const maxTime = Math.max(...allTimestamps) + BLOCK_DURATION_MS
 
-    for (let i = 0; i < totalIntervals; i++) {
-      const currentTime = new Date(date)
-      currentTime.setHours(0, 0, 0, 0)
-      currentTime.setMinutes(i * 5)
+    // Pad to hour boundaries for a clean axis
+    const rangeStart = new Date(minTime)
+    rangeStart.setMinutes(0, 0, 0)
+    const rangeEnd = new Date(maxTime)
+    if (rangeEnd.getMinutes() > 0 || rangeEnd.getSeconds() > 0) {
+      rangeEnd.setMinutes(0, 0, 0)
+      rangeEnd.setHours(rangeEnd.getHours() + 1)
+    }
 
-      const currentTimeEnd = new Date(currentTime.getTime() + intervalMs)
+    const spanMs = rangeEnd.getTime() - rangeStart.getTime()
+    const dp = getDisplayParams(spanMs)
 
+    // Filter blocks for the selected DC
+    const dcLocation = DATA_CENTERS.find(dc => dc.id === selectedDC)?.location
+    const dcBlocks = dcLocation ? blocks.filter(b => b.location === dcLocation) : []
+
+    // Build aggregated intervals
+    const intervals: AggregatedInterval[] = []
+    for (let t = rangeStart.getTime(); t < rangeEnd.getTime(); t += dp.intervalMs) {
+      const intervalEnd = t + dp.intervalMs
       const activeJobs: { job_id: string; load: number }[] = []
 
-      for (const block of blocks) {
-        // Basic validation to avoid runtime errors
-        if (!block || !block.timestamp || !block.location || typeof block.additional_load !== "number" || !block.job_id) continue
-
-        // Only consider blocks for this datacenter
-        if (block.location !== dcLocation) continue
-
-        const blockTime = new Date(block.timestamp)
-        const blockEndTime = new Date(blockTime.getTime() + intervalMs)
-
-        // If block overlaps the interval, accumulate its additional_load for that job
-        if (blockTime < currentTimeEnd && blockEndTime > currentTime) {
-          const existingJob = activeJobs.find(j => j.job_id === block.job_id)
-          if (existingJob) {
-            existingJob.load += block.additional_load
+      for (const block of dcBlocks) {
+        if (!block.timestamp || typeof block.additional_load !== "number") continue
+        const blockStart = new Date(block.timestamp).getTime()
+        const blockEnd = blockStart + BLOCK_DURATION_MS
+        if (blockStart < intervalEnd && blockEnd > t) {
+          const existing = activeJobs.find(j => j.job_id === block.job_id)
+          if (existing) {
+            existing.load += block.additional_load
           } else {
             activeJobs.push({ job_id: block.job_id, load: block.additional_load })
           }
@@ -137,26 +141,71 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       }
 
       intervals.push({
-        time: currentTime.toISOString(),
-        existing: 0, // baseline 'existing' not provided by API; treat as 0 kWh
+        time: new Date(t),
+        endTime: new Date(intervalEnd),
         jobs: activeJobs,
       })
     }
 
-    return intervals
-  }
-
-  const formatTime = (isoString: string) => {
-    return new Date(isoString).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
+    return { intervals, rangeStart, rangeEnd, displayParams: dp }
+  }, [blocks, selectedDC])
 
   const maxValue = Math.max(
-    ...workloadData.map(d => d.existing + d.jobs.reduce((sum, j) => sum + j.load, 0)),
-    1
+    ...intervals.map(d => d.jobs.reduce((sum, j) => sum + j.load, 0)),
+    1,
   )
+
+  // Day boundary markers
+  const dayBoundaries = useMemo(() => {
+    const boundaries: { index: number; date: Date }[] = []
+    let lastDateStr = ""
+    intervals.forEach((interval, index) => {
+      const dateStr = interval.time.toDateString()
+      if (dateStr !== lastDateStr) {
+        boundaries.push({ index, date: new Date(interval.time) })
+        lastDateStr = dateStr
+      }
+    })
+    return boundaries
+  }, [intervals])
+
+  // Time-axis labels (shown when there is enough horizontal space)
+  const timeLabels = useMemo(() => {
+    const labels: { index: number; text: string }[] = []
+    const pxPerBar = displayParams.barWidth + displayParams.gap
+    const barsPerHour = 60 * 60 * 1000 / displayParams.intervalMs
+    const pxPerHour = barsPerHour * pxPerBar
+
+    let labelFreqHours: number
+    if (pxPerHour >= 40) labelFreqHours = 3
+    else if (pxPerHour >= 15) labelFreqHours = 6
+    else if (pxPerHour >= 4) labelFreqHours = 12
+    else return labels // too compressed for time labels
+
+    intervals.forEach((interval, index) => {
+      const h = interval.time.getHours()
+      const m = interval.time.getMinutes()
+      if (m === 0 && h % labelFreqHours === 0) {
+        labels.push({
+          index,
+          text: interval.time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        })
+      }
+    })
+    return labels
+  }, [intervals, displayParams])
+
+  const chartHeight = 192
+  const pxPerBar = displayParams.barWidth + displayParams.gap
+  const totalWidth = intervals.length * pxPerBar
+
+  const formatDateShort = (date: Date) =>
+    date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+
+  const formatDateRange = (start: Date, end: Date) => {
+    const opts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" }
+    return `${start.toLocaleDateString("en-US", opts)} \u2013 ${end.toLocaleDateString("en-US", opts)}`
+  }
 
   return (
     <Card className="border-2 shadow-lg">
@@ -166,47 +215,23 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
             <CalendarIcon className="h-5 w-5 text-primary" />
             Workload Calendar
           </CardTitle>
-          <CardDescription>View existing workloads and scheduled jobs across data centres</CardDescription>
+          <CardDescription>
+            {blocks.length > 0
+              ? formatDateRange(rangeStart, rangeEnd)
+              : "View scheduled jobs across data centres"}
+          </CardDescription>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Date Picker */}
-        <div className="flex items-center gap-4">
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-[240px] justify-start text-left font-normal bg-transparent">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "PPP")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => {
-                  if (date) {
-                    setSelectedDate(date)
-                    setCalendarOpen(false)
-                  }
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
 
-        {/* Data Center Tabs */}
+      <CardContent className="space-y-4">
+        {/* Data Centre Tabs */}
         <Tabs value={selectedDC} onValueChange={setSelectedDC}>
           <TabsList className="grid w-full grid-cols-5">
             {DATA_CENTERS.map((dc) => (
-              <TabsTrigger 
-                key={dc.id} 
-                value={dc.id}
-                className="text-xs sm:text-sm"
-              >
+              <TabsTrigger key={dc.id} value={dc.id} className="text-xs sm:text-sm">
                 DC {dc.id.slice(-1)}
               </TabsTrigger>
             ))}
@@ -221,94 +246,150 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           </div>
         </div>
 
-        {/* Bar Chart */}
+        {/* Chart */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : intervals.length === 0 ? (
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            {scheduleId ? "No scheduled blocks for this data centre" : "Schedule a job to see workload data"}
+          </div>
         ) : (
           <div className="relative">
-            {/* Y-axis labels (kWh) */}
-            <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-muted-foreground pr-2">
-              <span>{maxValue.toFixed(1)} kWh</span>
-              <span>{(maxValue * 0.75).toFixed(1)} kWh</span>
-              <span>{(maxValue * 0.5).toFixed(1)} kWh</span>
-              <span>{(maxValue * 0.25).toFixed(1)} kWh</span>
+            {/* Y-axis labels */}
+            <div
+              className="absolute left-0 top-6 flex flex-col justify-between text-xs text-muted-foreground pr-2 z-10 w-14"
+              style={{ height: `${chartHeight}px` }}
+            >
+              <span>{maxValue.toFixed(1)}</span>
+              <span>{(maxValue * 0.75).toFixed(1)}</span>
+              <span>{(maxValue * 0.5).toFixed(1)}</span>
+              <span>{(maxValue * 0.25).toFixed(1)}</span>
               <span>0 kWh</span>
             </div>
-            
-            {/* Scrollable Chart Area */}
-            <div 
-              ref={scrollContainerRef}
-              className="ml-12 overflow-x-auto pb-8"
-            >
-              <div 
-                className="flex items-end gap-[2px] min-w-max"
-                style={{ width: `${workloadData.length * 6}px`, height: "192px" }}
+
+            {/* Scrollable chart area */}
+            <div ref={scrollContainerRef} className="ml-14 overflow-x-auto pb-2">
+              <div
+                className="relative"
+                style={{
+                  width: `${totalWidth}px`,
+                  height: `${chartHeight + 52}px`,
+                  paddingTop: "24px",
+                }}
               >
-                {workloadData.map((interval, index) => {
-                  const chartHeight = 192
-                  const existingPx = (interval.existing / maxValue) * chartHeight
-                  const jobsLoad = interval.jobs.reduce((sum, j) => sum + j.load, 0)
-                  const jobsPx = (jobsLoad / maxValue) * chartHeight
-                  
+                {/* Day labels + vertical separators */}
+                {dayBoundaries.map((boundary, i) => {
+                  const x = boundary.index * pxPerBar
+                  const nextX =
+                    i < dayBoundaries.length - 1
+                      ? dayBoundaries[i + 1].index * pxPerBar
+                      : totalWidth
+                  const dayWidth = nextX - x
+
                   return (
-                    <div 
-                      key={index} 
-                      className="flex flex-col items-center group relative"
-                      style={{ width: "4px", height: `${chartHeight}px` }}
-                    >
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                        <div className="bg-popover text-popover-foreground text-xs rounded-md px-2 py-1 shadow-md whitespace-nowrap border">
-                          <p className="font-medium">{formatTime(interval.time)}</p>
-                          {interval.jobs.length > 0 ? (
-                            <div>
-                              <p className="text-muted-foreground">Total scheduled: {interval.jobs.reduce((s, j) => s + j.load, 0)} kWh</p>
-                              <div className="border-t mt-1 pt-1">
-                                {interval.jobs.map((job, i) => (
-                                  <p key={i} className="text-blue-500">{job.job_id}: {job.load} kWh</p>
-                                ))}
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-muted-foreground">No scheduled load</p>
-                          )}
-                        </div>
+                    <div key={`day-${i}`}>
+                      {/* Day label above chart */}
+                      <div
+                        className="absolute top-0 text-[11px] font-medium text-foreground truncate"
+                        style={{ left: `${x + 2}px`, maxWidth: `${dayWidth - 4}px` }}
+                      >
+                        {formatDateShort(boundary.date)}
                       </div>
-                      {/* Stacked Bar - positioned from bottom */}
-                      <div className="absolute bottom-0 w-full flex flex-col-reverse">
-                        {/* Base load (bottom) */}
-                        <div 
-                          className="w-full bg-gray-400"
-                          style={{ height: `${existingPx}px` }}
+                      {/* Vertical dashed separator between days */}
+                      {i > 0 && (
+                        <div
+                          className="absolute border-l border-dashed border-muted-foreground/40"
+                          style={{ left: `${x}px`, top: "20px", height: `${chartHeight + 4}px` }}
                         />
-                        {/* Scheduled jobs (top) */}
-                        {jobsPx > 0 && (
-                          <div 
-                            className="w-full bg-blue-500"
-                            style={{ height: `${jobsPx}px` }}
-                          />
-                        )}
-                      </div>
-                      
-                      {/* X-axis label (show every hour = 12 intervals) */}
-                      {index % 12 === 0 && (
-                        <span className="absolute -bottom-6 text-[10px] text-muted-foreground whitespace-nowrap">
-                          {formatTime(interval.time)}
-                        </span>
                       )}
                     </div>
                   )
                 })}
+
+                {/* Bars */}
+                <div
+                  className="absolute flex items-end"
+                  style={{ top: "24px", left: 0, height: `${chartHeight}px` }}
+                >
+                  {intervals.map((interval, index) => {
+                    const jobsLoad = interval.jobs.reduce((sum, j) => sum + j.load, 0)
+                    const jobsPx = (jobsLoad / maxValue) * chartHeight
+
+                    return (
+                      <div
+                        key={index}
+                        className="relative group shrink-0"
+                        style={{ width: `${pxPerBar}px`, height: `${chartHeight}px` }}
+                      >
+                        {/* Tooltip */}
+                        <div
+                          className="absolute bottom-full mb-2 hidden group-hover:block z-20 pointer-events-none"
+                          style={{ left: "50%", transform: "translateX(-50%)" }}
+                        >
+                          <div className="bg-popover text-popover-foreground text-xs rounded-md px-2 py-1 shadow-md whitespace-nowrap border">
+                            <p className="font-medium">
+                              {interval.time.toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
+                              {interval.time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                            {interval.jobs.length > 0 ? (
+                              <div>
+                                <p className="text-muted-foreground">
+                                  Total: {jobsLoad.toFixed(2)} kWh
+                                </p>
+                                <div className="border-t mt-1 pt-1">
+                                  {interval.jobs.map((job, j) => (
+                                    <p key={j} className="text-blue-500">
+                                      {job.job_id}: {job.load.toFixed(2)} kWh
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-muted-foreground">No scheduled load</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Coloured bar */}
+                        {jobsPx > 0 && (
+                          <div
+                            className="absolute bottom-0 bg-blue-500 rounded-t-sm"
+                            style={{
+                              height: `${Math.max(jobsPx, 1)}px`,
+                              width: `${displayParams.barWidth}px`,
+                            }}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Time labels below chart */}
+                {timeLabels.map((label) => (
+                  <span
+                    key={`time-${label.index}`}
+                    className="absolute text-[10px] text-muted-foreground whitespace-nowrap"
+                    style={{
+                      left: `${label.index * pxPerBar}px`,
+                      top: `${chartHeight + 28}px`,
+                    }}
+                  >
+                    {label.text}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground text-center">
-          Scroll horizontally to view the full day (5-minute intervals)
-        </p>
+        {intervals.length > 0 && (
+          <p className="text-xs text-muted-foreground text-center">
+            Scroll horizontally to view the full schedule
+          </p>
+        )}
       </CardContent>
     </Card>
   )
