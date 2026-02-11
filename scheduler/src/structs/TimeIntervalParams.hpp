@@ -28,16 +28,17 @@ inline auto fromRequest(const HttpRequest &req)
     const auto &params = req.getParameters();
     auto start = std::optional<std::chrono::system_clock::time_point>{};
     auto end = std::optional<std::chrono::system_clock::time_point>{};
-    if (params.contains("start")) {
+    if (params.contains("start_time")) {
         const auto parse_res =
-            scheduler::utils::parseIso8601(params.at("start"));
+            scheduler::utils::parseIso8601(params.at("start_time"));
         if (!parse_res)
             throw scheduler::exceptions::ValidationException(
                 "Invalid start time format: " + parse_res.error());
         start = parse_res.value();
     }
-    if (params.contains("end")) {
-        const auto parse_res = scheduler::utils::parseIso8601(params.at("end"));
+    if (params.contains("end_time")) {
+        const auto parse_res =
+            scheduler::utils::parseIso8601(params.at("end_time"));
         if (!parse_res)
             throw scheduler::exceptions::ValidationException(
                 "Invalid end time format: " + parse_res.error());
