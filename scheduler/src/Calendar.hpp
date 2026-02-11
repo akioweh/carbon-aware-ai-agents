@@ -1,5 +1,6 @@
 #ifndef SCHEDULER_CALENDAR_HPP
 #define SCHEDULER_CALENDAR_HPP
+#include "utils/TimeGridder.hpp"
 #pragma once
 
 #include "structs/ScheduleResult.hpp"
@@ -21,8 +22,8 @@ auto add(const SchedulerOutput &output) -> drogon::Task<std::string>;
 
 auto get(const std::string &jobId) -> drogon::Task<ScheduleResult>;
 
-auto get(time_point start = time_point::min(),
-         time_point end = time_point::max())
+auto get(time_point start = scheduler::utils::MIN_TIME,
+         time_point end = scheduler::utils::MAX_TIME)
     -> drogon::Task<std::vector<ScheduleBlock>>;
 
 auto deleteSchedule(const std::string &jobId) -> drogon::Task<>;
