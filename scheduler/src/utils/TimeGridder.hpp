@@ -1,10 +1,18 @@
-#ifndef SCHEDULER_JOB_IDENTIFIER_HPP
-#define SCHEDULER_JOB_IDENTIFIER_HPP
+#ifndef SCHEDULER_UTILS_TIMEGRINDER_HPP
+#define SCHEDULER_UTILS_TIMEGRINDER_HPP
 #pragma once
 
 #include <chrono>
 
 namespace scheduler::utils {
+
+using SysNanoseconds = std::chrono::sys_time<std::chrono::nanoseconds>;
+
+inline constexpr SysNanoseconds MIN_TIME =
+    std::chrono::sys_days{std::chrono::January / 1 / 1970};
+
+inline constexpr SysNanoseconds MAX_TIME =
+    std::chrono::sys_days{std::chrono::January / 1 / 2100};
 
 template <typename T> struct is_duration : std::false_type {};
 

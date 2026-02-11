@@ -5,7 +5,7 @@
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleBlock.hpp"
 #include "structs/TimeIntervalParams.hpp"
-#include <chrono>
+#include "utils/TimeGridder.hpp"
 #include <drogon/HttpResponse.h>
 #include <drogon/HttpTypes.h>
 
@@ -19,8 +19,8 @@ auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
                                      const TimeIntervalParams interval) const
     -> Task<HttpResponsePtr> {
     const auto res = co_await calendar::get(
-        interval.start.value_or(chrono::system_clock::time_point::min()),
-        interval.end.value_or(chrono::system_clock::time_point::max()));
+        interval.start.value_or(scheduler::utils::MIN_TIME),
+        interval.end.value_or(scheduler::utils::MAX_TIME));
     auto ret = Json::Value(Json::arrayValue);
     for (const auto &block : res)
         ret.append(toJson(block));
