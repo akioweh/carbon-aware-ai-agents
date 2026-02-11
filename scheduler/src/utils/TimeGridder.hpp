@@ -61,4 +61,4 @@ class TimeGridder {
 };
 } // namespace scheduler::utils
 
-#endif // SCHEDULER_JOB_IDENTIFIER_HPP
+#endif // SCHEDULER_UTILS_TIMEGRINDER_HPP
