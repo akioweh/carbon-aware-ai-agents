@@ -45,7 +45,7 @@ inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
     res["scheduled_blocks"] = Json::Value(Json::arrayValue);
     res["impact"] = toJson(obj.impact);
     for (const auto &block : obj.schedule)
-        res["schedule"].append(toJson(block));
+        res["scheduled_blocks"].append(toJson(block));
     return res;
 }
 
