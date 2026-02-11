@@ -1,6 +1,7 @@
 #include "Calendar.hpp"
 #include "DtoMappers/Mappers.h"
 #include "exceptions/ValidationException.hpp"
+#include "structs/ScheduleResult.hpp"
 #include "utils/Coro.hpp"
 #include "utils/Utils.hpp"
 #include <drogon/orm/Criteria.h>
@@ -62,7 +63,7 @@ auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
     const int jobIdInt = scheduler::utils::parseStringIDtoInt(jobIdString);
 
     try {
-        auto [impactModel, jobsModels] = co_await scheduler::coro::when_all(
+        auto &&[impactModel, jobsModels] = co_await scheduler::coro::when_all(
             to_task<mappers::ImpactModel>(
                 context.impactMapper.findByPrimaryKey(jobIdInt)),
             to_task<std::vector<mappers::JobModel>>(context.jobsMapper.findBy(
@@ -71,7 +72,6 @@ auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
         co_return ScheduleResult{.jobId = jobIdString,
                                  .schedule = mappers::fromDtoAll(jobsModels),
                                  .impact = mappers::fromDto(impactModel)};
-
     } catch (const std::exception &e) {
         LOG_ERROR << "NO scheduled job with id=" + jobIdString << " in the DB!";
         throw scheduler::exceptions::ValidationException(
