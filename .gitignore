@@ -368,6 +368,8 @@ CMakeUserPresets.json
 
 
 cache.db
+cache.db-shm
+cache.db-wal
 history.json
 prediction.json
 predictions.json
