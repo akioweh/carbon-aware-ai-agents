@@ -24,6 +24,7 @@ interface WorkloadInterval {
 
 interface WorkloadCalendarProps {
   onClose: () => void
+  scheduleId?: string
 }
 
 const DATA_CENTERS = [
@@ -37,7 +38,7 @@ const DATA_CENTERS = [
 // Mock data generator removed — component now relies solely on the `/api/schedule` endpoint for schedule blocks
 // (If you later want a local fallback for offline dev, we can add an explicit mock path or feature flag.)
 
-export function WorkloadCalendar({ onClose }: WorkloadCalendarProps) {
+export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [selectedDC, setSelectedDC] = useState(DATA_CENTERS[0].id)
   const [workloadData, setWorkloadData] = useState<WorkloadInterval[]>([])
@@ -48,47 +49,43 @@ export function WorkloadCalendar({ onClose }: WorkloadCalendarProps) {
   // Fetch workload data when date or data center changes
   useEffect(() => {
     const fetchData = async () => {
+      if (!scheduleId) {
+        setWorkloadData([])
+        return
+      }
+
       setLoading(true)
-      
+
       try {
-        const startTime = new Date(selectedDate)
-        startTime.setHours(0, 0, 0, 0)
-        const endTime = new Date(selectedDate)
-        endTime.setHours(23, 59, 59, 999)
-        
-        const response = await fetch(
-          `/api/schedule?start_time=${startTime.toISOString()}&end_time=${endTime.toISOString()}`
-        )
-        
+        const response = await fetch(`/api/schedule/${scheduleId}`)
+
         if (!response.ok) {
-          console.error("[v0] API call failed:", response.status, await response.text())
+          console.error("[calendar] API call failed:", response.status, await response.text())
           setWorkloadData([])
           return
         }
 
-        const blocks = await response.json()
+        const data = await response.json()
 
-        if (!Array.isArray(blocks)) {
-          console.error("[v0] Unexpected schedule response shape:", blocks)
-          setWorkloadData([])
-          return
-        }
+        // GET /api/schedule/{schedule_id} returns a ScheduleCreationResponse
+        // with a scheduled_blocks array (per openapi.yaml)
+        const blocks: ScheduleBlock[] = Array.isArray(data.scheduled_blocks) ? data.scheduled_blocks : []
 
-        console.log("[v0] Fetched schedule blocks:", blocks)
-        
+        console.log("[calendar] Fetched schedule blocks:", blocks)
+
         // Process blocks into intervals with real data
         const intervals = processScheduleBlocks(selectedDate, selectedDC, blocks)
         setWorkloadData(intervals)
       } catch (error) {
-        console.log("[v0] Error fetching schedule:", error)
+        console.log("[calendar] Error fetching schedule:", error)
         setWorkloadData([])
       } finally {
         setLoading(false)
       }
     }
-    
+
     fetchData()
-  }, [selectedDate, selectedDC])
+  }, [selectedDate, selectedDC, scheduleId])
 
   // Process schedule blocks into interval data structure using real API schedule blocks
   function processScheduleBlocks(
