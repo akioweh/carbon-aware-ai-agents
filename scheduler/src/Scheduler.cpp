@@ -53,7 +53,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     assert(index_to_time(n_intervals - 1) < job.latest_finish);
 
     // fetch data
-    const auto [locations, existing_schedule] = co_await coro::when_all(
+    const auto &&[locations, existing_schedule] = co_await coro::when_all(
         stats_api.getAllDatacenters(), calendar::get(time_start, time_end));
     const auto n_locations = locations.size();
 
