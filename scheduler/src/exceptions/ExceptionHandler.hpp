@@ -1,5 +1,6 @@
 #ifndef SCHEDULER_EXCEPTION_HANDLER_HPP
 #define SCHEDULER_EXCEPTION_HANDLER_HPP
+#include "exceptions/NetworkException.hpp"
 #pragma once
 
 #include "SchedulingException.hpp"
@@ -46,6 +47,11 @@ inline void registerExceptionHandler() {
             if (const auto *ex =
                     dynamic_cast<const SchedulingException *>(&e)) {
                 callback(makeErrorResponse(drogon::k409Conflict, ex->what()));
+                return;
+            }
+            if (const auto *ex = dynamic_cast<const NetworkException *>(&e)) {
+                callback(makeErrorResponse(drogon::k503ServiceUnavailable,
+                                           ex->what()));
                 return;
             }
             defaultHandler(e, req, std::move(callback));
