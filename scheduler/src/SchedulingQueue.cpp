@@ -1,6 +1,7 @@
 #include "SchedulingQueue.hpp"
 #include "Scheduler.hpp"
 #include "structs/JobRequest.hpp"
+#include <atomic>
 #include <drogon/utils/coroutine.h>
 #include <exception>
 
@@ -11,7 +12,8 @@ auto SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
     while (!Q.push(schedulerTask))
         ;
     bool expected = false;
-    if (running.compare_exchange_strong(expected, true)) {
+    if (running.compare_exchange_strong(expected, true,
+                                        std::memory_order_acq_rel)) {
         drogon::async_run([this]() -> drogon::Task<> {
             co_await runTasks();
             co_return;
@@ -46,7 +48,8 @@ start:;
 
     if (queueSize.load(std::memory_order_acquire) > 0) {
         bool expected = false;
-        if (running.compare_exchange_strong(expected, true)) {
+        if (running.compare_exchange_strong(expected, true,
+                                            std::memory_order_acq_rel)) {
             goto start;
         }
     }
