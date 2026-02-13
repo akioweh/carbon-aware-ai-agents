@@ -1,12 +1,19 @@
-#ifndef SCHEDULE_BLOCK
-#define SCHEDULE_BLOCK
+#ifndef SCHEDULER_SCHEDULE_BLOCK_HPP
+#define SCHEDULER_SCHEDULE_BLOCK_HPP
 #pragma once
 
-#include <Serializable.hpp>
+#include "Serializable.hpp"
 #include <chrono>
 #include <string>
 #include <utils/Utils.hpp>
 
+namespace scheduler {
+
+/**
+ * @class ScheduleBlock
+ * @brief The atomic unit of a schedule, representing an amount of load at a
+ * given location and time. Aligns with API definition.
+ */
 class ScheduleBlock {
   public:
     std::chrono::system_clock::time_point timestamp;
@@ -31,4 +38,6 @@ inline auto f_toJson(const ScheduleBlock &obj) -> Json::Value {
 
 static_assert(Serializable<ScheduleBlock>);
 
-#endif // SCHEDULE_BLOCK
+} // namespace scheduler
+
+#endif // SCHEDULER_SCHEDULE_BLOCK_HPP

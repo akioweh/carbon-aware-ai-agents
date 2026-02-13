@@ -1,17 +1,18 @@
-#ifndef SCHEDULING_QUEUE
-#define SCHEDULING_QUEUE
+#ifndef SCHEDULER_SCHEDULING_QUEUE_HPP
+#define SCHEDULER_SCHEDULING_QUEUE_HPP
 #pragma once
 
-#include <Scheduler.hpp>
+#include "structs/JobRequest.hpp"
+#include "structs/SchedulerOutput.hpp"
 #include <atomic>
 #include <boost/lockfree/queue.hpp>
 #include <coroutine>
-#include <structs/JobRequest.hpp>
-#include <structs/ScheduleBlock.hpp>
+
+namespace scheduler {
 
 class SchedulerTask {
     std::atomic<std::coroutine_handle<>> taskHandle{nullptr};
-    ScheduleResult value;
+    SchedulerOutput value;
 
   public:
     JobRequest jobRequest;
@@ -24,9 +25,9 @@ class SchedulerTask {
         taskHandle.notify_one();
     }
 
-    auto await_resume() -> ScheduleResult { return std::move(value); }
+    auto await_resume() -> SchedulerOutput { return std::move(value); }
 
-    auto setValue(const ScheduleResult &result) { value = std::move(result); }
+    auto setValue(SchedulerOutput result) { value = std::move(result); }
 
     auto resume() {
         taskHandle.wait(nullptr, std::memory_order_acquire);
@@ -38,7 +39,7 @@ class SchedulerTask {
 class SchedulingQueue {
     const static int initialSize = 32;
     using LockFreeQueue = boost::lockfree::queue<SchedulerTask *>;
-    LockFreeQueue Q;
+    LockFreeQueue Q{initialSize};
     std::atomic<bool> running{false};
     std::atomic<int> queueSize{0};
 
@@ -46,15 +47,17 @@ class SchedulingQueue {
     auto push_back(SchedulerTask *);
 
   public:
-    SchedulingQueue() : Q(initialSize) {};
-    auto computeSchedule(const JobRequest &) -> drogon::Task<ScheduleResult>;
+    SchedulingQueue() = default;
+    auto computeSchedule(const JobRequest &) -> drogon::Task<SchedulerOutput>;
 
     SchedulingQueue(const SchedulingQueue &) = delete;
     SchedulingQueue(SchedulingQueue &&) = delete;
-    auto operator=(const SchedulingQueue &) -> SchedulingQueue & = delete;
-    auto operator=(SchedulingQueue &&) -> SchedulingQueue & = delete;
+    auto operator=(const SchedulingQueue &) = delete;
+    auto operator=(SchedulingQueue &&) = delete;
 };
 
-inline SchedulingQueue schedulingQueue;
+inline SchedulingQueue schedulingQueue{};
 
-#endif
+} // namespace scheduler
+
+#endif // SCHEDULER_SCHEDULING_QUEUE_HPP

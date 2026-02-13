@@ -1,15 +1,17 @@
-#ifndef STATS_API_CLIENT
-#define STATS_API_CLIENT
+#ifndef SCHEDULER_STATS_API_CLIENT_HPP
+#define SCHEDULER_STATS_API_CLIENT_HPP
 #pragma once
 
+#include "structs/Datacenter.hpp"
 #include <chrono>
 #include <drogon/drogon.h>
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
 #include <optional>
 #include <string>
-#include <structs/Datacenter.hpp>
 #include <vector>
+
+namespace scheduler {
 
 /// Location as returned by /locations endpoint
 struct Location {
@@ -63,7 +65,7 @@ class StatsAPIClient {
     static auto getLocationsPath() -> std::string { return "/locations"; }
 
   public:
-    explicit StatsAPIClient(std::string host = "http://127.0.0.1:5000");
+    explicit StatsAPIClient(std::string host = "http://140.238.79.139:5000");
 
     auto getLocations() -> drogon::Task<std::vector<Location>>;
     auto getLoadForecast(const std::string &locationId)
@@ -76,4 +78,6 @@ class StatsAPIClient {
     auto getAllDatacenters() -> drogon::Task<std::vector<Datacenter>>;
 };
 
-#endif // STATS_API_CLIENT
+} // namespace scheduler
+
+#endif // SCHEDULER_STATS_API_CLIENT_HPP

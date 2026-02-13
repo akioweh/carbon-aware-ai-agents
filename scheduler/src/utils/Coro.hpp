@@ -3,14 +3,15 @@
  * do you now Ken? XD
  */
 
-#ifndef SCHEDULER_UTIL_CORO
-#define SCHEDULER_UTIL_CORO
+#ifndef SCHEDULER_CORO_HPP
+#define SCHEDULER_CORO_HPP
 #pragma once
 
 #include <atomic>
 #include <coroutine>
 #include <cstddef>
 #include <drogon/drogon.h>
+#include <exception>
 #include <expected>
 #include <memory>
 #include <ranges>
@@ -44,7 +45,7 @@ inline static constexpr char EXCEPTION_IN_PROGRESS = 2;
 
 template <typename ResultsContainer> struct ResultContext {
     std::atomic<size_t> remaining;
-    std::atomic<std::coroutine_handle<>> continuation;
+    std::atomic<std::coroutine_handle<>> continuation{NO_CONTINUATION};
     std::atomic<char> exceptionState{NO_EXCEPTION};
     std::exception_ptr capturedException{nullptr};
     ResultsContainer results;
@@ -69,6 +70,7 @@ template <typename ResultsContainer> struct ResultContext {
 
         auto old_handle = continuation.exchange(WAITING_CONTINUATION,
                                                 std::memory_order::acq_rel);
+
         if (old_handle != NO_CONTINUATION)
             old_handle.resume();
     }
@@ -106,7 +108,7 @@ template <typename Context, bool return_exceptions> struct Awaiter {
 };
 
 // run a function at end of scope
-template <typename Func> struct ScopeGuard {
+template <std::invocable Func> struct ScopeGuard {
     Func func;
     ~ScopeGuard() { func(); }
 };
@@ -192,4 +194,4 @@ auto when_all(std::vector<drogon::Task<T>> coros) -> auto {
 }
 
 } // namespace scheduler::coro
-#endif // SCHEDULER_UTIL_CORO
+#endif // SCHEDULER_CORO_HPP

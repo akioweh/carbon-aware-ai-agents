@@ -1,14 +1,16 @@
-#include "structs/ScheduleBlock.hpp"
-#include <Calendar.hpp>
-#include <DtoMappers/Mappers.h>
-#include <Scheduler.hpp>
+#include "Calendar.hpp"
+#include "DtoMappers/Mappers.h"
+#include "exceptions/ValidationException.hpp"
+#include "structs/ScheduleResult.hpp"
+#include "utils/Coro.hpp"
+#include "utils/Utils.hpp"
 #include <drogon/orm/Criteria.h>
 #include <drogon/orm/Exception.h>
 #include <ranges>
-#include <utils/Coro.hpp>
-#include <utils/Utils.hpp>
 
-namespace calendarService {
+namespace scheduler::calendar {
+
+using namespace scheduler;
 
 namespace {
 
@@ -37,21 +39,22 @@ auto jobTimestampInsideTimeIntervalCriteria(time_point start, time_point end) {
 
 } // namespace
 
-auto add(Schedule schedule) -> drogon::Task<> {
+auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
     auto transaction =
         co_await drogon::app().getDbClient()->newTransactionCoro();
     Context context(transaction);
-    const auto &[impact, intervals] = schedule;
 
-    auto impactModel = mappers::toDto(impact);
+    auto impactModel = mappers::toDto(output.impact);
     impactModel = co_await context.impactMapper.insert(impactModel);
-    const int impactId = impactModel.getValueOfId();
+    const auto impactId = impactModel.getValueOfId();
 
     for (auto &&jobModel :
-         intervals |
+         output.blocks |
              std::views::transform(mappers::toDto.withImpactId(impactId))) {
         co_await context.jobsMapper.insert(jobModel);
     }
+
+    co_return scheduler::utils::parseIntToStringID(impactId);
 }
 
 auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
@@ -59,17 +62,21 @@ auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
 
     const int jobIdInt = scheduler::utils::parseStringIDtoInt(jobIdString);
 
-    auto [impactModel, jobsModels] = co_await scheduler::coro::when_all(
-        to_task<mappers::ImpactModel>(
-            context.impactMapper.findByPrimaryKey(jobIdInt)),
-        to_task<std::vector<mappers::JobModel>>(
-            context.jobsMapper.findBy(jobImpactIdEqualityCriteria(jobIdInt))));
+    try {
+        auto &&[impactModel, jobsModels] = co_await scheduler::coro::when_all(
+            to_task<mappers::ImpactModel>(
+                context.impactMapper.findByPrimaryKey(jobIdInt)),
+            to_task<std::vector<mappers::JobModel>>(context.jobsMapper.findBy(
+                jobImpactIdEqualityCriteria(jobIdInt))));
 
-    auto impact = mappers::fromDto(impactModel);
-    auto jobs = mappers::fromDtoAll(jobsModels);
-
-    co_return ScheduleResult{
-        .jobId = jobIdString, .schedule = jobs, .impact = impact};
+        co_return ScheduleResult{.jobId = jobIdString,
+                                 .schedule = mappers::fromDtoAll(jobsModels),
+                                 .impact = mappers::fromDto(impactModel)};
+    } catch (const std::exception &e) {
+        LOG_ERROR << "NO scheduled job with id=" + jobIdString << " in the DB!";
+        throw scheduler::exceptions::ValidationException(
+            "No scheduled job with id: " + jobIdString);
+    }
 }
 
 auto get(time_point start, time_point end)
@@ -80,6 +87,17 @@ auto get(time_point start, time_point end)
         jobTimestampInsideTimeIntervalCriteria(start, end)));
 }
 
+auto listJobs() -> drogon::Task<std::vector<std::string>> {
+    auto context = getContext();
+    auto res = co_await context.impactMapper.findAll();
+    std::vector<std::string> jobIds;
+    jobIds.reserve(res.size());
+    for (const auto &item : res)
+        jobIds.push_back(
+            scheduler::utils::parseIntToStringID(item.getValueOfId()));
+    co_return jobIds;
+}
+
 auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
     auto context = getContext();
     co_await context.impactMapper.deleteByPrimaryKey(
@@ -87,4 +105,4 @@ auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
     // we have cascade on delete, so no need to delete the children manually
 }
 
-} // namespace calendarService
+} // namespace scheduler::calendar

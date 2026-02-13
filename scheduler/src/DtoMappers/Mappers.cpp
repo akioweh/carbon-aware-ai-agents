@@ -1,11 +1,12 @@
 #include "utils/Utils.hpp"
 #include <DtoMappers/Mappers.h>
-#include <Scheduler.hpp>
 #include <models/Impacts.h>
 #include <models/Jobs.h>
 #include <structs/ScheduleBlock.hpp>
 
-namespace mappers {
+namespace scheduler::mappers {
+using namespace scheduler;
+
 auto f_toDto(const ScheduleImpact &impact) -> ImpactModel {
     ImpactModel impactDB;
     impactDB.setCarbonIntensity(impact.carbon_intensity);
@@ -14,7 +15,7 @@ auto f_toDto(const ScheduleImpact &impact) -> ImpactModel {
     return impactDB;
 }
 
-auto f_toDto(const ScheduleBlock &block, int impactId) -> JobModel {
+auto f_toDto(const InternalBlock &block, int impactId) -> JobModel {
     JobModel job;
     job.setAdditionalLoad(block.additionalLoad);
     job.setLocationId(block.location);
@@ -40,4 +41,4 @@ auto f_fromDto(const JobModel &jobDto) -> ScheduleBlock {
                          .additionalLoad = jobDto.getValueOfAdditionalLoad()};
 }
 
-}; // namespace mappers
+} // namespace scheduler::mappers
