@@ -94,7 +94,7 @@ inline auto calc_single(const std::vector<double> &load_f,
                         const std::vector<double> &capacity_f,
                         const CostFunction<double> auto &cost_f,
                         const double penalty_f, const double tot_work_f,
-                        const int resolution = 1000) -> SingleResult {
+                        const int resolution = 100) -> SingleResult {
     using namespace std;
     const auto n = static_cast<int>(load_f.size());
     // discretization
@@ -205,7 +205,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
                    const std::vector<std::vector<double>> &capacities_f,
                    const std::vector<CostFunc> &costs_f,
                    const std::vector<double> &penalties_f,
-                   const double tot_work_f, const int resolution = 1000)
+                   const double tot_work_f, const int resolution = 100)
     -> std::pair<double, std::vector<std::vector<double>>> {
     using namespace std;
     const auto m = loads_f.size();
