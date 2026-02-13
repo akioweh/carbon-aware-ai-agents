@@ -1,7 +1,8 @@
-#include "Scheduler.hpp"
 #include "SchedulingQueue.hpp"
+#include "Scheduler.hpp"
 #include "structs/JobRequest.hpp"
 #include <drogon/utils/coroutine.h>
+#include <exception>
 
 namespace scheduler {
 
@@ -31,10 +32,13 @@ start:;
     while (Q.pop(task)) {
         (void)queueSize.fetch_sub(1, std::memory_order_release);
 
-        Scheduler scheduler;
-        auto res = co_await scheduler.scheduleJob(task->jobRequest);
-
-        task->setValue(std::move(res));
+        try {
+            Scheduler scheduler;
+            auto res = co_await scheduler.scheduleJob(task->jobRequest);
+            task->setValue(std::move(res));
+        } catch (...) {
+            task->setException(std::current_exception());
+        }
         task->resume();
     }
 

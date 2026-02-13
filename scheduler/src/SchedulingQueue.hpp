@@ -41,7 +41,7 @@ class SchedulerTask {
         handle.resume();
     }
 
-    auto setException(auto &e) { except_ptr = e; }
+    auto setException(auto &&e) { except_ptr = e; }
 };
 
 class SchedulingQueue {
