@@ -149,11 +149,13 @@ inline auto calc_single(const std::vector<double> &load_f,
         }
 
         for (const auto w_prev : views::iota(0, tot_work + 1)) {
+            const auto &[prev0, prev1] =
+                array{prev_row[0][w_prev], prev_row[1][w_prev]};
             const auto &prev = prev_row[w_prev];
             // do no work (propagate to same w)
             {
-                const auto from_active = prev[0] < prev[1];
-                const auto new_cost = from_active ? prev[0] : prev[1];
+                const auto from_active = prev0 < prev1;
+                const auto new_cost = from_active ? prev0 : prev1;
                 if (new_cost < row[w_prev][1]) {
                     row[w_prev][1] = new_cost;
                     memo[i][w_prev][1] = {.alloc = 0,
@@ -165,7 +167,7 @@ inline auto calc_single(const std::vector<double> &load_f,
             for (const auto wi : views::iota(1, max_wi + 1)) {
                 const auto add_cost = cost_table[wi];
                 { // extend run
-                    const auto new_cost = prev[0] + add_cost;
+                    const auto new_cost = prev0 + add_cost;
                     const auto w = min(w_prev + wi, tot_work);
                     if (new_cost < row[w][0]) {
                         row[w][0] = new_cost;
@@ -174,7 +176,7 @@ inline auto calc_single(const std::vector<double> &load_f,
                     }
                 }
                 { // start new run
-                    const auto new_cost = prev[1] + add_cost;
+                    const auto new_cost = prev1 + add_cost;
                     const auto w = min(w_prev + wi - penalty, tot_work);
                     if (w >= 0 && new_cost < row[w][0]) {
                         row[w][0] = new_cost;
