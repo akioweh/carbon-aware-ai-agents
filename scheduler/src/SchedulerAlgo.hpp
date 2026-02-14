@@ -144,7 +144,7 @@ inline auto calc_single(const std::vector<double> &load_f,
         const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
         const auto base_cost = cost_func(load[i - 1]);
 
-        auto cost_table = vector(max_wi + 1, 0);
+        auto cost_table = vector(max_wi + 1, inf);
         for (int wi = 0; wi <= max_wi; wi++) {
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
         }
