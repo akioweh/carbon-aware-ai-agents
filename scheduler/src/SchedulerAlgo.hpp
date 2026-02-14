@@ -127,17 +127,27 @@ inline auto calc_single(const std::vector<double> &load_f,
     constexpr auto inf = numeric_limits<double>::max() / 2;
     auto row = array{vector(tot_work + 1, inf), vector(tot_work + 1, inf)};
 
-    auto prev_row = vector(tot_work + 1, array{inf, inf});
+    auto prev_row = array{vector(tot_work + 1, inf), vector(tot_work + 1, inf)};
     row[0][1] = 0.; // 0 cost for 0 work
     // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
-    auto memo = vector(n + 1, vector(tot_work + 1, array<MemoEntry, 2>{}));
+    auto memo = vector(n + 1, array{vector(tot_work + 1, MemoEntry{}),
+                                    vector(tot_work + 1, MemoEntry{})});
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
-        ranges::fill(row, array{inf, inf});
+
+        ranges::fill(row[0], inf);
+        ranges::fill(row[1], inf);
+
         const auto cost_func = cost[i - 1];
         const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
         const auto base_cost = cost_func(load[i - 1]);
+
+        const auto cost_table = vector(max_wi, 0);
+        for (int wi = 0; wi < max_wi; wi++) {
+            cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
+        }
+
         for (const auto w_prev : views::iota(0, tot_work + 1)) {
             const auto &prev = prev_row[w_prev];
             // do no work (propagate to same w)
@@ -153,7 +163,7 @@ inline auto calc_single(const std::vector<double> &load_f,
             }
             // do some work
             for (const auto wi : views::iota(1, max_wi + 1)) {
-                const auto add_cost = cost_func(wi + load[i - 1]) - base_cost;
+                const auto add_cost = cost_table[wi];
                 { // extend run
                     const auto new_cost = prev[0] + add_cost;
                     const auto w = min(w_prev + wi, tot_work);
