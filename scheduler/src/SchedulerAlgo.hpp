@@ -143,22 +143,21 @@ inline auto calc_single(const std::vector<double> &load_f,
         const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
         const auto base_cost = cost_func(load[i - 1]);
 
-        const auto cost_table = vector(max_wi, 0);
-        for (int wi = 0; wi < max_wi; wi++) {
+        auto cost_table = vector(max_wi + 1, 0);
+        for (int wi = 0; wi <= max_wi; wi++) {
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
         }
 
         for (const auto w_prev : views::iota(0, tot_work + 1)) {
             const auto &[prev0, prev1] =
                 array{prev_row[0][w_prev], prev_row[1][w_prev]};
-            const auto &prev = prev_row[w_prev];
             // do no work (propagate to same w)
             {
                 const auto from_active = prev0 < prev1;
                 const auto new_cost = from_active ? prev0 : prev1;
-                if (new_cost < row[w_prev][1]) {
-                    row[w_prev][1] = new_cost;
-                    memo[i][w_prev][1] = {.alloc = 0,
+                if (new_cost < row[1][w_prev]) {
+                    row[1][w_prev] = new_cost;
+                    memo[i][1][w_prev] = {.alloc = 0,
                                           .prev_state = from_active ? 0 : 1,
                                           .w_prev = w_prev};
                 }
@@ -169,18 +168,18 @@ inline auto calc_single(const std::vector<double> &load_f,
                 { // extend run
                     const auto new_cost = prev0 + add_cost;
                     const auto w = min(w_prev + wi, tot_work);
-                    if (new_cost < row[w][0]) {
-                        row[w][0] = new_cost;
-                        memo[i][w][0] = {
+                    if (new_cost < row[0][w]) {
+                        row[0][w] = new_cost;
+                        memo[i][0][w] = {
                             .alloc = wi, .prev_state = 0, .w_prev = w_prev};
                     }
                 }
                 { // start new run
                     const auto new_cost = prev1 + add_cost;
                     const auto w = min(w_prev + wi - penalty, tot_work);
-                    if (w >= 0 && new_cost < row[w][0]) {
-                        row[w][0] = new_cost;
-                        memo[i][w][0] = {
+                    if (w >= 0 && new_cost < row[0][w]) {
+                        row[0][w] = new_cost;
+                        memo[i][0][w] = {
                             .alloc = wi, .prev_state = 1, .w_prev = w_prev};
                     }
                 }
@@ -188,21 +187,32 @@ inline auto calc_single(const std::vector<double> &load_f,
         }
     }
 
+    // this we should probably refactor later
+    auto help_row = vector(tot_work + 1, array{inf, inf});
+    for (int i = 0; i <= tot_work; i++)
+        help_row[i] = {row[0][i], row[1][i]};
+
+    auto help_memo = vector(n + 1, vector(tot_work + 1, array<MemoEntry, 2>{}));
+    for (int i = 0; i <= n; i++) {
+        for (int p = 0; p <= tot_work; p++)
+            help_memo[i][p] = {memo[i][0][p], memo[i][1][p]};
+    }
+
     auto res = vector<double>{};
     res.reserve(tot_work + 1);
-    for (const auto &[w, costs] : views::enumerate(row)) {
+    for (const auto &[w, costs] : views::enumerate(help_row)) {
         // other than condensing the dp cost results,
         // we also want to set the last memo entry based on our choices here
         // (costs[0] vs costs[1]) for easier reconstruction later
         if (costs[0] < costs[1]) {
             res.push_back(costs[0]);
-            memo[n][w][1] = memo[n][w][0];
+            help_memo[n][w][1] = help_memo[n][w][0];
         } else {
             res.push_back(costs[1]);
-            memo[n][w][0] = memo[n][w][1];
+            help_memo[n][w][0] = help_memo[n][w][1];
         }
     }
-    return {std::move(res), std::move(memo)};
+    return {std::move(res), std::move(help_memo)};
 }
 
 /*
