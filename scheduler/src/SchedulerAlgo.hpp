@@ -38,6 +38,17 @@ struct MemoEntry {
     int prev_state = 0;
     int w_prev = 0;
 };
+
+struct MemoEntryVector {
+    std::vector<int> alloc;
+    std::vector<int> prev_state;
+    std::vector<int> w_prev;
+
+    MemoEntryVector(size_t size)
+        : alloc(std::vector(size, 0)), prev_state(std::vector(size, 0)),
+          w_prev(std::vector(size, 0)) {};
+};
+
 using ChoiceVector = std::vector<std::vector<std::array<MemoEntry, 2>>>;
 using SingleResult = std::pair<CostVector, ChoiceVector>;
 
@@ -100,7 +111,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     const auto n = static_cast<int>(load_f.size());
     // discretization
     const auto e_work = tot_work_f / resolution;
-    const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
+    const auto tot_work = resolution;
     auto load = vector<int>(n);
     transform(execution::unseq, load_f.begin(), load_f.end(), load.begin(),
               [e_work](double x) -> int {
@@ -131,8 +142,8 @@ inline auto calc_single(const std::vector<double> &load_f,
     auto prev_row = array{vector(tot_work + 1, inf), vector(tot_work + 1, inf)};
     row[1][0] = 0.; // 0 cost for 0 work
     // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
-    auto memo = vector(n + 1, array{vector(tot_work + 1, MemoEntry{}),
-                                    vector(tot_work + 1, MemoEntry{})});
+    auto memo = vector(n + 1, array{MemoEntryVector(tot_work + 1),
+                                    MemoEntryVector(tot_work + 1)});
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
@@ -158,9 +169,9 @@ inline auto calc_single(const std::vector<double> &load_f,
                 const auto new_cost = from_active ? prev0 : prev1;
                 if (new_cost < row[1][w_prev]) {
                     row[1][w_prev] = new_cost;
-                    memo[i][1][w_prev] = {.alloc = 0,
-                                          .prev_state = from_active ? 0 : 1,
-                                          .w_prev = w_prev};
+                    memo[i][1].alloc[w_prev] = 0;
+                    memo[i][1].prev_state[w_prev] = from_active ? 0 : 1;
+                    memo[i][1].w_prev[w_prev] = w_prev;
                 }
             }
             // do some work
@@ -171,17 +182,19 @@ inline auto calc_single(const std::vector<double> &load_f,
                     const auto w = min(w_prev + wi, tot_work);
                     if (new_cost < row[0][w]) {
                         row[0][w] = new_cost;
-                        memo[i][0][w] = {
-                            .alloc = wi, .prev_state = 0, .w_prev = w_prev};
-                    }
+                        memo[i][0].alloc[w] = wi;
+                        memo[i][0].prev_state[w] = 0;
+                        memo[i][0].w_prev[w] = w_prev;
+                    };
                 }
                 { // start new run
                     const auto new_cost = prev1 + add_cost;
                     const auto w = min(w_prev + wi - penalty, tot_work);
                     if (w >= 0 && new_cost < row[0][w]) {
                         row[0][w] = new_cost;
-                        memo[i][0][w] = {
-                            .alloc = wi, .prev_state = 1, .w_prev = w_prev};
+                        memo[i][0].alloc[w] = wi;
+                        memo[i][0].prev_state[w] = 1;
+                        memo[i][0].w_prev[w] = w_prev;
                     }
                 }
             }
@@ -195,8 +208,15 @@ inline auto calc_single(const std::vector<double> &load_f,
 
     auto help_memo = vector(n + 1, vector(tot_work + 1, array<MemoEntry, 2>{}));
     for (int i = 0; i <= n; i++) {
-        for (int p = 0; p <= tot_work; p++)
-            help_memo[i][p] = {memo[i][0][p], memo[i][1][p]};
+        for (int p = 0; p <= tot_work; p++) {
+            MemoEntry for0{.alloc = memo[i][0].alloc[p],
+                           .prev_state = memo[i][0].prev_state[p],
+                           .w_prev = memo[i][0].w_prev[p]};
+            MemoEntry for1{.alloc = memo[i][1].alloc[p],
+                           .prev_state = memo[i][1].prev_state[p],
+                           .w_prev = memo[i][1].w_prev[p]};
+            help_memo[i][p] = {for0, for1};
+        }
     }
 
     auto res = vector<double>{};
