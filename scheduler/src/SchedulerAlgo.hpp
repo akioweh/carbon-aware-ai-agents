@@ -129,7 +129,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     auto row = array{vector(tot_work + 1, inf), vector(tot_work + 1, inf)};
 
     auto prev_row = array{vector(tot_work + 1, inf), vector(tot_work + 1, inf)};
-    row[0][1] = 0.; // 0 cost for 0 work
+    row[1][0] = 0.; // 0 cost for 0 work
     // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
     auto memo = vector(n + 1, array{vector(tot_work + 1, MemoEntry{}),
                                     vector(tot_work + 1, MemoEntry{})});
