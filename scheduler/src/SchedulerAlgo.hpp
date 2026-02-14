@@ -9,6 +9,7 @@
 #include <cmath>
 #include <execution>
 #include <future>
+#include <iostream>
 #include <limits>
 #include <ranges>
 #include <utility>
@@ -244,6 +245,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         assert(capacities_f[i].size() == n);
     }
 
+    std::cout << "started paralel location computation" << std::endl;
     // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
     futures.reserve(m);
@@ -262,6 +264,8 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     auto locations_memo = vector<SingleResult::second_type>(m);
     for (auto i : views::iota(0ULL, m))
         tie(locations_cost_vector[i], locations_memo[i]) = futures[i].get();
+
+    std::cout << "ended COMPUTATION!" << std::endl;
 
     const auto e_work = tot_work_f / resolution;
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
@@ -351,7 +355,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         }
         assert(cur_w == 0);
     }
-
+    std::cout << "ENDED EVERYTHING!" << std::endl;
     return {final_cost, res};
 }
 
