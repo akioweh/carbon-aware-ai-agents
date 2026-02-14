@@ -125,7 +125,8 @@ inline auto calc_single(const std::vector<double> &load_f,
     // blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
     constexpr auto inf = numeric_limits<double>::max() / 2;
-    auto row = vector(tot_work + 1, array{inf, inf});
+    auto row = array{vector(tot_work + 1, inf), vector(tot_work + 1, inf)};
+
     auto prev_row = vector(tot_work + 1, array{inf, inf});
     row[0][1] = 0.; // 0 cost for 0 work
     // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
