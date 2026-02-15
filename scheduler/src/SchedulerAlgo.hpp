@@ -1,6 +1,5 @@
 #ifndef SCHEDULER_SCHEDULER_ALGO_HPP
 #define SCHEDULER_SCHEDULER_ALGO_HPP
-#include <immintrin.h>
 #pragma once
 
 #ifndef __AVX512F__
@@ -15,7 +14,6 @@
 #include <execution>
 #include <future>
 #include <immintrin.h>
-#include <iostream>
 #include <limits>
 #include <ranges>
 #include <utility>
@@ -427,6 +425,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         }
         assert(cur_w == 0);
     }
+
     return {final_cost, res};
 }
 
