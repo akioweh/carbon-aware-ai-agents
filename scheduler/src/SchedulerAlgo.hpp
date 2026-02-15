@@ -3,6 +3,10 @@
 #include <immintrin.h>
 #pragma once
 
+#ifndef __AVX512F__
+#error "AVX-512 flags are NOT active! The code will not use SIMD."
+#endif
+
 #include "exceptions/SchedulingException.hpp"
 #include <algorithm>
 #include <array>
@@ -10,6 +14,7 @@
 #include <cmath>
 #include <execution>
 #include <future>
+#include <immintrin.h>
 #include <iostream>
 #include <limits>
 #include <ranges>
@@ -40,14 +45,18 @@ struct MemoEntry {
     int w_prev = 0;
 };
 
+// this depends on what we are using in vectorization, float or double.
+static constexpr int padding = sizeof(double);
+
 struct MemoEntryVector {
     std::vector<int> alloc;
     std::vector<int> prev_state;
     std::vector<int> w_prev;
 
     MemoEntryVector(size_t size)
-        : alloc(std::vector(size, 0)), prev_state(std::vector(size, 0)),
-          w_prev(std::vector(size, 0)) {};
+        : alloc(std::vector(size + padding, 0)),
+          prev_state(std::vector(size + padding, 0)),
+          w_prev(std::vector(size + padding, 0)) {};
 };
 
 using ChoiceVector = std::vector<std::vector<std::array<MemoEntry, 2>>>;
@@ -104,9 +113,6 @@ struct LocationCost {
  *
  */
 
-// this depends on what we are using in vectorization, float or double.
-inline constexpr int padding = sizeof(double);
-
 inline void vectorizeDpTransition(const int w_prev, const int tot_work,
                                   const std::vector<double> &cost_table,
                                   const double prev0, const double prev1,
@@ -149,7 +155,7 @@ inline void vectorizeDpTransition(const int w_prev, const int tot_work,
     };
 
     constexpr int start_wi_extend = 1;
-    const int end_wi_extend = tot_work - w_prev;
+    const int end_wi_extend = std::min(max_wi, tot_work - w_prev);
     transitionAVX(start_wi_extend, end_wi_extend, prev0V, zeros);
 
     const int start_wi_new_run = std::max(1, penalty - w_prev);
@@ -192,13 +198,15 @@ inline auto calc_single(const std::vector<double> &load_f,
     // i blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
     constexpr auto inf = numeric_limits<double>::max() / 2;
-    auto row = array{vector(tot_work + 1, inf), vector(tot_work + 1, inf)};
+    auto row = array{vector(tot_work + 1 + padding, inf),
+                     vector(tot_work + 1 + padding, inf)};
 
-    auto prev_row = array{vector(tot_work + 1, inf), vector(tot_work + 1, inf)};
+    auto prev_row = array{vector(tot_work + 1 + padding, inf),
+                          vector(tot_work + 1 + padding, inf)};
     row[1][0] = 0.; // 0 cost for 0 work
     // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
-    auto memo = vector(n + 1, array{MemoEntryVector(tot_work + 1),
-                                    MemoEntryVector(tot_work + 1)});
+    auto memo = vector(n + 1, array{MemoEntryVector(tot_work + 1 + padding),
+                                    MemoEntryVector(tot_work + 1 + padding)});
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
@@ -210,7 +218,7 @@ inline auto calc_single(const std::vector<double> &load_f,
         const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
         const auto base_cost = cost_func(load[i - 1]);
 
-        auto cost_table = vector(max_wi + 1, inf);
+        auto cost_table = vector(max_wi + 1 + padding, inf);
         for (int wi = 0; wi <= max_wi; wi++) {
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
         }

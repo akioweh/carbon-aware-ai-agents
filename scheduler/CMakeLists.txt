@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 4.2)
 project(scheduler)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-mavx512f -mavx512bw -mavx512vl -mavx512dq)
+elseif(MSVC)
+    add_compile_options(/arch:AVX512)
+endif()
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE INTERNAL "") # force c++23 in cache
 
