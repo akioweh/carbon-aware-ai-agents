@@ -228,12 +228,11 @@ inline auto calc_single(const std::vector<double> &load_f,
     auto memo = vector(n + 1, array{MemoEntryVector(sizeOfDpWithPadding),
                                     MemoEntryVector(sizeOfDpWithPadding)});
 
-    int max_capacity{};
+    int max_wi_precomputed{0};
     for (auto i : capacity)
-        max_capacity = max(max_capacity, i);
+        max_wi_precomputed = max(max_wi_precomputed, i);
 
-    const int MAX_WI = static_cast<int>(ceil(max_capacity / e_work)) + 1;
-    auto cost_table = vector(MAX_WI + 1 + padding, inf);
+    auto cost_table = vector(max_wi_precomputed + 1 + padding, inf);
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
@@ -248,7 +247,7 @@ inline auto calc_single(const std::vector<double> &load_f,
         for (int wi = 0; wi <= max_wi; wi++) {
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
         }
-        for (int wi = max_wi; wi <= max_wi + padding + 1; wi++)
+        for (int wi = max_wi; wi <= max_wi + padding; wi++)
             cost_table[wi] = inf;
 
         for (const auto w_prev : views::iota(0, tot_work + 1)) {
@@ -321,7 +320,6 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         assert(capacities_f[i].size() == n);
     }
 
-    std::cout << "started paralel location computation" << std::endl;
     // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
     futures.reserve(m);
@@ -340,8 +338,6 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     auto locations_memo = vector<SingleResult::second_type>(m);
     for (auto i : views::iota(0ULL, m))
         tie(locations_cost_vector[i], locations_memo[i]) = futures[i].get();
-
-    std::cout << "ended COMPUTATION!" << std::endl;
 
     const auto e_work = tot_work_f / resolution;
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
@@ -431,7 +427,6 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         }
         assert(cur_w == 0);
     }
-    std::cout << "ENDED EVERYTHING!" << std::endl;
     return {final_cost, res};
 }
 
