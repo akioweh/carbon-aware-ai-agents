@@ -45,18 +45,14 @@ struct MemoEntry {
     int w_prev = 0;
 };
 
-// this depends on what we are using in vectorization, float or double.
-static constexpr int padding = sizeof(double);
-
 struct MemoEntryVector {
     std::vector<int> alloc;
     std::vector<int> prev_state;
     std::vector<int> w_prev;
 
     MemoEntryVector(size_t size)
-        : alloc(std::vector(size + padding, 0)),
-          prev_state(std::vector(size + padding, 0)),
-          w_prev(std::vector(size + padding, 0)) {};
+        : alloc(std::vector(size, 0)), prev_state(std::vector(size, 0)),
+          w_prev(std::vector(size, 0)) {};
 };
 
 using ChoiceVector = std::vector<std::vector<std::array<MemoEntry, 2>>>;
@@ -113,6 +109,8 @@ struct LocationCost {
  *
  */
 
+// depending on whether we are using floats, or doubles.
+constexpr int padding = sizeof(double);
 inline void vectorizeDpTransition(const int w_prev, const int tot_work,
                                   const std::vector<double> &cost_table,
                                   const double prev0, const double prev1,
@@ -197,16 +195,16 @@ inline auto calc_single(const std::vector<double> &load_f,
     // p = dp[i][w] = minimum cost to allocate w effective work in the first
     // i blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
+    const int sizeOfDpWithPadding = tot_work + 1 + padding;
     constexpr auto inf = numeric_limits<double>::max() / 2;
-    auto row = array{vector(tot_work + 1 + padding, inf),
-                     vector(tot_work + 1 + padding, inf)};
+    auto row = array{vector(sizeOfDpWithPadding, inf),
+                     vector(sizeOfDpWithPadding, inf)};
 
-    auto prev_row = array{vector(tot_work + 1 + padding, inf),
-                          vector(tot_work + 1 + padding, inf)};
+    auto prev_row = row;
     row[1][0] = 0.; // 0 cost for 0 work
     // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
-    auto memo = vector(n + 1, array{MemoEntryVector(tot_work + 1 + padding),
-                                    MemoEntryVector(tot_work + 1 + padding)});
+    auto memo = vector(n + 1, array{MemoEntryVector(sizeOfDpWithPadding),
+                                    MemoEntryVector(sizeOfDpWithPadding)});
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
