@@ -46,16 +46,38 @@ struct MemoEntry {
 };
 
 struct MemoEntryVector {
-    std::vector<int> alloc;
-    std::vector<int> prev_state;
-    std::vector<int> w_prev;
+    std::vector<int> alloc, prev_state, w_prev;
 
     MemoEntryVector(size_t size)
-        : alloc(std::vector(size, 0)), prev_state(std::vector(size, 0)),
-          w_prev(std::vector(size, 0)) {};
+        : alloc(size, 0), prev_state(size, 0), w_prev(size, 0) {}
+
+    struct Reference {
+        int &alloc, &prev_state, &w_prev;
+        void operator=(const Reference &other) {
+            alloc = other.alloc;
+            prev_state = other.prev_state;
+            w_prev = other.w_prev;
+        }
+        void operator=(const std::array<int, 3> &vals) {
+            alloc = vals[0];
+            prev_state = vals[1];
+            w_prev = vals[2];
+        }
+    };
+    auto operator[](size_t idx) {
+        return Reference{.alloc = alloc[idx],
+                         .prev_state = prev_state[idx],
+                         .w_prev = w_prev[idx]};
+    }
+
+    auto operator[](size_t idx) const -> MemoEntry {
+        return MemoEntry{.alloc = alloc[idx],
+                         .prev_state = prev_state[idx],
+                         .w_prev = w_prev[idx]};
+    }
 };
 
-using ChoiceVector = std::vector<std::vector<std::array<MemoEntry, 2>>>;
+using ChoiceVector = std::vector<std::array<MemoEntryVector, 2>>;
 using SingleResult = std::pair<CostVector, ChoiceVector>;
 
 struct LocationCost {
@@ -230,9 +252,8 @@ inline auto calc_single(const std::vector<double> &load_f,
                 const auto new_cost = from_active ? prev0 : prev1;
                 if (new_cost < row[1][w_prev]) {
                     row[1][w_prev] = new_cost;
-                    memo[i][1].alloc[w_prev] = 0;
-                    memo[i][1].prev_state[w_prev] = from_active ? 0 : 1;
-                    memo[i][1].w_prev[w_prev] = w_prev;
+                    memo[i][1][w_prev] =
+                        std::array{0, from_active ? 0 : 1, w_prev};
                 }
             }
             // do some work
@@ -241,23 +262,10 @@ inline auto calc_single(const std::vector<double> &load_f,
         }
     }
 
-    // this we should probably refactor later
+    // we made it cache friendly, now back to previous structure
     auto help_row = vector(tot_work + 1, array{inf, inf});
     for (int i = 0; i <= tot_work; i++)
         help_row[i] = {row[0][i], row[1][i]};
-
-    auto help_memo = vector(n + 1, vector(tot_work + 1, array<MemoEntry, 2>{}));
-    for (int i = 0; i <= n; i++) {
-        for (int p = 0; p <= tot_work; p++) {
-            MemoEntry for0{.alloc = memo[i][0].alloc[p],
-                           .prev_state = memo[i][0].prev_state[p],
-                           .w_prev = memo[i][0].w_prev[p]};
-            MemoEntry for1{.alloc = memo[i][1].alloc[p],
-                           .prev_state = memo[i][1].prev_state[p],
-                           .w_prev = memo[i][1].w_prev[p]};
-            help_memo[i][p] = {for0, for1};
-        }
-    }
 
     auto res = vector<double>{};
     res.reserve(tot_work + 1);
@@ -267,13 +275,13 @@ inline auto calc_single(const std::vector<double> &load_f,
         // (costs[0] vs costs[1]) for easier reconstruction later
         if (costs[0] < costs[1]) {
             res.push_back(costs[0]);
-            help_memo[n][w][1] = help_memo[n][w][0];
+            memo[n][1][w] = memo[n][0][w];
         } else {
             res.push_back(costs[1]);
-            help_memo[n][w][0] = help_memo[n][w][1];
+            memo[n][0][w] = memo[n][1][w];
         }
     }
-    return {std::move(res), std::move(help_memo)};
+    return {std::move(res), std::move(memo)};
 }
 
 /*
@@ -407,7 +415,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         // calc_single)
         int cur_state = 0;
         for (auto j = n; j--;) {
-            const auto &entry = loc_memo[j + 1][cur_w][cur_state];
+            const auto &entry = loc_memo[j + 1][cur_state][cur_w];
             loc_res[j] = static_cast<double>(entry.alloc) * e_work;
 
             cur_w = entry.w_prev;
