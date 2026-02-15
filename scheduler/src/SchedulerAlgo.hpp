@@ -228,6 +228,13 @@ inline auto calc_single(const std::vector<double> &load_f,
     auto memo = vector(n + 1, array{MemoEntryVector(sizeOfDpWithPadding),
                                     MemoEntryVector(sizeOfDpWithPadding)});
 
+    int max_capacity{};
+    for (auto i : capacity)
+        max_capacity = max(max_capacity, i);
+
+    const int MAX_WI = static_cast<int>(ceil(max_capacity / e_work)) + 1;
+    auto cost_table = vector(MAX_WI + 1 + padding, inf);
+
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
 
@@ -238,10 +245,11 @@ inline auto calc_single(const std::vector<double> &load_f,
         const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
         const auto base_cost = cost_func(load[i - 1]);
 
-        auto cost_table = vector(max_wi + 1 + padding, inf);
         for (int wi = 0; wi <= max_wi; wi++) {
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
         }
+        for (int wi = max_wi; wi <= max_wi + padding + 1; wi++)
+            cost_table[wi] = inf;
 
         for (const auto w_prev : views::iota(0, tot_work + 1)) {
             const auto &[prev0, prev1] =
