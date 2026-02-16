@@ -1,18 +1,25 @@
 cmake_minimum_required(VERSION 4.2)
 project(scheduler)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options(-mavx512f -mavx512bw -mavx512vl -mavx512dq)
-elseif(MSVC)
-    add_compile_options(/arch:AVX512)
-endif()
-
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE INTERNAL "") # force c++23 in cache
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 add_compile_options(-Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+option(USE_NATIVE_ARCH "Optimize for this specific machine" ON)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  if(USE_NATIVE_ARCH)
+    add_compile_options(-march=native)
+  else()
+    # the standard AVX-512 baseline (F, BW, VL, DQ, etc.)
+    add_compile_options(-march=x86-64-v4)
+  endif()
+elseif(MSVC)
+  add_compile_options(/arch:AVX512)
+endif()
 
 find_package(Drogon CONFIG REQUIRED)
 
