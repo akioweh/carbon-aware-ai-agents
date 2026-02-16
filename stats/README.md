@@ -33,7 +33,8 @@ Before running the API, optionally generate sample history data:
 python generate_history.py
 ```
 
-This will create a `history.json` file with 30 days of historical data.
+This will populate the SQLite database (`cache.db`) with 30 days of historical
+data.
 
 ### Run the API
 
@@ -161,14 +162,17 @@ patterns:
 
 ## Service Behavior
 
-- On startup, the service loads historical data from `history.json` and
-  generates them fresh if not found.
+- On startup, the service initializes the SQLite database (`cache.db`).
+- If a legacy `history.json` exists and the database is empty, it migrates the
+  data.
+- If the database is empty and no history exists, it generates fresh historical
+  data.
 - The service concurrently (in a background thread) computes new predictions
-  (every 5 minutes)
+  (every 5 minutes).
 - On each request, the service returns the latest data point from the history.
 
-Specifically, the background worker writes to a sqlite database that the request
-handlers also read from.
+The background worker writes to the sqlite database that the request handlers
+also read from.
 
 > [!TIP]  
 > This architecture avoids stale data while also maintaining API latency.

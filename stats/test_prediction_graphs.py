@@ -1,5 +1,7 @@
 import json
+
 import matplotlib.pyplot as plt
+
 from generate_history import DATA_CENTRES
 
 # Load the data

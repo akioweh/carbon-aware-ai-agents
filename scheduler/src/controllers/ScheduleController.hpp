@@ -1,10 +1,15 @@
-#ifndef SCHEDULE_CONTROLLER_HPP
-#define SCHEDULE_CONTROLLER_HPP
+#ifndef SCHEDULER_SCHEDULE_CONTROLLER_HPP
+#define SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #pragma once
 
-#include <Scheduler.hpp>
+#include "structs/JobIdentifierParam.hpp"
+#include "structs/JobRequest.hpp"
+#include "structs/TimeIntervalParams.hpp"
 #include <drogon/HttpController.h>
+#include <drogon/HttpResponse.h>
 #include <drogon/utils/coroutine.h>
+
+namespace scheduler::controllers {
 
 class ScheduleController : public drogon::HttpController<ScheduleController> {
   public:
@@ -13,17 +18,32 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                   drogon::Post);
     ADD_METHOD_TO(ScheduleController::getSchedule, "/api/schedule",
                   drogon::Get);
+    ADD_METHOD_TO(ScheduleController::deleteSchedule, "/api/schedule/{job_id}",
+                  drogon::Delete);
+    ADD_METHOD_TO(ScheduleController::getSpecificSchedule,
+                  "/api/schedule/{job_id}", drogon::Get);
+    ADD_METHOD_TO(ScheduleController::getScheduledJobs, "/api/schedule/jobs",
+                  drogon::Get);
     METHOD_LIST_END
 
-    auto calculateSchedule(
-        drogon::HttpRequestPtr req,
-        std::function<void(const drogon::HttpResponsePtr &)> callback)
-        -> drogon::Task<void>;
+    [[nodiscard]] auto calculateSchedule(drogon::HttpRequestPtr,
+                                         JobRequest) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
 
-    auto
-    getSchedule(drogon::HttpRequestPtr req,
-                std::function<void(const drogon::HttpResponsePtr &)> callback)
-        -> drogon::Task<void>;
+    [[nodiscard]] auto getSchedule(drogon::HttpRequestPtr,
+                                   TimeIntervalParams) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
+
+    [[nodiscard]] auto deleteSchedule(drogon::HttpRequestPtr,
+                                      JobIdentifierParam) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
+    [[nodiscard]] auto getSpecificSchedule(drogon::HttpRequestPtr,
+                                           JobIdentifierParam) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
+    [[nodiscard]] auto getScheduledJobs(drogon::HttpRequestPtr) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
 };
 
-#endif
+} // namespace scheduler::controllers
+
+#endif // SCHEDULER_SCHEDULE_CONTROLLER_HPP

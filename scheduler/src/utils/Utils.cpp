@@ -1,41 +1,9 @@
 #include "Utils.hpp"
-#include <expected>
-#include <sstream>
+#include "exceptions/ValidationException.hpp"
 
 namespace scheduler::utils {
 using namespace std;
 using namespace drogon;
-
-using SysTime = chrono::system_clock::time_point;
-
-auto toIso8601(const SysTime &timePoint) -> string {
-    // remove sub-second precision
-    auto tp_sec = chrono::floor<chrono::seconds>(timePoint);
-    // %F = YYYY-MM-DD
-    // %T = HH:MM:SS
-    // Z  = Literal Z suffix
-    return format("{:%FT%TZ}", tp_sec);
-}
-
-auto parseIso8601(const string &timestamp) -> expected<SysTime, string> {
-
-    chrono::sys_seconds res;
-    istringstream iss(timestamp);
-
-    if (iss >> chrono::parse("%FT%TZ", res))
-        return res;
-    // try with explicit offset
-    iss.clear();
-    iss.str(timestamp);
-    if (iss >> chrono::parse("%FT%T%Ez", res))
-        return res;
-    iss.clear();
-    iss.str(timestamp);
-    if (iss >> chrono::parse("%FT%T%z", res))
-        return res;
-
-    return unexpected("Failed to parse ISO8601 string: " + timestamp);
-}
 
 auto makeGetRequest(const string &host, const string &path)
     -> Task<shared_ptr<Json::Value>> {
@@ -67,4 +35,25 @@ auto makeGetRequest(const string &host, const string &path)
 
     co_return make_shared<Json::Value>(*jsonResponsePtr);
 }
+
+auto parseStringIDtoInt(const std::string &jobId) -> int {
+    auto pos = jobId.find('-');
+    if (pos == std::string::npos) {
+        throw exceptions::ValidationException(
+            "Invalid ID format: missing prefix separator");
+    }
+    int value = 0;
+    auto res = std::from_chars(jobId.data() + pos + 1,
+                               jobId.data() + jobId.size(), value);
+    if (res.ec != std::errc()) {
+        throw exceptions::ValidationException(
+            "Invalid ID format: invalid number");
+    }
+    return value;
+}
+
+auto parseIntToStringID(int jobId) -> std::string {
+    return "sched-" + std::to_string(jobId);
+}
+
 } // namespace scheduler::utils

@@ -15,6 +15,8 @@ entire project.
   current inter-component APIs. This will evolve as the feature set expands.
 - [Functional Design Specs](./functional_design.md): in-depth reference to how
   select features are implemented.
+- [Coding Style Guide](./CODING_STYLE.md): high-level coding style guide for the
+  entire project.
 
 ## Developer Information
 

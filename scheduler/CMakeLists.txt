@@ -8,14 +8,15 @@ add_compile_options(-Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "src/*.cpp")
-add_executable(scheduler main.cpp ${SRC_FILES})
-target_include_directories(scheduler PRIVATE src)
-
-target_link_libraries(scheduler PRIVATE stdc++exp) # g++ std23 stuff
-
 find_package(Drogon CONFIG REQUIRED)
-target_link_libraries(scheduler PRIVATE Drogon::Drogon)
+
+add_subdirectory(src)
+
+add_executable(scheduler main.cpp)
+target_link_libraries(scheduler PRIVATE scheduler_core)
+
+enable_testing()
+add_subdirectory(tests)
 
 # copy compile_commands.json to root for clangd
 if(CMAKE_EXPORT_COMPILE_COMMANDS)

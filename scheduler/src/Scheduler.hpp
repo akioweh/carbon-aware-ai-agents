@@ -1,53 +1,31 @@
-#ifndef SCHEDULER
-#define SCHEDULER
+#ifndef SCHEDULER_SCHEDULER_HPP
+#define SCHEDULER_SCHEDULER_HPP
 #pragma once
 
-#include <JobRequest.hpp>
-#include <PredictionApi.hpp>
-#include <ScheduleForDatacenter.hpp>
-#include <Serializable.hpp>
-#include <map>
-#include <set>
+#include "StatsAPIClient.hpp"
+#include "structs/JobRequest.hpp"
+#include "structs/SchedulerOutput.hpp"
 
-struct SchedulingImpact {
-    double carbon_intensity{};
-    double total_emissions{};
-    double sci{};
-};
+namespace scheduler {
 
-inline auto f_toJson(const SchedulingImpact &obj) -> Json::Value {
-    auto res = Json::Value{};
-    res["carbon_intensity"] = obj.carbon_intensity;
-    res["total_emissions"] = obj.total_emissions;
-    res["sci"] = obj.sci;
-    return res;
-}
-
-static_assert(Serializable<SchedulingImpact>);
-
+/**
+ * @class Scheduler
+ * @brief The main schedule optimization engine.
+ *
+ * The scheduler itself is stateless. It produces a SchedulerOutput
+ * containing the optimal allocation and impact metrics. It has no
+ * knowledge of persistence or API concerns.
+ */
 class Scheduler {
   private:
-    static const unsigned int KWH = 1000 * 60 * 60;
+    static constexpr unsigned int KWH = 1000 * 60 * 60;
 
-    PredictionApi predictionApi;
-
-    std::map<long long, ScheduleForDatacenter>
-        fullSchedule; // datacenterId -> schedule
-
-    auto getCombinedIntervals(
-        std::map<long long, std::vector<PredictedDatacenterInformation>> &data)
-        -> std::multiset<PredictedDatacenterInformation>;
-
-    auto schedule(PredictedDatacenterInformation &interval, JobRequest &job)
-        -> double;
+    StatsAPIClient stats_api;
 
   public:
-    auto calculateSchedule(JobRequest job) -> drogon::Task<SchedulingImpact>;
-    void show() const;
-    [[nodiscard]] auto getSchedule() const
-        -> const std::map<long long, ScheduleForDatacenter> & {
-        return fullSchedule;
-    }
+    auto scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput>;
 };
 
-#endif
+} // namespace scheduler
+
+#endif // SCHEDULER_SCHEDULER_HPP

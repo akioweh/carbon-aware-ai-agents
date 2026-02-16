@@ -19,8 +19,39 @@
       }
     },
     {
+      "name": "debug-base",
+      "hidden": true,
+      "description": "Debug build with ASan and UBSan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
+    {
+      "name": "release-base",
+      "hidden": true,
+      "description": "Release build with O3 optimization",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS": "-O3"
+      }
+    },
+    {
+      "name": "tsan-base",
+      "hidden": true,
+      "description": "Debug build with ThreadSanitizer (cannot combine with ASan/UBSan)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=thread"
+      }
+    },
+    {
       "name": "windows-mingw",
-      "displayName": "Windows (MinGW/MSYS2)",
+      "displayName": "Windows (MinGW/MSYS2) - Debug",
       "inherits": "vcpkg-base",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic",
@@ -33,15 +64,57 @@
       }
     },
     {
-      "name": "arch",
-      "displayName": "Linux (System GCC)",
-      "description": "Uses system pacman libraries, no vcpkg",
-      "inherits": "ci-base",
+      "name": "windows-mingw-rel",
+      "displayName": "Windows (MinGW/MSYS2) - Release",
+      "inherits": [
+        "vcpkg-base",
+        "release-base"
+      ],
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_CXX_COMPILER": "g++",
-        "CMAKE_C_COMPILER": "gcc"
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
       },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "arch",
+      "displayName": "Linux - Debug",
+      "description": "Uses system libraries",
+      "inherits": [
+        "ci-base",
+        "debug-base"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "arch-rel",
+      "displayName": "Linux - Release",
+      "description": "Uses system libraries",
+      "inherits": [
+        "ci-base",
+        "release-base"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "arch-tsan",
+      "displayName": "Linux - ThreadSanitizer",
+      "description": "Uses system libraries",
+      "inherits": [
+        "ci-base",
+        "tsan-base"
+      ],
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",

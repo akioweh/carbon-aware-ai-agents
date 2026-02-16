@@ -26,7 +26,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/ScheduleCreationResponse"
         "400":
-          description: Invalid request
+          description:
+            Malformed request (e.g. missing or unparseable path parameter)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: >
+            Semantically invalid request (e.g. invalid schedule_id format)
           content:
             application/json:
               schema:
@@ -35,14 +43,16 @@ paths:
     delete:
       operationId: deleteScheduledJob
       summary: Deletes a scheduled job
-      description: Cause POST on this endpoint automatically persists the job, we need a way to delete it if user doesnt confirm it
+      description:
+        Cause POST on this endpoint automatically persists the job, we need a
+        way to delete it if user doesnt confirm it
       parameters:
         - $ref: "#/components/parameters/ScheduleIdParam"
       responses:
         "200":
           description: Schedule deleted successfully
         "400":
-          description: Invalid request
+          description: Malformed request
           content:
             application/json:
               schema:
@@ -52,7 +62,10 @@ paths:
     get:
       operationId: getSchedule
       summary: Fetch datacenter work schedule
-      description: gets all already-scheduled jobs (gets all blocks) which start after start_time and end before end_time. Those arguments are optional, so providing neither gives back the whole schedule.
+      description:
+        gets all already-scheduled jobs (gets all blocks) which start after
+        start_time and end before end_time. Those arguments are optional, so
+        providing neither gives back the whole schedule.
       parameters:
         - $ref: "#/components/parameters/StartTimeParam"
         - $ref: "#/components/parameters/EndTimeParam"
@@ -64,7 +77,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/ScheduleResponse"
         "400":
-          description: Invalid request
+          description: Malformed request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: >
+            Semantically invalid parameters (e.g. invalid date format,
+            start_time after end_time)
           content:
             application/json:
               schema:
@@ -73,7 +94,9 @@ paths:
     post:
       operationId: scheduleJob
       summary: Schedule a job
-      description: Submit a job and get back an optimized schedule placement (only blocks of this new job)
+      description:
+        Submit a job and get back an optimized schedule placement (only blocks
+        of this new job)
       requestBody:
         required: true
         content:
@@ -88,7 +111,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/ScheduleCreationResponse"
         "400":
-          description: Invalid request
+          description: Malformed request (e.g. missing or unparseable JSON body)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: >
+            Scheduling conflict: the request is valid but cannot be satisfied
+            given the current system state (e.g. insufficient capacity across
+            all locations, no available data centers, scheduling window too
+            narrow or in the past)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: >
+            Semantically invalid request body (e.g. missing required fields,
+            invalid date format, non-positive workload_amount, latest_finish
+            before earliest_start)
           content:
             application/json:
               schema:
@@ -115,7 +157,7 @@ components:
       schema:
         type: string
         format: date-time
-        description: Earliest time to start
+        description: Latest time to end
         example: "2025-12-08T00:00:00Z"
 
     ScheduleIdParam:
@@ -146,6 +188,7 @@ components:
           type: number
           description: Amount of workload in the specified functional unit
           minimum: 0
+          exclusiveMinimum: true
           example: 20
         earliest_start:
           type: string
@@ -155,7 +198,7 @@ components:
         latest_finish:
           type: string
           format: date-time
-          description: Latest time to finish
+          description: Latest time to finish (must be after earliest_start)
           example: "2025-12-10T00:00:00Z"
         additional_constraints:
           type: object
@@ -194,7 +237,9 @@ components:
 
     ScheduleCreationResponse:
       type: object
-      description: Response after scheduling a job, indicating success and server-assigned schedule ID
+      description:
+        Response after scheduling a job, indicating success and server-assigned
+        schedule ID
       required:
         - schedule_id
         - scheduled_blocks
@@ -217,7 +262,9 @@ components:
           properties:
             carbon_intensity:
               type: number
-              description: average carbon intensity during the scheduled period in kg CO2/kWh
+              description:
+                average carbon intensity during the scheduled period in kg
+                CO2/kWh
               example: 50.0
             total_emissions:
               type: number
@@ -225,8 +272,9 @@ components:
               example: 0.14
             sci:
               type: number
-              description: the sci bruh
+              description: Software Carbon Intensity score for the schedule
               example: 20
+
     Error:
       type: object
       required:
@@ -234,5 +282,5 @@ components:
       properties:
         error:
           type: string
-          description: Error message
+          description: Human-readable error message
           example: "Invalid job specification"

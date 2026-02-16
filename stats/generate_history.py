@@ -1,7 +1,8 @@
-import json
 import math
 import random
 from datetime import datetime, timedelta
+
+import db_utils
 
 MAX_CAPACITY = 50
 DATA_CENTRES = [
@@ -111,8 +112,8 @@ def generate_history():
     start = now - timedelta(days=30)
     current = start
 
-    # dictionary keyed by data centre name
-    histories = {dc: [] for dc in DATA_CENTRES}
+    # Prepare bulk data for efficient insertion
+    bulk_data = []
 
     # Shared weather system (or could be per region)
     weather = WeatherSystem()
@@ -121,20 +122,20 @@ def generate_history():
         weather.update()
 
         for i, dc in enumerate(DATA_CENTRES):
-            histories[dc].append(
-                {
-                    'timestamp': current.isoformat(),
-                    'load': generate_load(current, i),
-                    'greenness': generate_greenness(current, weather),
-                }
-            )
+            bulk_data.append({
+                'location': dc,
+                'timestamp': current,
+                'load': generate_load(current, i),
+                'greenness': generate_greenness(current, weather),
+            })
         current += timedelta(minutes=5)
 
-    with open('history.json', 'w') as f:
-        json.dump(histories, f, indent=2)
-
-    print('history.json generated.')
+    # Insert all data into database
+    db_utils.insert_historical_data_bulk(bulk_data)
+    print(f'Generated and inserted {len(bulk_data)} historical data points into database.')
 
 
 if __name__ == '__main__':
+    # ensure database is initialized
+    db_utils.initialize_db()
     generate_history()

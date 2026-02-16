@@ -1,112 +1,84 @@
-#include "ScheduleController.hpp"
-#include <JobRequest.hpp>
-#include <utils/Utils.hpp>
+#include "controllers/ScheduleController.hpp"
+#include "Calendar.hpp"
+#include "SchedulingQueue.hpp"
+#include "structs/JobIdentifierParam.hpp"
+#include "structs/JobRequest.hpp"
+#include "structs/ScheduleBlock.hpp"
+#include "structs/TimeIntervalParams.hpp"
+#include "utils/TimeGridder.hpp"
+#include <drogon/HttpResponse.h>
+#include <drogon/HttpTypes.h>
 
-using Callback = std::function<void(const drogon::HttpResponsePtr &)>;
+namespace scheduler::controllers {
 
-namespace {
-void sendBadRequest(const Callback &callback, std::string_view message) {
-    auto resp = drogon::HttpResponse::newHttpResponse();
-    resp->setStatusCode(drogon::k400BadRequest);
-    Json::Value err;
-    err["error"] = std::string(message);
-    resp->setBody(err.toStyledString());
-    resp->setContentTypeCode(drogon::CT_APPLICATION_JSON);
-    callback(resp);
+using namespace std;
+using namespace drogon;
+using namespace scheduler;
+
+auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
+                                     const TimeIntervalParams interval) const
+    -> Task<HttpResponsePtr> {
+    const auto res = co_await calendar::get(
+        interval.start.value_or(scheduler::utils::MIN_TIME),
+        interval.end.value_or(scheduler::utils::MAX_TIME));
+    auto ret = Json::Value(Json::arrayValue);
+    for (const auto &block : res)
+        ret.append(toJson(block));
+    const auto resp = HttpResponse::newHttpJsonResponse(ret);
+    co_return resp;
 }
 
-auto generateJobId() -> std::string {
-    static int counter = 0;
-    return "job-" + std::to_string(++counter);
+auto ScheduleController::getSpecificSchedule(
+    HttpRequestPtr /*req*/, const JobIdentifierParam job_id) const
+    -> Task<HttpResponsePtr> {
+    const auto res = co_await calendar::get(job_id.jobId);
+    const auto resp = HttpResponse::newHttpJsonResponse(toJson(res));
+    co_return resp;
 }
-} // namespace
 
-auto ScheduleController::getSchedule(drogon::HttpRequestPtr req,
-                                     Callback callback) -> drogon::Task<void> {
+auto ScheduleController::deleteSchedule(HttpRequestPtr /*req*/,
+                                        const JobIdentifierParam job_id) const
+    -> Task<HttpResponsePtr> {
+    co_await calendar::deleteSchedule(job_id.jobId);
+    co_return HttpResponse::newHttpResponse();
+}
 
-    // TODO: empty stub awaiting stats component's calendar persistence support
+auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
+                                           const JobRequest job_request) const
+    -> Task<HttpResponsePtr> {
+    auto output = co_await schedulingQueue.computeSchedule(job_request);
+
+    // persist and get the DB-assigned job ID
+    const auto job_id = co_await calendar::add(output);
+
+    // construct the API DTO with the real job ID
+    auto schedule = vector<ScheduleBlock>{};
+    schedule.reserve(output.blocks.size());
+    for (auto &block : output.blocks)
+        schedule.push_back({
+            .timestamp = block.timestamp,
+            .jobId = job_id,
+            .location = std::move(block.location),
+            .additionalLoad = block.additionalLoad,
+        });
+
+    const auto result = ScheduleResult{
+        .jobId = job_id,
+        .schedule = std::move(schedule),
+        .impact = output.impact,
+    };
+
+    co_return HttpResponse::newHttpJsonResponse(toJson(result));
+}
+
+auto ScheduleController::getScheduledJobs(HttpRequestPtr /*req*/) const
+    -> Task<HttpResponsePtr> {
+    const auto jobIds = co_await calendar::listJobs();
     Json::Value ret(Json::arrayValue);
-    const auto resp = drogon::HttpResponse::newHttpJsonResponse(ret);
-    callback(resp);
-    co_return;
+    for (const auto &id : jobIds)
+        ret.append(id);
+    const auto resp = HttpResponse::newHttpJsonResponse(ret);
+    co_return resp;
 }
 
-auto ScheduleController::calculateSchedule(drogon::HttpRequestPtr req,
-                                           Callback callback)
-    -> drogon::Task<void> {
-
-    const auto jsonPtr = req->jsonObject();
-    if (!jsonPtr) {
-        sendBadRequest(callback, "Invalid JSON");
-        co_return;
-    }
-
-    const auto &json = *jsonPtr;
-
-    if (!json.isMember("job_type") || !json.isMember("workload_amount") ||
-        !json.isMember("earliest_start") || !json.isMember("latest_finish")) {
-        sendBadRequest(callback, "Missing required fields");
-        co_return;
-    }
-
-    const auto jobType = json["job_type"].asString();
-    const auto workload = json["workload_amount"].asDouble();
-    const auto earliestStartStr = json["earliest_start"].asString();
-    const auto latestFinishStr = json["latest_finish"].asString();
-
-    // i like haskell better
-    auto parseResult =
-        scheduler::utils::parseIso8601(earliestStartStr)
-            .and_then([&](auto timePoint) -> auto {
-                return scheduler::utils::parseIso8601(latestFinishStr)
-                    .transform([timePoint](auto latestFinish) -> auto {
-                        return std::make_pair(timePoint, latestFinish);
-                    });
-            });
-    if (!parseResult) {
-        sendBadRequest(callback, parseResult.error());
-        co_return;
-    }
-    const auto &[earliestStart, latestFinish] = parseResult.value();
-
-    std::string jobId = generateJobId();
-
-    const auto jobRequest =
-        JobRequest(jobType, workload, earliestStart, latestFinish, jobId);
-
-    auto scheduler = Scheduler{};
-
-    SchedulingImpact impact = co_await scheduler.calculateSchedule(jobRequest);
-
-    Json::Value ret;
-    ret["schedule_id"] = "sched-" + jobId;
-    ret["message"] = "Schedule created successfully";
-
-    Json::Value blocks(Json::arrayValue);
-    const auto &fullSchedule = scheduler.getSchedule();
-
-    for (const auto &[dcId, scheduleForDC] : fullSchedule) {
-        Json::Value dcJson = toJson(scheduleForDC);
-        // Assuming datacenterInfo has a name field we can use as location
-        std::string location = dcJson["datacenterInfo"]["name"].asString();
-        const auto &intervals = dcJson["intervals"];
-
-        for (const auto &interval : intervals) {
-            Json::Value block;
-            block["timestamp"] =
-                interval["timestamp"]; // Already string from toJson
-            block["location"] = location;
-            block["job_id"] = interval["job_id"];
-            block["additional_load"] = interval["additional_load"];
-
-            blocks.append(block);
-        }
-    }
-    ret["scheduled_blocks"] = blocks;
-
-    ret["impact"] = toJson(impact);
-
-    const auto resp = drogon::HttpResponse::newHttpJsonResponse(ret);
-    callback(resp);
-    co_return;
-}
+} // namespace scheduler::controllers

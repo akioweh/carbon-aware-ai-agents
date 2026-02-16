@@ -5,4 +5,6 @@ Checks: >
   performance-*,
   readability-*,
   -readability-braces-around-statements,
+  -readability-identifier-length,
   -bugprone-easily-swappable-parameters,
+  -readability-implicit-bool-conversion,
