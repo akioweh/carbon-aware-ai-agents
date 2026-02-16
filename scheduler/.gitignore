@@ -1,4 +1,5 @@
 tests/scheduler_test.db
+db_data/
 
 #--------------------------------------------------#
 # The following was generated with gitignore.nvim: #
