@@ -42,7 +42,7 @@ export default function Home() {
         {/* Main Content */}
         <main>
           {showCalendar ? (
-            <WorkloadCalendar onClose={() => setShowCalendar(false)} />
+            <WorkloadCalendar onClose={() => setShowCalendar(false)} scheduleId={scheduleResult?.schedule_id} />
           ) : scheduleResult ? (
             <ScheduleResult
               result={scheduleResult}
