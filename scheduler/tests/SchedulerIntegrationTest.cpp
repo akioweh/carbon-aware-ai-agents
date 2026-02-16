@@ -87,10 +87,10 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     BOOST_CHECK(!jobId.empty());
 
     // Check fields in response
-    BOOST_CHECK((*json).isMember("schedule"));
+    BOOST_CHECK((*json).isMember("scheduled_blocks"));
     BOOST_CHECK((*json).isMember("impact"));
-    BOOST_CHECK((*json)["schedule"].isArray());
-    BOOST_CHECK((*json)["schedule"].size() > 0);
+    BOOST_CHECK((*json)["scheduled_blocks"].isArray());
+    BOOST_CHECK((*json)["scheduled_blocks"].size() > 0);
 
     // 2. Retrieve the schedule (GET)
     auto getReq = HttpRequest::newHttpRequest();
@@ -279,8 +279,8 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     BOOST_REQUIRE(getJson);
     BOOST_CHECK((*getJson).isMember("schedule_id"));
     BOOST_CHECK_EQUAL((*getJson)["schedule_id"].asString(), id1);
-    BOOST_CHECK((*getJson).isMember("schedule"));
-    BOOST_CHECK((*getJson)["schedule"].isArray());
+    BOOST_CHECK((*getJson).isMember("scheduled_blocks"));
+    BOOST_CHECK((*getJson)["scheduled_blocks"].isArray());
     BOOST_CHECK((*getJson).isMember("impact"));
 }
 
