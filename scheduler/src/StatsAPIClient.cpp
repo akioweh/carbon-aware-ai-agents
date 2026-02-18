@@ -22,10 +22,6 @@ StatsAPIClient::StatsAPIClient(string host) : host(std::move(host)) {}
 
 auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
     auto jsonPtr = co_await utils::makeGetRequest(host, getLocationsPath());
-    if (!jsonPtr) {
-        LOG_ERROR << "Failed to get locations";
-        co_return {};
-    }
 
     const auto &json = *jsonPtr;
     auto locations = vector<Location>{};
@@ -39,10 +35,6 @@ auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
 auto StatsAPIClient::getLoadForecast(const string &location)
     -> Task<std::optional<LoadForecast>> {
     auto jsonPtr = co_await utils::makeGetRequest(host, getLoadPath(location));
-    if (!jsonPtr) {
-        LOG_ERROR << "Failed to get load forecast for " << location;
-        co_return std::nullopt;
-    }
 
     const auto &json = *jsonPtr;
     Capacity capacity{};
@@ -84,10 +76,6 @@ auto StatsAPIClient::getGreennessForecast(const string &location)
     -> Task<std::optional<GreennessForecast>> {
     auto jsonPtr =
         co_await utils::makeGetRequest(host, getGreennessPath(location));
-    if (!jsonPtr) {
-        LOG_ERROR << "Failed to get greenness forecast for " << location;
-        co_return std::nullopt;
-    }
 
     const auto &json = *jsonPtr;
     auto data = decltype(GreennessForecast::data){};
