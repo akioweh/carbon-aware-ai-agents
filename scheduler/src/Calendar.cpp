@@ -57,10 +57,10 @@ auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
     co_return scheduler::utils::parseIntToStringID(impactId);
 }
 
-auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
+auto get(const std::string &scheduleIdString) -> drogon::Task<ScheduleResult> {
     auto context = getContext();
 
-    const int jobIdInt = scheduler::utils::parseStringIDtoInt(jobIdString);
+    const int jobIdInt = scheduler::utils::parseStringIDtoInt(scheduleIdString);
 
     try {
         auto &&[impactModel, jobsModels] = co_await scheduler::coro::when_all(
@@ -69,13 +69,14 @@ auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
             to_task<std::vector<mappers::JobModel>>(context.jobsMapper.findBy(
                 jobImpactIdEqualityCriteria(jobIdInt))));
 
-        co_return ScheduleResult{.jobId = jobIdString,
+        co_return ScheduleResult{.scheduleId = scheduleIdString,
                                  .schedule = mappers::fromDtoAll(jobsModels),
                                  .impact = mappers::fromDto(impactModel)};
     } catch (const std::exception &e) {
-        LOG_ERROR << "NO scheduled job with id=" + jobIdString << " in the DB!";
+        LOG_ERROR << "NO scheduled job with id=" + scheduleIdString
+                  << " in the DB!";
         throw scheduler::exceptions::ValidationException(
-            "No scheduled job with id: " + jobIdString);
+            "No scheduled job with id: " + scheduleIdString);
     }
 }
 
@@ -98,10 +99,10 @@ auto listJobs() -> drogon::Task<std::vector<std::string>> {
     co_return jobIds;
 }
 
-auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
+auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<> {
     auto context = getContext();
     co_await context.impactMapper.deleteByPrimaryKey(
-        scheduler::utils::parseStringIDtoInt(jobId));
+        scheduler::utils::parseStringIDtoInt(scheduleId));
     // we have cascade on delete, so no need to delete the children manually
 }
 

@@ -20,13 +20,13 @@ using time_point = std::chrono::system_clock::time_point;
  */
 auto add(const SchedulerOutput &output) -> drogon::Task<std::string>;
 
-auto get(const std::string &jobId) -> drogon::Task<ScheduleResult>;
+auto get(const std::string &scheduleIdString) -> drogon::Task<ScheduleResult>;
 
 auto get(time_point start = scheduler::utils::MIN_TIME,
          time_point end = scheduler::utils::MAX_TIME)
     -> drogon::Task<std::vector<ScheduleBlock>>;
 
-auto deleteSchedule(const std::string &jobId) -> drogon::Task<>;
+auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<>;
 
 auto listJobs() -> drogon::Task<std::vector<std::string>>;
 

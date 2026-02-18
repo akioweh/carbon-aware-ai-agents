@@ -17,7 +17,7 @@ namespace scheduler {
 class ScheduleBlock {
   public:
     std::chrono::system_clock::time_point timestamp;
-    std::string jobId;
+    std::string scheduleId;
     std::string location;
     double additionalLoad{}; /// thats what we scheduled
 };
@@ -30,7 +30,7 @@ inline auto operator<=>(const ScheduleBlock &lhs, const ScheduleBlock &rhs)
 inline auto f_toJson(const ScheduleBlock &obj) -> Json::Value {
     auto res = Json::Value{};
     res["timestamp"] = scheduler::utils::toIso8601(obj.timestamp);
-    res["job_id"] = obj.jobId;
+    res["schedule_id"] = obj.scheduleId;
     res["additional_load"] = obj.additionalLoad;
     res["location"] = obj.location;
     return res;

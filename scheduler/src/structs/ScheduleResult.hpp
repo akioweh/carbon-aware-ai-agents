@@ -34,14 +34,14 @@ static_assert(Serializable<ScheduleImpact>);
  * @brief API DTO for the result of a scheduling operation.
  */
 struct ScheduleResult {
-    std::string jobId;
+    std::string scheduleId;
     std::vector<ScheduleBlock> schedule;
     ScheduleImpact impact{};
 };
 
 inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
     auto res = Json::Value{};
-    res["schedule_id"] = obj.jobId;
+    res["schedule_id"] = obj.scheduleId;
     res["message"] = "Success";
     res["scheduled_blocks"] = Json::Value(Json::arrayValue);
     res["impact"] = toJson(obj.impact);
