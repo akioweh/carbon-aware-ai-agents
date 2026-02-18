@@ -4,16 +4,21 @@ import { useState } from "react"
 import { SchedulingForm } from "@/components/scheduling-form"
 import { ScheduleResult } from "@/components/schedule-result"
 import { WorkloadCalendar } from "@/components/workload-calendar"
+import { PreviousJobs } from "@/components/previous-jobs"
+import { Button } from "@/components/ui/button"
+import { History } from "lucide-react"
 
 export default function Home() {
   const [scheduleResult, setScheduleResult] = useState<any>(null)
   const [timeRange, setTimeRange] = useState<{ earliestStart: string; latestFinish: string } | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
+  const [showPreviousJobs, setShowPreviousJobs] = useState(false)
 
   const handleScheduleComplete = (result: any, earliestStart: string, latestFinish: string) => {
     setScheduleResult(result)
     setTimeRange({ earliestStart, latestFinish })
     setShowCalendar(false)
+    setShowPreviousJobs(false)
   }
 
   const handleBack = () => {
@@ -24,6 +29,12 @@ export default function Home() {
   const handleCancel = () => {
     setScheduleResult(null)
     setTimeRange(null)
+  }
+
+  const handleSelectJob = (job: any) => {
+    setScheduleResult(job)
+    setTimeRange(null)
+    setShowPreviousJobs(false)
   }
 
   return (
@@ -43,6 +54,8 @@ export default function Home() {
         <main>
           {showCalendar ? (
             <WorkloadCalendar onClose={() => setShowCalendar(false)} scheduleId={scheduleResult?.schedule_id} />
+          ) : showPreviousJobs ? (
+            <PreviousJobs onClose={() => setShowPreviousJobs(false)} onSelectJob={handleSelectJob} />
           ) : scheduleResult ? (
             <ScheduleResult
               result={scheduleResult}
@@ -52,10 +65,22 @@ export default function Home() {
               onCancel={handleCancel}
             />
           ) : (
-            <SchedulingForm
-              onScheduleComplete={handleScheduleComplete}
-              onViewCalendar={() => setShowCalendar(true)}
-            />
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPreviousJobs(true)}
+                  className="gap-2 bg-transparent"
+                >
+                  <History className="h-4 w-4" />
+                  View Previous Jobs
+                </Button>
+              </div>
+              <SchedulingForm
+                onScheduleComplete={handleScheduleComplete}
+                onViewCalendar={() => setShowCalendar(true)}
+              />
+            </div>
           )}
         </main>
 

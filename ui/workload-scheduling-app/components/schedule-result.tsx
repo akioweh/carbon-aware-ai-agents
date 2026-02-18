@@ -233,11 +233,9 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
       if (response.ok) {
         onCancel?.()
       } else {
-        // For demo, still call onCancel
         onCancel?.()
       }
     } catch (error) {
-      // For demo purposes, still proceed with cancel
       onCancel?.()
     } finally {
       setCancelling(false)

@@ -1,7 +1,5 @@
 "use client"
 
-import { Calendar } from "@/components/ui/calendar"
-
 import type React from "react"
 
 import { useState } from "react"
@@ -50,8 +48,6 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
       latest_finish: new Date(latestFinish).toISOString(),
     }
 
-    console.log("[v0] Submitting job request:", jobRequest)
-
     try {
       const response = await fetch("/api/schedule", {
         method: "POST",
@@ -66,13 +62,12 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
       }
 
       const result = await response.json()
-      console.log("[v0] Schedule result:", result)
 
       if (onScheduleComplete) {
         onScheduleComplete(result, earliestStart, latestFinish)
       }
     } catch (error) {
-      console.error("[v0] Error scheduling job:", error)
+      console.error("Error scheduling job:", error)
       alert("Failed to schedule job. Please try again.")
     } finally {
       setIsSubmitting(false)
