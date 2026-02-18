@@ -11,13 +11,14 @@ servers:
     description: Local development server
 
 paths:
-  /api/schedule/{schedule_id}:
+  /api/schedule/{schedule_id}/{datacenter}:
     get:
       operationId: getScheduledJob
-      summary: Fetch a schedule.
+      summary: Fetch blocks of specific schedule at specific datacenter.
       description: Gets schedule by its schedule_id.
       parameters:
         - $ref: "#/components/parameters/ScheduleIdParam"
+        - $ref: "#/components/parameters/DatacenterLocationParam"
       responses:
         "200":
           description: Successful response with specific schedule data
@@ -40,9 +41,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/schedule/{schedule_id}:
     delete:
       operationId: deleteScheduledJob
-      summary: Deletes a scheduled job
+      summary: Deletes specific schedule.
       description:
         Cause POST on this endpoint automatically persists the job, we need a
         way to delete it if user doesnt confirm it
@@ -58,10 +60,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/schedule:
+  /api/schedule/{datacenter}:
     get:
       operationId: getSchedule
-      summary: Fetch datacenter work schedule
+      summary: Fetch blocks across different schedules which are inside the specific datacenter.
       description:
         gets all already-scheduled jobs (gets all blocks) which start after
         start_time and end before end_time. Those arguments are optional, so
@@ -69,6 +71,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/StartTimeParam"
         - $ref: "#/components/parameters/EndTimeParam"
+        - $ref: "#/components/parameters/DatacenterLocationParam"
       responses:
         "200":
           description: Successful response with schedule data
@@ -91,9 +94,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/schedule:
     post:
       operationId: scheduleJob
-      summary: Schedule a job
+      summary: Create a Schedule
       description:
         Submit a job and get back an optimized schedule placement (only blocks
         of this new job)
@@ -177,6 +181,16 @@ components:
         description: Id of a schedule returned by POST /api/schedule.
         example: "Sche_123"
 
+    DatacenterLocationParam:
+      name: datacenter
+      in: path
+      description: Location of datacenter that is being queried
+      required: true
+      schema:
+        type: string
+        description: Fetches blocks only from this specific Datacenter
+        example: "Data-Center-1"
+
   schemas:
     JobRequest:
       type: object
@@ -221,7 +235,7 @@ components:
       required:
         - timestamp
         - location
-        - job_id
+        - shed_id
         - additional_load
       properties:
         timestamp:
@@ -231,12 +245,12 @@ components:
           example: "2025-12-08T02:00:00Z"
         location:
           type: string
-          description: Data center location
+          description: Location of a datacenter in which this block has been scheduled.
           example: "us-west-1"
-        job_id:
+        shedule_id:
           type: string
-          description: Identifier for the scheduled job
-          example: "job-123"
+          description: Identifier telling to which schedule this block belongs.
+          example: "shed-456"
         additional_load:
           type: number
           description: Additional load in kWh during this block
