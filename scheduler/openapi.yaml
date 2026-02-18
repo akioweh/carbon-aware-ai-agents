@@ -7,7 +7,7 @@ info:
   version: 0.1.0
 
 servers:
-  - url: http://localhost:8000
+  - url: http://localhost:6969
     description: Local development server
 
 paths:
@@ -135,6 +135,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "503":
+          description: >
+            Connection to Python API failed in some way. This results in our service being no longer valid and available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error" 
 
 components:
   parameters:
