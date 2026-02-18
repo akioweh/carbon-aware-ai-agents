@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const BASE_URL = "http://localhost:8000/api/schedule"
+const BASE_URL = "http://localhost:6969/api/schedule"
 
 // ---------------------------------------------------------
 // GET /api/schedule/:schedule_id
