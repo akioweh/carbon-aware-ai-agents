@@ -42,6 +42,7 @@ struct ScheduleResult {
 inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
     auto res = Json::Value{};
     res["schedule_id"] = obj.jobId;
+    res["message"] = "Success";
     res["scheduled_blocks"] = Json::Value(Json::arrayValue);
     res["impact"] = toJson(obj.impact);
     for (const auto &block : obj.schedule)
