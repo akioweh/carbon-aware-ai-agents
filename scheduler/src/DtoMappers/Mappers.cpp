@@ -36,7 +36,7 @@ auto f_fromDto(const JobModel &jobDto) -> ScheduleBlock {
     auto stringId =
         scheduler::utils::parseIntToStringID(jobDto.getValueOfImpactId());
     return ScheduleBlock{.timestamp = chronoTimestamp,
-                         .jobId = stringId,
+                         .scheduleId = stringId,
                          .location = jobDto.getValueOfLocationId(),
                          .additionalLoad = jobDto.getValueOfAdditionalLoad()};
 }
