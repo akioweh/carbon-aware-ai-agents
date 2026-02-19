@@ -8,3 +8,4 @@ pytest
 schemathesis
 requests
 schedule
+uvicorn

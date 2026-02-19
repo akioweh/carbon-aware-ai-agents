@@ -14,9 +14,22 @@ from predictor import (
     generate_next_week_greenness_prediction,
     generate_next_week_load_prediction,
 )
+from carbon_collector import (
+    init_database as init_carbon_db,
+    collect_all_regions,
+    get_reading_count,
+    DB_PATH as CARBON_DB_PATH,
+    INTERVAL_MINUTES as CARBON_INTERVAL_MINUTES,
+)
 
 DB_FILE = 'cache.db'
 HISTORY_FILE = 'history.json'
+
+# Configuration for Oracle/server deployment
+HOST = os.environ.get('STATS_HOST', '127.0.0.1')
+PORT = int(os.environ.get('STATS_PORT', 5000))
+CARBON_SYNC_INTERVAL = int(os.environ.get('CARBON_SYNC_INTERVAL', 1800))  # 30 min
+CARBON_COLLECTION_ENABLED = os.environ.get('CARBON_COLLECTION_ENABLED', '1') == '1'
 
 
 class Location(BaseModel):
@@ -81,22 +94,76 @@ def prediction_loop():
         time.sleep(300)
 
 
+def carbon_sync_loop():
+    """Background loop to sync carbon intensity data periodically."""
+    while True:
+        try:
+            if db_utils.has_carbon_data():
+                count = db_utils.sync_carbon_to_historical(days_back=7)
+                print(f'Carbon sync: {count} records updated')
+        except Exception as e:
+            print(f'Error syncing carbon data: {e}')
+        time.sleep(CARBON_SYNC_INTERVAL)
+
+
+def carbon_collector_loop():
+    """Background loop to collect carbon intensity data from UK API."""
+    print(f'Carbon collector starting (interval: {CARBON_INTERVAL_MINUTES} min)')
+    print(f'Database: {CARBON_DB_PATH}')
+
+    conn = init_carbon_db(CARBON_DB_PATH)
+
+    while True:
+        try:
+            collect_all_regions(conn)
+            print(f'Carbon readings total: {get_reading_count(conn)}')
+        except Exception as e:
+            print(f'Error collecting carbon data: {e}')
+        time.sleep(CARBON_INTERVAL_MINUTES * 60)
+
+
 # does some housekeeping stuff including
 # generating history and auto-updating the api schema file
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db_utils.initialize_db()
 
-    # Migrate existing history.json to database if it exists and DB is empty
-    if os.path.exists(HISTORY_FILE) and db_utils.count_historical_data() == 0:
-        print('Migrating history.json to database...')
-        db_utils.migrate_json_to_db(HISTORY_FILE)
-    elif db_utils.count_historical_data() == 0:
-        print('No historical data found, generating initial data...')
-        generate_history()
+    # Try to use real carbon data if available
+    if db_utils.has_carbon_data():
+        print('Carbon intensity database found, syncing real data...')
+        try:
+            count = db_utils.sync_carbon_to_historical(days_back=30)
+            print(f'Synced {count} carbon readings to historical data')
+        except Exception as e:
+            print(f'Failed to sync carbon data: {e}')
 
-    thread = threading.Thread(target=prediction_loop, daemon=True)
-    thread.start()
+    # Fall back to other data sources if no historical data
+    if db_utils.count_historical_data() == 0:
+        if os.path.exists(HISTORY_FILE):
+            print('Migrating history.json to database...')
+            db_utils.migrate_json_to_db(HISTORY_FILE)
+        else:
+            print('No historical data found, generating initial data...')
+            generate_history()
+
+    # Start background threads
+    prediction_thread = threading.Thread(target=prediction_loop, daemon=True)
+    prediction_thread.start()
+
+    # Start carbon collector and sync threads if enabled
+    if CARBON_COLLECTION_ENABLED:
+        collector_thread = threading.Thread(target=carbon_collector_loop, daemon=True)
+        collector_thread.start()
+        print('Carbon collector background thread started')
+
+        sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
+        sync_thread.start()
+        print('Carbon sync background thread started')
+    elif db_utils.has_carbon_data():
+        # If not collecting but have existing data, still sync it
+        sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
+        sync_thread.start()
+        print('Carbon sync background thread started')
 
     openapi_data = app.openapi()
     with open('openapi.yaml', 'w') as f:
@@ -208,4 +275,5 @@ def get_locations() -> list[Location]:
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, port=5000)
+    print(f'Starting Stats API on {HOST}:{PORT}')
+    uvicorn.run(app, host=HOST, port=PORT)
