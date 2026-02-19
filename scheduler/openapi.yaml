@@ -11,7 +11,7 @@ servers:
     description: Local development server
 
 paths:
-  /api/schedule/{schedule_id}/{datacenter}:
+  /api/schedules/{schedule_id}/datacenters/{datacenter}:
     get:
       operationId: getScheduledJob
       summary: Fetch blocks of specific schedule at specific datacenter.
@@ -25,7 +25,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ScheduleCreationResponse"
+                $ref: "#/components/schemas/ScheduleDetailResponse"
         "400":
           description:
             Malformed request (e.g. missing or unparseable path parameter)
@@ -41,7 +41,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/schedule/{schedule_id}:
+  /api/schedules/{schedule_id}:
     delete:
       operationId: deleteScheduledJob
       summary: Deletes specific schedule.
@@ -51,7 +51,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ScheduleIdParam"
       responses:
-        "200":
+        "204":
           description: Schedule deleted successfully
         "400":
           description: Malformed request
@@ -60,7 +60,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/schedule/{datacenter}:
+  /api/schedules/datacenter/{datacenter}:
     get:
       operationId: getSchedule
       summary: Fetch blocks across different schedules which are inside the specific datacenter.
@@ -94,7 +94,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/schedule:
+  /api/schedules:
     post:
       operationId: scheduleJob
       summary: Create a Schedule
@@ -113,7 +113,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ScheduleCreationResponse"
+                $ref: "#/components/schemas/ScheduleDetailResponse"
         "400":
           description: Malformed request (e.g. missing or unparseable JSON body)
           content:
@@ -235,7 +235,7 @@ components:
       required:
         - timestamp
         - location
-        - shed_id
+        - schedule_id
         - additional_load
       properties:
         timestamp:
@@ -247,7 +247,7 @@ components:
           type: string
           description: Location of a datacenter in which this block has been scheduled.
           example: "us-west-1"
-        shedule_id:
+        schedule_id:
           type: string
           description: Identifier telling to which schedule this block belongs.
           example: "shed-456"
@@ -256,7 +256,7 @@ components:
           description: Additional load in kWh during this block
           example: 5.0
 
-    ScheduleCreationResponse:
+    ScheduleDetailResponse:
       type: object
       description:
         Response after scheduling a job, indicating success and server-assigned
