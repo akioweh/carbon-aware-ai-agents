@@ -1,10 +1,10 @@
 #define BOOST_TEST_MODULE ControllerDeserializationTest
+#include "structs/JobRequest.hpp"
+#include "structs/ScheduleIdentifierParam.hpp"
+#include "structs/TimeIntervalParams.hpp"
+#include <boost/test/included/unit_test.hpp>
 #include <drogon/HttpRequest.h>
 #include <json/json.h>
-#include <boost/test/included/unit_test.hpp>
-#include "structs/JobRequest.hpp"
-#include "structs/TimeIntervalParams.hpp"
-#include "structs/JobIdentifierParam.hpp"
 
 using namespace scheduler;
 using namespace scheduler::exceptions;
@@ -138,8 +138,8 @@ BOOST_AUTO_TEST_SUITE(TimeIntervalParamsDeserialization)
 
 BOOST_AUTO_TEST_CASE(valid_params) {
     auto req = drogon::HttpRequest::newHttpRequest();
-    req->setParameter("start", "2023-10-26T10:00:00Z");
-    req->setParameter("end", "2023-10-26T12:00:00Z");
+    req->setParameter("start_time", "2023-10-26T10:00:00Z");
+    req->setParameter("end_time", "2023-10-26T12:00:00Z");
 
     auto params = drogon::fromRequest<TimeIntervalParams>(*req);
     BOOST_CHECK(params.start.has_value());
@@ -158,7 +158,7 @@ BOOST_AUTO_TEST_CASE(optional_params) {
 
 BOOST_AUTO_TEST_CASE(only_start) {
     auto req = drogon::HttpRequest::newHttpRequest();
-    req->setParameter("start", "2023-10-26T10:00:00Z");
+    req->setParameter("start_time", "2023-10-26T10:00:00Z");
 
     auto params = drogon::fromRequest<TimeIntervalParams>(*req);
     BOOST_CHECK(params.start.has_value());
@@ -167,7 +167,7 @@ BOOST_AUTO_TEST_CASE(only_start) {
 
 BOOST_AUTO_TEST_CASE(invalid_time_format) {
     auto req = drogon::HttpRequest::newHttpRequest();
-    req->setParameter("start", "invalid");
+    req->setParameter("start_time", "invalid");
 
     BOOST_CHECK_THROW(drogon::fromRequest<TimeIntervalParams>(*req),
                       ValidationException);
@@ -175,8 +175,8 @@ BOOST_AUTO_TEST_CASE(invalid_time_format) {
 
 BOOST_AUTO_TEST_CASE(start_after_end) {
     auto req = drogon::HttpRequest::newHttpRequest();
-    req->setParameter("start", "2023-10-26T13:00:00Z");
-    req->setParameter("end", "2023-10-26T12:00:00Z");
+    req->setParameter("start_time", "2023-10-26T13:00:00Z");
+    req->setParameter("end_time", "2023-10-26T12:00:00Z");
 
     BOOST_CHECK_THROW(drogon::fromRequest<TimeIntervalParams>(*req),
                       ValidationException);
@@ -187,12 +187,12 @@ BOOST_AUTO_TEST_SUITE_END()
 BOOST_AUTO_TEST_SUITE(JobIdentifierParamValidation)
 
 BOOST_AUTO_TEST_CASE(valid_id) {
-    JobIdentifierParam param("12345");
-    BOOST_CHECK_EQUAL(param.getJobId(), "12345");
+    ScheduleIdentifierParam param("12345");
+    BOOST_CHECK_EQUAL(param.getScheduleId(), "12345");
 }
 
 BOOST_AUTO_TEST_CASE(empty_id_throws) {
-    BOOST_CHECK_THROW(JobIdentifierParam(""), ValidationException);
+    BOOST_CHECK_THROW(ScheduleIdentifierParam(""), ValidationException);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
