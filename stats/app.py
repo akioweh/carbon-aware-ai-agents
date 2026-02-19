@@ -28,6 +28,12 @@ DB_FILE = 'cache.db'
 HISTORY_FILE = 'history.json'
 LOG_FILE = os.environ.get('STATS_LOG_FILE', 'app.log')
 
+"""
+See logs on the oracle server with:
+tail -f app.log
+grep CRITICAL app.log  # just see alerts
+"""
+
 # Logging setup — writes to both stdout and a persistent log file
 _log_fmt = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 logging.basicConfig(
