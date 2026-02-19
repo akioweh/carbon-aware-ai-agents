@@ -1,5 +1,6 @@
 #ifndef SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #define SCHEDULER_SCHEDULE_CONTROLLER_HPP
+#include "structs/DatacenterIdentifierParam.hpp"
 #pragma once
 
 #include "structs/JobRequest.hpp"
@@ -14,15 +15,16 @@ namespace scheduler::controllers {
 class ScheduleController : public drogon::HttpController<ScheduleController> {
   public:
     METHOD_LIST_BEGIN
-    ADD_METHOD_TO(ScheduleController::calculateSchedule, "/api/schedule",
+    ADD_METHOD_TO(ScheduleController::calculateSchedule, "/api/schedules",
                   drogon::Post);
-    ADD_METHOD_TO(ScheduleController::getSchedule, "/api/schedule",
-                  drogon::Get);
-    ADD_METHOD_TO(ScheduleController::deleteSchedule, "/api/schedule/{job_id}",
-                  drogon::Delete);
+    ADD_METHOD_TO(ScheduleController::getSchedule,
+                  "/api/schedules/datacenter/{datacenter}", drogon::Get);
+    ADD_METHOD_TO(ScheduleController::deleteSchedule,
+                  "/api/schedules/{schedule_id}", drogon::Delete);
     ADD_METHOD_TO(ScheduleController::getSpecificSchedule,
-                  "/api/schedule/{job_id}", drogon::Get);
-    ADD_METHOD_TO(ScheduleController::getScheduledJobs, "/api/schedule/jobs",
+                  "/api/schedules/{schedule_id}/datacenters/{datacenter}",
+                  drogon::Get);
+    ADD_METHOD_TO(ScheduleController::getScheduledJobs, "/api/schedules/jobs",
                   drogon::Get);
     METHOD_LIST_END
 
@@ -31,6 +33,7 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
         -> drogon::Task<drogon::HttpResponsePtr>;
 
     [[nodiscard]] auto getSchedule(drogon::HttpRequestPtr,
+                                   DatacenterIdentifierParam,
                                    TimeIntervalParams) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 
@@ -38,7 +41,8 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                                       ScheduleIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
     [[nodiscard]] auto getSpecificSchedule(drogon::HttpRequestPtr,
-                                           ScheduleIdentifierParam) const
+                                           ScheduleIdentifierParam,
+                                           DatacenterIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
     [[nodiscard]] auto getScheduledJobs(drogon::HttpRequestPtr) const
         -> drogon::Task<drogon::HttpResponsePtr>;

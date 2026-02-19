@@ -1,6 +1,7 @@
 #include "controllers/ScheduleController.hpp"
 #include "Calendar.hpp"
 #include "SchedulingQueue.hpp"
+#include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleBlock.hpp"
 #include "structs/ScheduleIdentifierParam.hpp"
@@ -16,11 +17,13 @@ using namespace drogon;
 using namespace scheduler;
 
 auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
+                                     const DatacenterIdentifierParam datacenter,
                                      const TimeIntervalParams interval) const
     -> Task<HttpResponsePtr> {
     const auto res = co_await calendar::get(
         interval.start.value_or(scheduler::utils::MIN_TIME),
-        interval.end.value_or(scheduler::utils::MAX_TIME));
+        interval.end.value_or(scheduler::utils::MAX_TIME),
+        datacenter.getDatacenter());
     auto ret = Json::Value(Json::arrayValue);
     for (const auto &block : res)
         ret.append(toJson(block));
@@ -29,9 +32,10 @@ auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
 }
 
 auto ScheduleController::getSpecificSchedule(
-    HttpRequestPtr /*req*/, const ScheduleIdentifierParam schedule_id) const
-    -> Task<HttpResponsePtr> {
-    const auto res = co_await calendar::get(schedule_id.getScheduleId());
+    HttpRequestPtr /*req*/, const ScheduleIdentifierParam schedule_id,
+    const DatacenterIdentifierParam datacenter) const -> Task<HttpResponsePtr> {
+    const auto res = co_await calendar::get(schedule_id.getScheduleId(),
+                                            datacenter.getDatacenter());
     const auto resp = HttpResponse::newHttpJsonResponse(toJson(res));
     co_return resp;
 }
