@@ -16,6 +16,7 @@ from predictor import (
 )
 from carbon_collector import (
     init_database as init_carbon_db,
+    backfill,
     collect_all_regions,
     get_reading_count,
     DB_PATH as CARBON_DB_PATH,
@@ -112,6 +113,7 @@ def carbon_collector_loop():
     print(f'Database: {CARBON_DB_PATH}')
 
     conn = init_carbon_db(CARBON_DB_PATH)
+    backfill(conn)
 
     while True:
         try:
