@@ -22,8 +22,7 @@ auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
     -> Task<HttpResponsePtr> {
     const auto res = co_await calendar::get(
         interval.start.value_or(scheduler::utils::MIN_TIME),
-        interval.end.value_or(scheduler::utils::MAX_TIME),
-        datacenter.getDatacenter());
+        interval.end.value_or(scheduler::utils::MAX_TIME), datacenter.name);
     auto ret = Json::Value(Json::arrayValue);
     for (const auto &block : res)
         ret.append(toJson(block));
@@ -34,8 +33,8 @@ auto ScheduleController::getSchedule(HttpRequestPtr /*req*/,
 auto ScheduleController::getSpecificSchedule(
     HttpRequestPtr /*req*/, const ScheduleIdentifierParam schedule_id,
     const DatacenterIdentifierParam datacenter) const -> Task<HttpResponsePtr> {
-    const auto res = co_await calendar::get(schedule_id.getScheduleId(),
-                                            datacenter.getDatacenter());
+    const auto res =
+        co_await calendar::get(schedule_id.getScheduleId(), datacenter.name);
     const auto resp = HttpResponse::newHttpJsonResponse(toJson(res));
     co_return resp;
 }

@@ -19,7 +19,7 @@ auto combineCriteria(Args &&...criteria) -> drogon::orm::Criteria {
     return (std::forward<Args>(criteria) && ...);
 }
 
-constexpr std::string ANY_DATACENTER = "everyting";
+constexpr std::string ANY_DATACENTER{};
 
 using time_point = std::chrono::system_clock::time_point;
 
