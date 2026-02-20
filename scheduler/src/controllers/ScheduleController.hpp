@@ -17,13 +17,12 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
     METHOD_LIST_BEGIN
     ADD_METHOD_TO(ScheduleController::calculateSchedule, "/api/schedules",
                   drogon::Post);
-    ADD_METHOD_TO(ScheduleController::getSchedule,
-                  "/api/schedules/datacenter/{datacenter}", drogon::Get);
+    ADD_METHOD_TO(ScheduleController::getSchedule, "/api/schedules",
+                  drogon::Get);
     ADD_METHOD_TO(ScheduleController::deleteSchedule,
                   "/api/schedules/{schedule_id}", drogon::Delete);
     ADD_METHOD_TO(ScheduleController::getSpecificSchedule,
-                  "/api/schedules/{schedule_id}/datacenters/{datacenter}",
-                  drogon::Get);
+                  "/api/schedules/{schedule_id}", drogon::Get);
     ADD_METHOD_TO(ScheduleController::getScheduledJobs, "/api/schedules/jobs",
                   drogon::Get);
     METHOD_LIST_END
