@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 2. Retrieve the schedule (GET)
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
-    getReq->setPath("/api/schedules/datacenter/whatever-will-fix-later");
+    getReq->setPath("/api/schedules");
     getReq->setParameter("start_time", scheduler::utils::toIso8601(tomorrow));
     getReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
 
@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 4. Verify Deletion (GET should not return the deleted blocks)
     auto verifyReq = HttpRequest::newHttpRequest();
     verifyReq->setMethod(drogon::Get);
-    verifyReq->setPath("/api/schedules/datacenter/whatever-will-fix-later");
+    verifyReq->setPath("/api/schedules");
     verifyReq->setParameter("start_time",
                             scheduler::utils::toIso8601(tomorrow));
     verifyReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
@@ -239,7 +239,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // 2. List Jobs (GET /api/schedule/jobs)
     auto listReq = HttpRequest::newHttpRequest();
     listReq->setMethod(drogon::Get);
-    listReq->setPath("/api/schedule/jobs");
+    listReq->setPath("/api/schedules/jobs");
 
     auto listRespPair = client->sendRequest(listReq);
     BOOST_REQUIRE_EQUAL(listRespPair.first, ReqResult::Ok);
@@ -267,7 +267,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // 3. Get Specific Job (GET /api/schedule/{id})
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
-    getReq->setPath("/api/schedule/" + id1);
+    getReq->setPath("/api/schedules/" + id1);
 
     auto getRespPair = client->sendRequest(getReq);
     BOOST_REQUIRE_EQUAL(getRespPair.first, ReqResult::Ok);
@@ -279,8 +279,8 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     BOOST_REQUIRE(getJson);
     BOOST_CHECK((*getJson).isMember("schedule_id"));
     BOOST_CHECK_EQUAL((*getJson)["schedule_id"].asString(), id1);
-    BOOST_CHECK((*getJson).isMember("schedule"));
-    BOOST_CHECK((*getJson)["schedule"].isArray());
+    BOOST_CHECK((*getJson).isMember("scheduled_blocks"));
+    BOOST_CHECK((*getJson)["scheduled_blocks"].isArray());
     BOOST_CHECK((*getJson).isMember("impact"));
 }
 
