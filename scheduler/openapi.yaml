@@ -11,10 +11,10 @@ servers:
     description: Local development server
 
 paths:
-  /api/schedules/{schedule_id}/datacenters/{datacenter}:
+  /api/schedules/{schedule_id}:
     get:
       operationId: getScheduledJob
-      summary: Fetch blocks of specific schedule at specific datacenter.
+      summary: Fetch blocks of specific schedule. Optionally at a specific datacenter.
       description: Gets schedule by its schedule_id.
       parameters:
         - $ref: "#/components/parameters/ScheduleIdParam"
@@ -35,13 +35,11 @@ paths:
                 $ref: "#/components/schemas/Error"
         "422":
           description: >
-            Semantically invalid request (e.g. invalid schedule_id format)
+            Semantically invalid request (e.g. invalid schedule_id format or non-existent schedule_id)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
-  /api/schedules/{schedule_id}:
     delete:
       operationId: deleteScheduledJob
       summary: Deletes specific schedule.
@@ -60,10 +58,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/schedules/datacenter/{datacenter}:
+  /api/schedules:
     get:
       operationId: getSchedule
-      summary: Fetch blocks across different schedules which are inside the specific datacenter.
+      summary: Fetch blocks across different schedules. Optionally those which are inside the specific datacenter.
       description:
         gets all already-scheduled jobs (gets all blocks) which start after
         start_time and end before end_time. Those arguments are optional, so
@@ -93,8 +91,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
-  /api/schedules:
     post:
       operationId: scheduleJob
       summary: Create a Schedule
@@ -114,6 +110,58 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ScheduleDetailResponse"
+        "400":
+          description: Malformed request (e.g. missing or unparseable JSON body)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: >
+            Scheduling conflict: the request is valid but cannot be satisfied
+            given the current system state (e.g. insufficient capacity across
+            all locations, no available data centers, scheduling window too
+            narrow or in the past)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: >
+            Semantically invalid request body (e.g. missing required fields,
+            invalid date format, non-positive workload_amount, latest_finish
+            before earliest_start)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: >
+            Connection to Python API failed in some way. This results in our service being no longer valid and available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error" 
+
+  /api/schedules/trivialSchedule:
+    post:
+      operationId: scheduleTrivialJob
+      summary: Create a trivial Schedule
+      description:
+        Submit a job and get back an un-optimized schedule impact.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobRequest"
+      responses:
+        "200":
+          description: Schedule calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDetailResponse'
         "400":
           description: Malformed request (e.g. missing or unparseable JSON body)
           content:
@@ -183,9 +231,9 @@ components:
 
     DatacenterLocationParam:
       name: datacenter
-      in: path
+      in: query
       description: Location of datacenter that is being queried
-      required: true
+      required: false
       schema:
         type: string
         description: Fetches blocks only from this specific Datacenter
