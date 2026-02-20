@@ -1,5 +1,7 @@
 #ifndef SCHEDULER_DATACENTER_IDENTIFIER_HPP
 #define SCHEDULER_DATACENTER_IDENTIFIER_HPP
+#include "Calendar.hpp"
+#include "structs/Datacenter.hpp"
 #pragma once
 
 #include "exceptions/ValidationException.hpp"
@@ -8,24 +10,25 @@
 
 namespace scheduler {
 /**
- * @class JobIdentifier
- * @brief Job ID deserializer from URL parameters.
+ * @class DatacenterIdentifierParam
+ * @brief Datacenter name deserializer from URL parameters.
  */
 struct DatacenterIdentifierParam {
-    std::string datacenter;
-
-    DatacenterIdentifierParam() = default;
-
-    explicit DatacenterIdentifierParam(const std::string &datacenter) {
-        if (datacenter.empty())
-            throw exceptions::ValidationException("datacenter cannot be empty");
-        this->datacenter = datacenter;
-    }
-
-    [[nodiscard]] auto getDatacenter() const -> const std::string & {
-        return datacenter;
-    }
+    std::string name;
 };
 } // namespace scheduler
+
+namespace drogon {
+template <>
+inline auto fromRequest(const HttpRequest &req)
+    -> scheduler::DatacenterIdentifierParam {
+    const auto &params = req.getParameters();
+    auto defaultName = scheduler::calendar::ANY_DATACENTER;
+    if (params.contains("datacenter")) {
+        defaultName = params.at("datacenter");
+    }
+    return scheduler::DatacenterIdentifierParam{.name = defaultName};
+}
+} // namespace drogon
 
 #endif // SCHEDULER_DATACENTER_IDENTIFIER_HPP
