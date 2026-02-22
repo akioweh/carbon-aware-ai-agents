@@ -28,13 +28,23 @@ auto jobImpactIdEqualityCriteria(const int impactId) {
                                  drogon::orm::CompareOperator::EQ, impactId);
 }
 
-auto jobTimestampInsideTimeIntervalCriteria(time_point start, time_point end) {
+auto jobTimestampAfterStartCriteria(time_point start) {
     return drogon::orm::Criteria(mappers::JobModel::Cols::_time_stamp,
                                  drogon::orm::CompareOperator::GE,
-                                 scheduler::utils::chronoToTrantor(start)) &&
-           drogon::orm::Criteria(mappers::JobModel::Cols::_time_stamp,
+                                 scheduler::utils::chronoToTrantor(start));
+}
+
+auto jobTimestampBeforeEndCriteria(time_point end) {
+    return drogon::orm::Criteria(mappers::JobModel::Cols::_time_stamp,
                                  drogon::orm::CompareOperator::LT,
                                  scheduler::utils::chronoToTrantor(end));
+}
+
+auto specificDatacenterCriteria(const std::string &datacenter) {
+    if (datacenter == ANY_DATACENTER)
+        return drogon::orm::Criteria();
+    return drogon::orm::Criteria(mappers::JobModel::Cols::_location_id,
+                                 drogon::orm::CompareOperator::EQ, datacenter);
 }
 
 } // namespace
@@ -57,34 +67,45 @@ auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
     co_return scheduler::utils::parseIntToStringID(impactId);
 }
 
-auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
+auto get(const std::string &scheduleIdString, const std::string &datacenter)
+    -> drogon::Task<ScheduleResult> {
     auto context = getContext();
 
-    const int jobIdInt = scheduler::utils::parseStringIDtoInt(jobIdString);
+    const int jobIdInt = scheduler::utils::parseStringIDtoInt(scheduleIdString);
 
     try {
+        const auto fullCriteria =
+            combineCriteria(jobImpactIdEqualityCriteria(jobIdInt),
+                            specificDatacenterCriteria(datacenter));
+
         auto &&[impactModel, jobsModels] = co_await scheduler::coro::when_all(
             to_task<mappers::ImpactModel>(
                 context.impactMapper.findByPrimaryKey(jobIdInt)),
-            to_task<std::vector<mappers::JobModel>>(context.jobsMapper.findBy(
-                jobImpactIdEqualityCriteria(jobIdInt))));
+            to_task<std::vector<mappers::JobModel>>(
+                context.jobsMapper.findBy(fullCriteria)));
 
-        co_return ScheduleResult{.jobId = jobIdString,
+        co_return ScheduleResult{.scheduleId = scheduleIdString,
                                  .schedule = mappers::fromDtoAll(jobsModels),
                                  .impact = mappers::fromDto(impactModel)};
     } catch (const std::exception &e) {
-        LOG_ERROR << "NO scheduled job with id=" + jobIdString << " in the DB!";
+        LOG_ERROR << "NO scheduled job with id=" + scheduleIdString
+                  << " in the DB!";
         throw scheduler::exceptions::ValidationException(
-            "No scheduled job with id: " + jobIdString);
+            "No scheduled job with id: " + scheduleIdString);
     }
 }
 
-auto get(time_point start, time_point end)
+auto get(time_point start, time_point end, const std::string &datacenter)
     -> drogon::Task<std::vector<ScheduleBlock>> {
     auto context = getContext();
 
-    co_return mappers::fromDtoAll(co_await context.jobsMapper.findBy(
-        jobTimestampInsideTimeIntervalCriteria(start, end)));
+    const auto fullCriteria =
+        combineCriteria(jobTimestampAfterStartCriteria(start),
+                        jobTimestampBeforeEndCriteria(end),
+                        specificDatacenterCriteria(datacenter));
+
+    co_return mappers::fromDtoAll(
+        co_await context.jobsMapper.findBy(fullCriteria));
 }
 
 auto listJobs() -> drogon::Task<std::vector<std::string>> {
@@ -98,10 +119,10 @@ auto listJobs() -> drogon::Task<std::vector<std::string>> {
     co_return jobIds;
 }
 
-auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
+auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<> {
     auto context = getContext();
     co_await context.impactMapper.deleteByPrimaryKey(
-        scheduler::utils::parseStringIDtoInt(jobId));
+        scheduler::utils::parseStringIDtoInt(scheduleId));
     // we have cascade on delete, so no need to delete the children manually
 }
 

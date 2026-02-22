@@ -41,12 +41,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     // we round up (inclusive-exclusive type indexing)
     const auto n_intervals =
         time_gridder.toIndexCeil(job.latest_finish) - time_index_offset;
-    if (n_intervals < 0)
-        throw SchedulingException(
-            "Invalid time window: latest_finish must be after earliest_start");
-    if (n_intervals == 0)
-        throw SchedulingException("Invalid time window: latest_finish is too "
-                                  "close to earliest_start.");
+    assert(n_intervals > 0);
     // real time points aligned to time grid
     // "start" rounds down; "end" rounds up
     const auto time_start = index_to_time(0);
@@ -58,7 +53,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     assert(index_to_time(n_intervals - 1) < job.latest_finish);
 
     // fetch data
-    const auto [locations, existing_schedule] = co_await coro::when_all(
+    const auto &&[locations, existing_schedule] = co_await coro::when_all(
         stats_api.getAllDatacenters(), calendar::get(time_start, time_end));
     const auto n_locations = locations.size();
 
