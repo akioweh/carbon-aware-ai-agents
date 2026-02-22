@@ -49,7 +49,7 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
     }
 
     try {
-      const response = await fetch("/api/schedule", {
+      const response = await fetch("/api/schedules", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -40,7 +40,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
       setLoading(true)
       try {
         // Fetch all schedule blocks (no time filter = all jobs)
-        const response = await fetch("/api/schedule")
+        const response = await fetch("/api/schedules")
         
         if (!response.ok) {
           throw new Error(`Failed to fetch jobs: ${response.status}`)
@@ -74,20 +74,38 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
           jobMap.get(block.job_id)?.push(block)
         }
 
-        // Convert to job summaries
-        const jobSummaries: JobSummary[] = Array.from(jobMap.entries()).map(([job_id, blocks]) => {
-          const timestamps = blocks.map(b => new Date(b.timestamp).getTime())
-          const start_time = new Date(Math.min(...timestamps)).toISOString()
-          const end_time = new Date(Math.max(...timestamps) + 5 * 60 * 1000).toISOString()
-          
-          return {
-            schedule_id: job_id,
-            job_id,
-            scheduled_blocks: blocks,
-            start_time,
-            end_time,
-          }
-        })
+        // Convert to job summaries and fetch impact data for each
+        const jobSummaries: JobSummary[] = await Promise.all(
+          Array.from(jobMap.entries()).map(async ([job_id, blocks]) => {
+            const timestamps = blocks.map(b => new Date(b.timestamp).getTime())
+            const start_time = new Date(Math.min(...timestamps)).toISOString()
+            const end_time = new Date(Math.max(...timestamps) + 5 * 60 * 1000).toISOString()
+            
+            const jobSummary: JobSummary = {
+              schedule_id: job_id,
+              job_id,
+              scheduled_blocks: blocks,
+              start_time,
+              end_time,
+            }
+
+            // Fetch full schedule details to get impact data
+            try {
+              const scheduleResponse = await fetch(`/api/schedules/${job_id}`)
+              if (scheduleResponse.ok) {
+                const scheduleData = await scheduleResponse.json()
+                if (scheduleData.impact) {
+                  jobSummary.impact = scheduleData.impact
+                }
+              }
+            } catch (err) {
+              console.error(`Failed to fetch impact for job ${job_id}:`, err)
+              // Continue anyway, impact will just be undefined
+            }
+
+            return jobSummary
+          })
+        )
 
         // Sort by start time (most recent first)
         jobSummaries.sort((a, b) => {

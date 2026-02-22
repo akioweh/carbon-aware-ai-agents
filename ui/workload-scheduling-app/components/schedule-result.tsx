@@ -119,6 +119,7 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
   const [workloadData, setWorkloadData] = useState<WorkloadInterval[]>([])
   const [loading, setLoading] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [allBlocks, setAllBlocks] = useState<any[]>([])
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Get impact values (support both new and legacy format)
@@ -160,73 +161,69 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
     }
   }
 
-  // Update workload data when data center changes
+  // Fetch all blocks once on mount (approach A: load all data upfront)
   useEffect(() => {
-  const loadWorkload = async () => {
-    setLoading(true)
+    const loadAllBlocks = async () => {
+      setLoading(true)
+      try {
+        // Fetch all blocks without time filtering - get complete picture of all workloads
+        const res = await fetch(`/api/schedules`)
+        
+        if (!res.ok) {
+          throw new Error(`Failed to fetch schedules: ${res.status}`)
+        }
 
+        const raw = await res.json()
+
+        if (!Array.isArray(raw)) {
+          throw new Error("Unexpected schedule response shape")
+        }
+
+        // Sanitize blocks (ensure required fields exist and are correct types)
+        const blocks = raw.filter((b: any) => {
+          return (
+            b &&
+            typeof b.timestamp === "string" &&
+            typeof b.location === "string" &&
+            typeof b.job_id === "string" &&
+            typeof b.additional_load === "number"
+          )
+        })
+
+        setAllBlocks(blocks)
+      } catch (err) {
+        console.error("Failed to load blocks", err)
+        setAllBlocks([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadAllBlocks()
+  }, [])
+
+  // Update workload data when data center changes (uses cached allBlocks)
+  useEffect(() => {
     const { start, end } = getTimeRange()
 
-    try {
-      // Align requested window to 5-minute boundaries so backend (which filters by block start)
-      // returns the neighboring blocks even if the UI time range begins at an off-boundary.
-      const intervalMs = 5 * 60 * 1000
-      const fetchStart = floorToInterval(start, intervalMs)
-      const fetchEnd = ceilToInterval(end, intervalMs)
+    // Filter blocks by selected DC
+    const dcBlocks = allBlocks.filter(
+      (b: any) => locationToDcId(b.location) === selectedDC
+    )
 
-      // Fetch all scheduled blocks in the time range (aligned to 5-min)
-      const res = await fetch(
-        `/api/schedule?start_time=${fetchStart.toISOString()}&end_time=${fetchEnd.toISOString()}`
-      )
+    // Determine new job id from result (prefer job_id then schedule_id)
+    const newJobId = result.job_id ?? result.schedule_id
 
-      if (!res.ok) {
-        throw new Error(`Failed to fetch schedule: ${res.status}`)
-      }
+    // Convert blocks → workload intervals for your chart
+    const intervals = convertBlocksToWorkload(dcBlocks, start, end, newJobId)
 
-      const raw = await res.json()
-
-      if (!Array.isArray(raw)) {
-        throw new Error("Unexpected schedule response shape")
-      }
-
-      // Sanitize blocks (ensure required fields exist and are correct types)
-      const blocks = raw.filter((b: any) => {
-        return (
-          b &&
-          typeof b.timestamp === "string" &&
-          typeof b.location === "string" &&
-          typeof b.job_id === "string" &&
-          typeof b.additional_load === "number"
-        )
-      })
-
-      // Map server location -> dc id for filtering
-      const dcBlocks = blocks.filter(
-        (b: any) => locationToDcId(b.location) === selectedDC
-      )
-
-      // Determine new job id from result (prefer job_id then schedule_id)
-      const newJobId = result.job_id ?? result.schedule_id
-
-      // Convert blocks → workload intervals for your chart
-      const intervals = convertBlocksToWorkload(dcBlocks, start, end, newJobId)
-
-      setWorkloadData(intervals)
-    } catch (err) {
-      console.error("Failed to load workload", err)
-      setWorkloadData([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  loadWorkload()
-}, [selectedDC, result.scheduled_blocks, result.job_id, result.schedule_id, earliestStart, latestFinish])
+    setWorkloadData(intervals)
+  }, [selectedDC, allBlocks, result.job_id, result.schedule_id, earliestStart, latestFinish])
 
   const handleCancel = async () => {
     setCancelling(true)
     try {
-      const response = await fetch(`/api/schedule/${result.schedule_id}`, {
+      const response = await fetch(`/api/schedules/${result.schedule_id}`, {
         method: "DELETE",
       })
       
@@ -293,7 +290,7 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Keep Job</AlertDialogCancel>
-              <AlertDialogAction onClick={handleCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogAction onClick={handleCancel} className="bg-destructive text-white hover:bg-destructive/90">
                 Cancel Job
               </AlertDialogAction>
             </AlertDialogFooter>

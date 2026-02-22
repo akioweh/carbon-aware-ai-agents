@@ -1,27 +1,37 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const BASE_URL = "http://localhost:6969/api/schedule"
+const BASE_URL = "http://localhost:6969/api/schedules"
 
 // ---------------------------------------------------------
-// GET /api/schedule/:schedule_id
+// GET /api/schedules/:schedule_id
+// Retrieves a specific schedule by ID
+// Supports optional: datacenter parameter
 // ---------------------------------------------------------
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ schedule_id: string }> }
 ) {
   const { schedule_id } = await params
 
   try {
-    const backendRes = await fetch(`${BASE_URL}/${schedule_id}`, {
-      method: "GET",
-    })
+    const url = new URL(`${BASE_URL}/${schedule_id}`)
+
+    // Pass through optional datacenter parameter
+    const datacenter = request.nextUrl.searchParams.get("datacenter")
+    if (datacenter) url.searchParams.set("datacenter", datacenter)
+
+    const backendRes = await fetch(url.toString(), { method: "GET" })
 
     if (!backendRes.ok) {
-      throw new Error(`Backend returned ${backendRes.status}`)
+      console.error(`Backend returned ${backendRes.status}`)
+      return NextResponse.json(
+        { error: "Schedule not found" },
+        { status: backendRes.status }
+      )
     }
 
     const data = await backendRes.json()
-    return NextResponse.json(data, { status: backendRes.status })
+    return NextResponse.json(data, { status: 200 })
   } catch (err) {
     console.error("Error fetching schedule:", err)
     return NextResponse.json({ error: "Backend unavailable" }, { status: 500 })
@@ -29,7 +39,8 @@ export async function GET(
 }
 
 // ---------------------------------------------------------
-// DELETE /api/schedule/:schedule_id
+// DELETE /api/schedules/:schedule_id
+// Deletes a specific schedule by ID
 // ---------------------------------------------------------
 export async function DELETE(
   _request: NextRequest,
@@ -42,8 +53,8 @@ export async function DELETE(
       method: "DELETE",
     })
 
-    if (backendRes.status === 200) {
-      return NextResponse.json({ message: "Deleted" })
+    if (backendRes.status === 204 || backendRes.status === 200) {
+      return NextResponse.json({ message: "Deleted" }, { status: 200 })
     }
 
     const data = await backendRes.json()

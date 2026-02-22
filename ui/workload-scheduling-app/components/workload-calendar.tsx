@@ -63,30 +63,35 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
   const [loading, setLoading] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Fetch all blocks for this schedule once
+  // Fetch all blocks across all data centers once on mount
   useEffect(() => {
     const fetchData = async () => {
-      if (!scheduleId) {
-        setBlocks([])
-        return
-      }
       setLoading(true)
       try {
-        const response = await fetch(`/api/schedule/${scheduleId}`)
+        // Fetch all schedules across all datacenters (no schedule_id or datacenter filter)
+        const response = await fetch(`/api/schedules`)
         if (!response.ok) {
+          console.error(`Failed to fetch schedules: ${response.status}`)
           setBlocks([])
           return
         }
         const data = await response.json()
-        setBlocks(Array.isArray(data.scheduled_blocks) ? data.scheduled_blocks : [])
-      } catch {
+        // Response should be an array of ScheduleBlock objects
+        if (Array.isArray(data)) {
+          setBlocks(data)
+        } else {
+          console.error("Unexpected response format from /api/schedule")
+          setBlocks([])
+        }
+      } catch (err) {
+        console.error("Error fetching schedules:", err)
         setBlocks([])
       } finally {
         setLoading(false)
       }
     }
     fetchData()
-  }, [scheduleId])
+  }, [])
 
   // Derive time range, display params, and aggregated intervals
   const { intervals, rangeStart, rangeEnd, displayParams } = useMemo(() => {
