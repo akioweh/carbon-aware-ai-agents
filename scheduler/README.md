@@ -63,9 +63,12 @@ To run the tests:
 2. Run via CTest:
 
    ```bash
-   cd build/<preset name>
-   ctest --output-on-failure
+   ctest --test-dir buld/<preset name> --output-on-failure
    ```
+
+   > [!TIP]  
+   > use the `-N` flag to list available tests, and use `-R <regex>` to run a
+   > subset matching the regex.
 
 **Build Configuration:**
 
