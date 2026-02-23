@@ -24,7 +24,7 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
     ADD_METHOD_TO(ScheduleController::getSpecificSchedule,
                   "/api/schedules/{schedule_id}", drogon::Get);
     ADD_METHOD_TO(ScheduleController::getScheduleSummaries,
-                  "/api/schedules/scheduleSummaries", drogon::Get);
+                  "/api/schedules/summary", drogon::Get);
     METHOD_LIST_END
 
     [[nodiscard]] auto calculateSchedule(drogon::HttpRequestPtr,
