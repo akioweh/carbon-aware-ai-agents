@@ -108,15 +108,17 @@ auto get(time_point start, time_point end, const std::string &datacenter)
         co_await context.jobsMapper.findBy(fullCriteria));
 }
 
-auto listJobs() -> drogon::Task<std::vector<std::string>> {
+auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>> {
     auto context = getContext();
     auto res = co_await context.impactMapper.findAll();
-    std::vector<std::string> jobIds;
-    jobIds.reserve(res.size());
+    std::vector<ScheduleSummary> scheduleSummaries;
+    scheduleSummaries.reserve(res.size());
     for (const auto &item : res)
-        jobIds.push_back(
-            scheduler::utils::parseIntToStringID(item.getValueOfId()));
-    co_return jobIds;
+        scheduleSummaries.push_back(
+            {.scheduleId =
+                 scheduler::utils::parseIntToStringID(item.getValueOfId()),
+             .impact = scheduler::mappers::fromDto(item)});
+    co_return scheduleSummaries;
 }
 
 auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<> {
