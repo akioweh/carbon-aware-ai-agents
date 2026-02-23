@@ -58,6 +58,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/schedules/summary:
+    get:
+      operationId: getSchedules Summaries
+      summary: Fetch schedule ids and impacts of all schedules.
+      description:
+        Gets all the schedule ids and impacts of all scheduled jobs.
+      parameters:
+      responses:
+        "200":
+          description: Successful response with schedule data
+          content:
+            application/json:
+              schema:
+                type: array
+                items: 
+                  $ref: '#/components/schemas/ScheduleSummary'
+        "400":
+          description: Malformed request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/schedules:
     get:
       operationId: getSchedule
@@ -303,6 +326,18 @@ components:
           type: number
           description: Additional load in kWh during this block
           example: 5.0
+
+    ScheduleSummary:
+      type: object
+      description: Includes schedule id and impacts of that schedule
+      required:
+        - schedule_id
+        - impact
+      properties:
+        schedule_id:
+          $ref: '#/components/schemas/ScheduleDetailResponse/properties/schedule_id'
+        impact:
+          $ref: '#/components/schemas/ScheduleDetailResponse/properties/impact'
 
     ScheduleDetailResponse:
       type: object
