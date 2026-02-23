@@ -18,7 +18,7 @@ from predictor import (
 from carbon_collector import (
     init_database as init_carbon_db,
     backfill,
-    collect_all_regions,
+    collect_current,
     get_reading_count,
     DB_PATH as CARBON_DB_PATH,
     INTERVAL_MINUTES as CARBON_INTERVAL_MINUTES,
@@ -170,7 +170,7 @@ def carbon_collector_loop():
     consecutive_failures = 0
     while True:
         try:
-            collect_all_regions(conn)
+            collect_current(conn)
             logger.info('Carbon readings total: %d', get_reading_count(conn))
             if consecutive_failures:
                 logger.info('Carbon collector loop recovered after %d failure(s)', consecutive_failures)
