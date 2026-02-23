@@ -74,12 +74,12 @@ auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
     co_return HttpResponse::newHttpJsonResponse(toJson(result));
 }
 
-auto ScheduleController::getScheduledJobs(HttpRequestPtr /*req*/) const
+auto ScheduleController::getScheduleSummaries(HttpRequestPtr /*req*/) const
     -> Task<HttpResponsePtr> {
-    const auto scheduleIds = co_await calendar::listJobs();
+    const auto scheduleSummaries = co_await calendar::scheduleSummaries();
     Json::Value ret(Json::arrayValue);
-    for (const auto &id : scheduleIds)
-        ret.append(id);
+    for (const auto &scheduleSummary : scheduleSummaries)
+        ret.append(toJson(scheduleSummary));
     const auto resp = HttpResponse::newHttpJsonResponse(ret);
     co_return resp;
 }

@@ -23,8 +23,8 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                   "/api/schedules/{schedule_id}", drogon::Delete);
     ADD_METHOD_TO(ScheduleController::getSpecificSchedule,
                   "/api/schedules/{schedule_id}", drogon::Get);
-    ADD_METHOD_TO(ScheduleController::getScheduledJobs, "/api/schedules/jobs",
-                  drogon::Get);
+    ADD_METHOD_TO(ScheduleController::getScheduleSummaries,
+                  "/api/schedules/scheduleSummaries", drogon::Get);
     METHOD_LIST_END
 
     [[nodiscard]] auto calculateSchedule(drogon::HttpRequestPtr,
@@ -43,7 +43,7 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                                            ScheduleIdentifierParam,
                                            DatacenterIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
-    [[nodiscard]] auto getScheduledJobs(drogon::HttpRequestPtr) const
+    [[nodiscard]] auto getScheduleSummaries(drogon::HttpRequestPtr) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
 
