@@ -239,7 +239,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // 2. List Jobs (GET /api/schedule/jobs)
     auto listReq = HttpRequest::newHttpRequest();
     listReq->setMethod(drogon::Get);
-    listReq->setPath("/api/schedules/jobs");
+    listReq->setPath("/api/schedules/scheduleSummaries");
 
     auto listRespPair = client->sendRequest(listReq);
     BOOST_REQUIRE_EQUAL(listRespPair.first, ReqResult::Ok);
@@ -255,10 +255,10 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // Verify both IDs are present
     bool found1 = false;
     bool found2 = false;
-    for (const auto &id : *listJson) {
-        if (id.asString() == id1)
+    for (const auto &obj : *listJson) {
+        if (obj["schedule_id"].asString() == id1)
             found1 = true;
-        if (id.asString() == id2)
+        if (obj["schedule_id"].asString() == id2)
             found2 = true;
     }
     BOOST_CHECK(found1);

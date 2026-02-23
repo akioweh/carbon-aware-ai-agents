@@ -72,12 +72,12 @@ auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<> {
     co_return;
 }
 
-auto listJobs() -> drogon::Task<std::vector<std::string>> {
+auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>> {
     std::lock_guard<std::mutex> lock(g_mutex);
-    std::vector<std::string> ids;
+    std::vector<ScheduleSummary> ids;
     ids.reserve(g_storage.size());
-    for (const auto &[id, _] : g_storage) {
-        ids.push_back(id);
+    for (const auto &[id, scheduleResult] : g_storage) {
+        ids.push_back({.scheduleId = id, .impact = scheduleResult.impact});
     }
     co_return ids;
 }
