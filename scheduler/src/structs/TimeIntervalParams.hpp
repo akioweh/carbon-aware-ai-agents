@@ -44,6 +44,11 @@ inline auto fromRequest(const HttpRequest &req)
                 "Invalid end time format: " + parse_res.error());
         end = parse_res.value();
     }
+
+    if (start && end && *end < std::chrono::system_clock::now()) {
+        throw scheduler::exceptions::ValidationException(
+            "End time must be in the future!");
+    }
     // if both start and end are provided, validate that start <= end
     if (start && end && *start > *end)
         throw scheduler::exceptions::ValidationException(

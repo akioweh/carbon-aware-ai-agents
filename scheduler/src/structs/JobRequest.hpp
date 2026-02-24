@@ -63,6 +63,10 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
     if (latest_finish_opt.value() < earliest_start_opt.value())
         throw scheduler::exceptions::ValidationException(
             "latest_finish must be after earliest_start");
+    if (latest_finish_opt.value() < std::chrono::system_clock::now()) {
+        throw scheduler::exceptions::ValidationException(
+            "End time must be in the future!");
+    }
     try {
         const auto workload_amount = json["workload_amount"].asDouble();
         if (workload_amount < 0.)
