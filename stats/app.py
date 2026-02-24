@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 import time
@@ -14,9 +15,45 @@ from predictor import (
     generate_next_week_greenness_prediction,
     generate_next_week_load_prediction,
 )
+from carbon_collector import (
+    init_database as init_carbon_db,
+    backfill,
+    collect_current,
+    get_reading_count,
+    DB_PATH as CARBON_DB_PATH,
+    INTERVAL_MINUTES as CARBON_INTERVAL_MINUTES,
+)
 
 DB_FILE = 'cache.db'
 HISTORY_FILE = 'history.json'
+LOG_FILE = os.environ.get('STATS_LOG_FILE', 'app.log')
+
+"""
+See logs on the oracle server with:
+tail -f app.log
+grep CRITICAL app.log  # just see alerts
+"""
+
+# Logging setup — writes to both stdout and a persistent log file
+_log_fmt = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+logging.basicConfig(
+    level=logging.INFO,
+    format=_log_fmt,
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(LOG_FILE),
+    ],
+)
+logger = logging.getLogger('stats.app')
+
+# Threshold: log a CRITICAL alert after this many consecutive failures in a loop
+_FAILURE_ALERT_THRESHOLD = int(os.environ.get('FAILURE_ALERT_THRESHOLD', 5))
+
+# Configuration for Oracle/server deployment
+HOST = os.environ.get('STATS_HOST', '127.0.0.1')
+PORT = int(os.environ.get('STATS_PORT', 5000))
+CARBON_SYNC_INTERVAL = int(os.environ.get('CARBON_SYNC_INTERVAL', 1800))  # 30 min
+CARBON_COLLECTION_ENABLED = os.environ.get('CARBON_COLLECTION_ENABLED', '1') == '1'
 
 
 class Location(BaseModel):
@@ -66,8 +103,9 @@ class ErrorResponse(BaseModel):
 
 def prediction_loop():
     """Background loop to update predictions every 5 minutes."""
+    consecutive_failures: dict[str, int] = {dc: 0 for dc in DATA_CENTRES}
     while True:
-        print('Updating predictions cache...')
+        logger.info('Updating predictions cache...')
         for dc in DATA_CENTRES:
             try:
                 load_data = generate_next_week_load_prediction(dc)
@@ -75,10 +113,81 @@ def prediction_loop():
 
                 greenness_data = generate_next_week_greenness_prediction(dc)
                 db_utils.save_prediction(f'greenness_forecast_{dc}', greenness_data)
-            except Exception as e:
-                print(f'Error updating predictions for {dc}: {e}')
+
+                if consecutive_failures[dc]:
+                    logger.info('Prediction loop recovered for %s after %d failure(s)', dc, consecutive_failures[dc])
+                consecutive_failures[dc] = 0
+            except Exception:
+                consecutive_failures[dc] += 1
+                logger.error(
+                    'Error updating predictions for %s (consecutive failures: %d)',
+                    dc, consecutive_failures[dc],
+                    exc_info=True,
+                )
+                if consecutive_failures[dc] >= _FAILURE_ALERT_THRESHOLD:
+                    logger.critical(
+                        'ALERT: prediction loop for %s has failed %d times in a row — predictions may be stale',
+                        dc, consecutive_failures[dc],
+                    )
 
         time.sleep(300)
+
+
+def carbon_sync_loop():
+    """Background loop to sync carbon intensity data periodically."""
+    consecutive_failures = 0
+    while True:
+        try:
+            if db_utils.has_carbon_data():
+                count = db_utils.sync_carbon_to_historical(days_back=7)
+                logger.info('Carbon sync: %d records updated', count)
+            if consecutive_failures:
+                logger.info('Carbon sync loop recovered after %d failure(s)', consecutive_failures)
+            consecutive_failures = 0
+        except Exception:
+            consecutive_failures += 1
+            logger.error(
+                'Error syncing carbon data (consecutive failures: %d)',
+                consecutive_failures,
+                exc_info=True,
+            )
+            if consecutive_failures >= _FAILURE_ALERT_THRESHOLD:
+                logger.critical(
+                    'ALERT: carbon sync loop has failed %d times in a row — carbon data in cache.db may be stale',
+                    consecutive_failures,
+                )
+        time.sleep(CARBON_SYNC_INTERVAL)
+
+
+def carbon_collector_loop():
+    """Background loop to collect carbon intensity data from UK API."""
+    logger.info('Carbon collector starting (interval: %d min)', CARBON_INTERVAL_MINUTES)
+    logger.info('Database: %s', CARBON_DB_PATH)
+
+    conn = init_carbon_db(CARBON_DB_PATH)
+    backfill(conn)
+
+    consecutive_failures = 0
+    while True:
+        try:
+            collect_current(conn)
+            logger.info('Carbon readings total: %d', get_reading_count(conn))
+            if consecutive_failures:
+                logger.info('Carbon collector loop recovered after %d failure(s)', consecutive_failures)
+            consecutive_failures = 0
+        except Exception:
+            consecutive_failures += 1
+            logger.error(
+                'Error collecting carbon data (consecutive failures: %d)',
+                consecutive_failures,
+                exc_info=True,
+            )
+            if consecutive_failures >= _FAILURE_ALERT_THRESHOLD:
+                logger.critical(
+                    'ALERT: carbon collector has failed %d times in a row — no new carbon readings are being stored',
+                    consecutive_failures,
+                )
+        time.sleep(CARBON_INTERVAL_MINUTES * 60)
 
 
 # does some housekeeping stuff including
@@ -87,16 +196,42 @@ def prediction_loop():
 async def lifespan(app: FastAPI):
     db_utils.initialize_db()
 
-    # Migrate existing history.json to database if it exists and DB is empty
-    if os.path.exists(HISTORY_FILE) and db_utils.count_historical_data() == 0:
-        print('Migrating history.json to database...')
-        db_utils.migrate_json_to_db(HISTORY_FILE)
-    elif db_utils.count_historical_data() == 0:
-        print('No historical data found, generating initial data...')
-        generate_history()
+    # Try to use real carbon data if available
+    if db_utils.has_carbon_data():
+        logger.info('Carbon intensity database found, syncing real data...')
+        try:
+            count = db_utils.sync_carbon_to_historical(days_back=30)
+            logger.info('Synced %d carbon readings to historical data', count)
+        except Exception:
+            logger.error('Failed to sync carbon data on startup', exc_info=True)
 
-    thread = threading.Thread(target=prediction_loop, daemon=True)
-    thread.start()
+    # Fall back to other data sources if no historical data
+    if db_utils.count_historical_data() == 0:
+        if os.path.exists(HISTORY_FILE):
+            print('Migrating history.json to database...')
+            db_utils.migrate_json_to_db(HISTORY_FILE)
+        else:
+            print('No historical data found, generating initial data...')
+            generate_history()
+
+    # Start background threads
+    prediction_thread = threading.Thread(target=prediction_loop, daemon=True)
+    prediction_thread.start()
+
+    # Start carbon collector and sync threads if enabled
+    if CARBON_COLLECTION_ENABLED:
+        collector_thread = threading.Thread(target=carbon_collector_loop, daemon=True)
+        collector_thread.start()
+        print('Carbon collector background thread started')
+
+        sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
+        sync_thread.start()
+        print('Carbon sync background thread started')
+    elif db_utils.has_carbon_data():
+        # If not collecting but have existing data, still sync it
+        sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
+        sync_thread.start()
+        print('Carbon sync background thread started')
 
     openapi_data = app.openapi()
     with open('openapi.yaml', 'w') as f:
@@ -208,4 +343,5 @@ def get_locations() -> list[Location]:
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, port=5000)
+    print(f'Starting Stats API on {HOST}:{PORT}')
+    uvicorn.run(app, host=HOST, port=PORT)

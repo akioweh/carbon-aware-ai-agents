@@ -18,7 +18,6 @@ const std::string Jobs::Cols::_impact_id = "\"impact_id\"";
 const std::string Jobs::Cols::_time_stamp = "\"time_stamp\"";
 const std::string Jobs::Cols::_location_id = "\"location_id\"";
 const std::string Jobs::Cols::_additional_load = "\"additional_load\"";
-const std::string Jobs::Cols::_total_load = "\"total_load\"";
 const std::string Jobs::primaryKeyName = "id";
 const bool Jobs::hasPrimaryKey = true;
 const std::string Jobs::tableName = "\"jobs\"";
@@ -28,8 +27,7 @@ const std::vector<typename Jobs::MetaData> Jobs::metaData_={
 {"impact_id","int32_t","integer",4,0,0,1},
 {"time_stamp","::trantor::Date","timestamp with time zone",0,0,0,1},
 {"location_id","std::string","text",0,0,0,0},
-{"additional_load","double","double precision",8,0,0,0},
-{"total_load","double","double precision",8,0,0,0}
+{"additional_load","double","double precision",8,0,0,0}
 };
 const std::string &Jobs::getColumnName(size_t index) noexcept(false)
 {
@@ -78,15 +76,11 @@ Jobs::Jobs(const Row &r, const ssize_t indexOffset) noexcept
         {
             additionalLoad_=std::make_shared<double>(r["additional_load"].as<double>());
         }
-        if(!r["total_load"].isNull())
-        {
-            totalLoad_=std::make_shared<double>(r["total_load"].as<double>());
-        }
     }
     else
     {
         size_t offset = (size_t)indexOffset;
-        if(offset + 6 > r.size())
+        if(offset + 5 > r.size())
         {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
@@ -135,18 +129,13 @@ Jobs::Jobs(const Row &r, const ssize_t indexOffset) noexcept
         {
             additionalLoad_=std::make_shared<double>(r[index].as<double>());
         }
-        index = offset + 5;
-        if(!r[index].isNull())
-        {
-            totalLoad_=std::make_shared<double>(r[index].as<double>());
-        }
     }
 
 }
 
 Jobs::Jobs(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 6)
+    if(pMasqueradingVector.size() != 5)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -207,14 +196,6 @@ Jobs::Jobs(const Json::Value &pJson, const std::vector<std::string> &pMasqueradi
         if(!pJson[pMasqueradingVector[4]].isNull())
         {
             additionalLoad_=std::make_shared<double>(pJson[pMasqueradingVector[4]].asDouble());
-        }
-    }
-    if(!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5]))
-    {
-        dirtyFlag_[5] = true;
-        if(!pJson[pMasqueradingVector[5]].isNull())
-        {
-            totalLoad_=std::make_shared<double>(pJson[pMasqueradingVector[5]].asDouble());
         }
     }
 }
@@ -279,20 +260,12 @@ Jobs::Jobs(const Json::Value &pJson) noexcept(false)
             additionalLoad_=std::make_shared<double>(pJson["additional_load"].asDouble());
         }
     }
-    if(pJson.isMember("total_load"))
-    {
-        dirtyFlag_[5]=true;
-        if(!pJson["total_load"].isNull())
-        {
-            totalLoad_=std::make_shared<double>(pJson["total_load"].asDouble());
-        }
-    }
 }
 
 void Jobs::updateByMasqueradedJson(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 6)
+    if(pMasqueradingVector.size() != 5)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -354,14 +327,6 @@ void Jobs::updateByMasqueradedJson(const Json::Value &pJson,
             additionalLoad_=std::make_shared<double>(pJson[pMasqueradingVector[4]].asDouble());
         }
     }
-    if(!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5]))
-    {
-        dirtyFlag_[5] = true;
-        if(!pJson[pMasqueradingVector[5]].isNull())
-        {
-            totalLoad_=std::make_shared<double>(pJson[pMasqueradingVector[5]].asDouble());
-        }
-    }
 }
 
 void Jobs::updateByJson(const Json::Value &pJson) noexcept(false)
@@ -421,14 +386,6 @@ void Jobs::updateByJson(const Json::Value &pJson) noexcept(false)
         if(!pJson["additional_load"].isNull())
         {
             additionalLoad_=std::make_shared<double>(pJson["additional_load"].asDouble());
-        }
-    }
-    if(pJson.isMember("total_load"))
-    {
-        dirtyFlag_[5] = true;
-        if(!pJson["total_load"].isNull())
-        {
-            totalLoad_=std::make_shared<double>(pJson["total_load"].asDouble());
         }
     }
 }
@@ -538,28 +495,6 @@ void Jobs::setAdditionalLoadToNull() noexcept
     dirtyFlag_[4] = true;
 }
 
-const double &Jobs::getValueOfTotalLoad() const noexcept
-{
-    static const double defaultValue = double();
-    if(totalLoad_)
-        return *totalLoad_;
-    return defaultValue;
-}
-const std::shared_ptr<double> &Jobs::getTotalLoad() const noexcept
-{
-    return totalLoad_;
-}
-void Jobs::setTotalLoad(const double &pTotalLoad) noexcept
-{
-    totalLoad_ = std::make_shared<double>(pTotalLoad);
-    dirtyFlag_[5] = true;
-}
-void Jobs::setTotalLoadToNull() noexcept
-{
-    totalLoad_.reset();
-    dirtyFlag_[5] = true;
-}
-
 void Jobs::updateId(const uint64_t id)
 {
 }
@@ -570,8 +505,7 @@ const std::vector<std::string> &Jobs::insertColumns() noexcept
         "impact_id",
         "time_stamp",
         "location_id",
-        "additional_load",
-        "total_load"
+        "additional_load"
     };
     return inCols;
 }
@@ -622,17 +556,6 @@ void Jobs::outputArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[5])
-    {
-        if(getTotalLoad())
-        {
-            binder << getValueOfTotalLoad();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
 }
 
 const std::vector<std::string> Jobs::updateColumns() const
@@ -653,10 +576,6 @@ const std::vector<std::string> Jobs::updateColumns() const
     if(dirtyFlag_[4])
     {
         ret.push_back(getColumnName(4));
-    }
-    if(dirtyFlag_[5])
-    {
-        ret.push_back(getColumnName(5));
     }
     return ret;
 }
@@ -707,17 +626,6 @@ void Jobs::updateArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[5])
-    {
-        if(getTotalLoad())
-        {
-            binder << getValueOfTotalLoad();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
 }
 Json::Value Jobs::toJson() const
 {
@@ -762,14 +670,6 @@ Json::Value Jobs::toJson() const
     {
         ret["additional_load"]=Json::Value();
     }
-    if(getTotalLoad())
-    {
-        ret["total_load"]=getValueOfTotalLoad();
-    }
-    else
-    {
-        ret["total_load"]=Json::Value();
-    }
     return ret;
 }
 
@@ -777,7 +677,7 @@ Json::Value Jobs::toMasqueradedJson(
     const std::vector<std::string> &pMasqueradingVector) const
 {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 6)
+    if(pMasqueradingVector.size() == 5)
     {
         if(!pMasqueradingVector[0].empty())
         {
@@ -834,17 +734,6 @@ Json::Value Jobs::toMasqueradedJson(
                 ret[pMasqueradingVector[4]]=Json::Value();
             }
         }
-        if(!pMasqueradingVector[5].empty())
-        {
-            if(getTotalLoad())
-            {
-                ret[pMasqueradingVector[5]]=getValueOfTotalLoad();
-            }
-            else
-            {
-                ret[pMasqueradingVector[5]]=Json::Value();
-            }
-        }
         return ret;
     }
     LOG_ERROR << "Masquerade failed";
@@ -888,14 +777,6 @@ Json::Value Jobs::toMasqueradedJson(
     {
         ret["additional_load"]=Json::Value();
     }
-    if(getTotalLoad())
-    {
-        ret["total_load"]=getValueOfTotalLoad();
-    }
-    else
-    {
-        ret["total_load"]=Json::Value();
-    }
     return ret;
 }
 
@@ -936,18 +817,13 @@ bool Jobs::validateJsonForCreation(const Json::Value &pJson, std::string &err)
         if(!validJsonOfField(4, "additional_load", pJson["additional_load"], err, true))
             return false;
     }
-    if(pJson.isMember("total_load"))
-    {
-        if(!validJsonOfField(5, "total_load", pJson["total_load"], err, true))
-            return false;
-    }
     return true;
 }
 bool Jobs::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                                               const std::vector<std::string> &pMasqueradingVector,
                                               std::string &err)
 {
-    if(pMasqueradingVector.size() != 6)
+    if(pMasqueradingVector.size() != 5)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1003,14 +879,6 @@ bool Jobs::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                   return false;
           }
       }
-      if(!pMasqueradingVector[5].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[5]))
-          {
-              if(!validJsonOfField(5, pMasqueradingVector[5], pJson[pMasqueradingVector[5]], err, true))
-                  return false;
-          }
-      }
     }
     catch(const Json::LogicError &e)
     {
@@ -1051,18 +919,13 @@ bool Jobs::validateJsonForUpdate(const Json::Value &pJson, std::string &err)
         if(!validJsonOfField(4, "additional_load", pJson["additional_load"], err, false))
             return false;
     }
-    if(pJson.isMember("total_load"))
-    {
-        if(!validJsonOfField(5, "total_load", pJson["total_load"], err, false))
-            return false;
-    }
     return true;
 }
 bool Jobs::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector,
                                             std::string &err)
 {
-    if(pMasqueradingVector.size() != 6)
+    if(pMasqueradingVector.size() != 5)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1096,11 +959,6 @@ bool Jobs::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
       if(!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4]))
       {
           if(!validJsonOfField(4, pMasqueradingVector[4], pJson[pMasqueradingVector[4]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5]))
-      {
-          if(!validJsonOfField(5, pMasqueradingVector[5], pJson[pMasqueradingVector[5]], err, false))
               return false;
       }
     }
@@ -1172,17 +1030,6 @@ bool Jobs::validJsonOfField(size_t index,
             }
             break;
         case 4:
-            if(pJson.isNull())
-            {
-                return true;
-            }
-            if(!pJson.isNumeric())
-            {
-                err="Type error in the "+fieldName+" field";
-                return false;
-            }
-            break;
-        case 5:
             if(pJson.isNull())
             {
                 return true;

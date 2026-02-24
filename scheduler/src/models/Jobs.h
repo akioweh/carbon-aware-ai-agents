@@ -49,7 +49,6 @@ class Jobs
         static const std::string _time_stamp;
         static const std::string _location_id;
         static const std::string _additional_load;
-        static const std::string _total_load;
     };
 
     static const int primaryKeyNumber;
@@ -144,17 +143,8 @@ class Jobs
     void setAdditionalLoad(const double &pAdditionalLoad) noexcept;
     void setAdditionalLoadToNull() noexcept;
 
-    /**  For column total_load  */
-    ///Get the value of the column total_load, returns the default value if the column is null
-    const double &getValueOfTotalLoad() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<double> &getTotalLoad() const noexcept;
-    ///Set the value of the column total_load
-    void setTotalLoad(const double &pTotalLoad) noexcept;
-    void setTotalLoadToNull() noexcept;
 
-
-    static size_t getColumnNumber() noexcept {  return 6;  }
+    static size_t getColumnNumber() noexcept {  return 5;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -180,7 +170,6 @@ class Jobs
     std::shared_ptr<::trantor::Date> timeStamp_;
     std::shared_ptr<std::string> locationId_;
     std::shared_ptr<double> additionalLoad_;
-    std::shared_ptr<double> totalLoad_;
     struct MetaData
     {
         const std::string colName_;
@@ -192,7 +181,7 @@ class Jobs
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[6]={ false };
+    bool dirtyFlag_[5]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -232,11 +221,6 @@ class Jobs
             sql += "additional_load,";
             ++parametersCount;
         }
-        if(dirtyFlag_[5])
-        {
-            sql += "total_load,";
-            ++parametersCount;
-        }
         needSelection=true;
         if(parametersCount > 0)
         {
@@ -266,11 +250,6 @@ class Jobs
             sql.append(placeholderStr, n);
         }
         if(dirtyFlag_[4])
-        {
-            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
-            sql.append(placeholderStr, n);
-        }
-        if(dirtyFlag_[5])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
