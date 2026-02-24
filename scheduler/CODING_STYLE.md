@@ -30,18 +30,17 @@ maintainability across the codebase.
 
 - **Always Initialize:** If you are declaring a stack variable without
   initialization (e.g. `int x;`), consider if you really need to do this.
-- **Prefer `auto`:** Use the assignment format with `auto` for almost viable
-  initializations:
+- Use **assignment-initialization syntax** with `auto`::
   - **Class Types:** `auto var = MyClass();` or `auto var = MyClass{};`.
   - **Aggregate Types:** always define aggregates with default-initialized
     members; initialize aggregates with brace initialization.
   - **Primitive Types:** Do not explicitly write the type when it's obvious or
     can be inferred. Use literal suffixes where necessary:
-    - `auto x = 1;` (int)
-    - `auto y = 1.;` (double) no digits after `.` if value is whole
-    - `auto z = 1ULL;` (unsigned long long)
-    - `auto s = 1UZ;` (size_t)
-    - `auto sv = "asdf"sv;` (std::string_view)
+    - `auto x = 1;` (`int`)
+    - `auto y = 1.;` (`double`) no digits after `.` if value is whole
+    - `auto z = 1ULL;` (`unsigned long long`)
+    - `auto s = 1UZ;` (`size_t`)
+    - `auto sv = "asdf"sv;` (`std::string_view`)
 
 ### Control Flow
 
