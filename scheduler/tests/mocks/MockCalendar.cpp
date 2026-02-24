@@ -24,13 +24,13 @@ auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
     blocks.reserve(output.blocks.size());
     for (const auto &ib : output.blocks) {
         blocks.push_back({.timestamp = ib.timestamp,
-                          .jobId = id,
+                          .scheduleId = id,
                           .location = ib.location,
                           .additionalLoad = ib.additionalLoad});
     }
 
     ScheduleResult res{
-        .jobId = id, .schedule = blocks, .impact = output.impact};
+        .scheduleId = id, .schedule = blocks, .impact = output.impact};
 
     std::lock_guard<std::mutex> lock(g_mutex);
     g_storage[id] = res;
@@ -38,7 +38,8 @@ auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
     co_return id;
 }
 
-auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
+auto get(const std::string &jobIdString, const std::string &datacenter)
+    -> drogon::Task<ScheduleResult> {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_storage.contains(jobIdString)) {
         co_return g_storage[jobIdString];
@@ -47,7 +48,7 @@ auto get(const std::string &jobIdString) -> drogon::Task<ScheduleResult> {
     co_return ScheduleResult{};
 }
 
-auto get(time_point start, time_point end)
+auto get(time_point start, time_point end, const std::string &datacenter)
     -> drogon::Task<std::vector<ScheduleBlock>> {
     std::lock_guard<std::mutex> lock(g_mutex);
     std::vector<ScheduleBlock> result;
@@ -62,21 +63,21 @@ auto get(time_point start, time_point end)
     co_return result;
 }
 
-auto deleteSchedule(const std::string &jobId) -> drogon::Task<> {
+auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<> {
     // Validate ID format (mimic real implementation)
-    scheduler::utils::parseStringIDtoInt(jobId);
+    scheduler::utils::parseStringIDtoInt(scheduleId);
 
     std::lock_guard<std::mutex> lock(g_mutex);
-    g_storage.erase(jobId);
+    g_storage.erase(scheduleId);
     co_return;
 }
 
-auto listJobs() -> drogon::Task<std::vector<std::string>> {
+auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>> {
     std::lock_guard<std::mutex> lock(g_mutex);
-    std::vector<std::string> ids;
+    std::vector<ScheduleSummary> ids;
     ids.reserve(g_storage.size());
-    for (const auto &[id, _] : g_storage) {
-        ids.push_back(id);
+    for (const auto &[id, scheduleResult] : g_storage) {
+        ids.push_back({.scheduleId = id, .impact = scheduleResult.impact});
     }
     co_return ids;
 }

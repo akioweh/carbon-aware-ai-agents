@@ -1,5 +1,6 @@
 #ifndef SCHEDULER_SCHEDULING_QUEUE_HPP
 #define SCHEDULER_SCHEDULING_QUEUE_HPP
+#include <exception>
 #pragma once
 
 #include "structs/JobRequest.hpp"
@@ -13,6 +14,7 @@ namespace scheduler {
 class SchedulerTask {
     std::atomic<std::coroutine_handle<>> taskHandle{nullptr};
     SchedulerOutput value;
+    std::exception_ptr except_ptr{nullptr};
 
   public:
     JobRequest jobRequest;
@@ -25,7 +27,11 @@ class SchedulerTask {
         taskHandle.notify_one();
     }
 
-    auto await_resume() -> SchedulerOutput { return std::move(value); }
+    auto await_resume() -> SchedulerOutput {
+        if (except_ptr)
+            std::rethrow_exception(except_ptr);
+        return std::move(value);
+    }
 
     auto setValue(SchedulerOutput result) { value = std::move(result); }
 
@@ -34,6 +40,8 @@ class SchedulerTask {
         auto handle = taskHandle.load(std::memory_order_acquire);
         handle.resume();
     }
+
+    auto setException(auto &&e) { except_ptr = e; }
 };
 
 class SchedulingQueue {

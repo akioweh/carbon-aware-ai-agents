@@ -1,4 +1,5 @@
 #include "Utils.hpp"
+#include "exceptions/NetworkException.hpp"
 #include "exceptions/ValidationException.hpp"
 
 namespace scheduler::utils {
@@ -7,30 +8,33 @@ using namespace drogon;
 
 auto makeGetRequest(const string &host, const string &path)
     -> Task<shared_ptr<Json::Value>> {
+    constexpr int TIMEOUT = 10;
     auto client = HttpClient::newHttpClient(host);
+
     auto request = HttpRequest::newHttpRequest();
     request->setMethod(Get);
     request->setPath(path);
 
     HttpResponsePtr response;
     try {
-        response = co_await client->sendRequestCoro(request);
+        response = co_await client->sendRequestCoro(request, TIMEOUT);
 
     } catch (const exception &e) {
         LOG_ERROR << "something is not yes, maybe run python API? XD "
                   << e.what();
-        co_return nullptr;
+        throw exceptions::NetworkException(
+            "Request to the greeness API timed out!");
     }
 
     if (!response || response->getStatusCode() != drogon::k200OK) {
         LOG_ERROR << "response is null or has a code different than 200";
-        co_return nullptr;
+        throw exceptions::NetworkException("Third party API failed");
     }
 
     auto jsonResponsePtr = response->jsonObject();
     if (!jsonResponsePtr) {
         LOG_ERROR << "couldnt transform to JSON the response";
-        co_return nullptr;
+        throw exceptions::NetworkException("Third party API failed");
     }
 
     co_return make_shared<Json::Value>(*jsonResponsePtr);

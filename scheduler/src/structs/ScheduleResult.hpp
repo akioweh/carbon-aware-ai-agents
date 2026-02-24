@@ -34,14 +34,15 @@ static_assert(Serializable<ScheduleImpact>);
  * @brief API DTO for the result of a scheduling operation.
  */
 struct ScheduleResult {
-    std::string jobId;
+    std::string scheduleId;
     std::vector<ScheduleBlock> schedule;
     ScheduleImpact impact{};
 };
 
 inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
     auto res = Json::Value{};
-    res["schedule_id"] = obj.jobId;
+    res["schedule_id"] = obj.scheduleId;
+    res["message"] = "Success";
     res["scheduled_blocks"] = Json::Value(Json::arrayValue);
     res["impact"] = toJson(obj.impact);
     for (const auto &block : obj.schedule)
@@ -50,6 +51,25 @@ inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
 }
 
 static_assert(Serializable<ScheduleResult>);
+
+/**
+ * @class ScheduleSummary
+ * @brief API DTO for the summary of a scheduling operation.
+ */
+struct ScheduleSummary {
+    std::string scheduleId;
+    ScheduleImpact impact{};
+};
+
+inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["schedule_id"] = obj.scheduleId;
+    res["message"] = "Success";
+    res["impact"] = toJson(obj.impact);
+    return res;
+}
+
+static_assert(Serializable<ScheduleSummary>);
 
 } // namespace scheduler
 

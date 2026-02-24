@@ -7,24 +7,25 @@ info:
   version: 0.1.0
 
 servers:
-  - url: http://localhost:8000
+  - url: http://localhost:6969
     description: Local development server
 
 paths:
-  /api/schedule/{schedule_id}:
+  /api/schedules/{schedule_id}:
     get:
       operationId: getScheduledJob
-      summary: Fetch a schedule.
+      summary: Fetch blocks of specific schedule. Optionally at a specific datacenter.
       description: Gets schedule by its schedule_id.
       parameters:
         - $ref: "#/components/parameters/ScheduleIdParam"
+        - $ref: "#/components/parameters/DatacenterLocationParam"
       responses:
         "200":
           description: Successful response with specific schedule data
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ScheduleCreationResponse"
+                $ref: "#/components/schemas/ScheduleDetailResponse"
         "400":
           description:
             Malformed request (e.g. missing or unparseable path parameter)
@@ -34,22 +35,21 @@ paths:
                 $ref: "#/components/schemas/Error"
         "422":
           description: >
-            Semantically invalid request (e.g. invalid schedule_id format)
+            Semantically invalid request (e.g. invalid schedule_id format or non-existent schedule_id)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
     delete:
       operationId: deleteScheduledJob
-      summary: Deletes a scheduled job
+      summary: Deletes specific schedule.
       description:
         Cause POST on this endpoint automatically persists the job, we need a
         way to delete it if user doesnt confirm it
       parameters:
         - $ref: "#/components/parameters/ScheduleIdParam"
       responses:
-        "200":
+        "204":
           description: Schedule deleted successfully
         "400":
           description: Malformed request
@@ -58,10 +58,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/schedule:
+  /api/schedules/summary:
+    get:
+      operationId: getSchedules Summaries
+      summary: Fetch schedule ids and impacts of all schedules.
+      description:
+        Gets all the schedule ids and impacts of all scheduled jobs.
+      parameters:
+      responses:
+        "200":
+          description: Successful response with schedule data
+          content:
+            application/json:
+              schema:
+                type: array
+                items: 
+                  $ref: '#/components/schemas/ScheduleSummary'
+        "400":
+          description: Malformed request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/schedules:
     get:
       operationId: getSchedule
-      summary: Fetch datacenter work schedule
+      summary: Fetch blocks across different schedules. Optionally those which are inside the specific datacenter.
       description:
         gets all already-scheduled jobs (gets all blocks) which start after
         start_time and end before end_time. Those arguments are optional, so
@@ -69,6 +92,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/StartTimeParam"
         - $ref: "#/components/parameters/EndTimeParam"
+        - $ref: "#/components/parameters/DatacenterLocationParam"
       responses:
         "200":
           description: Successful response with schedule data
@@ -90,10 +114,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
     post:
       operationId: scheduleJob
-      summary: Schedule a job
+      summary: Create a Schedule
       description:
         Submit a job and get back an optimized schedule placement (only blocks
         of this new job)
@@ -109,7 +132,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ScheduleCreationResponse"
+                $ref: "#/components/schemas/ScheduleDetailResponse"
         "400":
           description: Malformed request (e.g. missing or unparseable JSON body)
           content:
@@ -135,6 +158,65 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "503":
+          description: >
+            Connection to Python API failed in some way. This results in our service being no longer valid and available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error" 
+
+  /api/schedules/trivialSchedule:
+    post:
+      operationId: scheduleTrivialJob
+      summary: Create a trivial Schedule
+      description:
+        Submit a job and get back an un-optimized schedule impact.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobRequest"
+      responses:
+        "200":
+          description: Schedule calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDetailResponse'
+        "400":
+          description: Malformed request (e.g. missing or unparseable JSON body)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: >
+            Scheduling conflict: the request is valid but cannot be satisfied
+            given the current system state (e.g. insufficient capacity across
+            all locations, no available data centers, scheduling window too
+            narrow or in the past)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: >
+            Semantically invalid request body (e.g. missing required fields,
+            invalid date format, non-positive workload_amount, latest_finish
+            before earliest_start)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: >
+            Connection to Python API failed in some way. This results in our service being no longer valid and available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error" 
 
 components:
   parameters:
@@ -169,6 +251,16 @@ components:
         type: string
         description: Id of a schedule returned by POST /api/schedule.
         example: "Sche_123"
+
+    DatacenterLocationParam:
+      name: datacenter
+      in: query
+      description: Location of datacenter that is being queried
+      required: false
+      schema:
+        type: string
+        description: Fetches blocks only from this specific Datacenter
+        example: "Data-Center-1"
 
   schemas:
     JobRequest:
@@ -214,7 +306,7 @@ components:
       required:
         - timestamp
         - location
-        - job_id
+        - schedule_id
         - additional_load
       properties:
         timestamp:
@@ -224,18 +316,30 @@ components:
           example: "2025-12-08T02:00:00Z"
         location:
           type: string
-          description: Data center location
+          description: Location of a datacenter in which this block has been scheduled.
           example: "us-west-1"
-        job_id:
+        schedule_id:
           type: string
-          description: Identifier for the scheduled job
-          example: "job-123"
+          description: Identifier telling to which schedule this block belongs.
+          example: "shed-456"
         additional_load:
           type: number
           description: Additional load in kWh during this block
           example: 5.0
 
-    ScheduleCreationResponse:
+    ScheduleSummary:
+      type: object
+      description: Includes schedule id and impacts of that schedule
+      required:
+        - schedule_id
+        - impact
+      properties:
+        schedule_id:
+          $ref: '#/components/schemas/ScheduleDetailResponse/properties/schedule_id'
+        impact:
+          $ref: '#/components/schemas/ScheduleDetailResponse/properties/impact'
+
+    ScheduleDetailResponse:
       type: object
       description:
         Response after scheduling a job, indicating success and server-assigned

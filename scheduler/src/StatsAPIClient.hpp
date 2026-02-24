@@ -68,12 +68,12 @@ class StatsAPIClient {
     explicit StatsAPIClient(std::string host = "http://140.238.79.139:5000");
 
     auto getLocations() -> drogon::Task<std::vector<Location>>;
-    auto getLoadForecast(const std::string &locationId)
+    auto getLoadForecast(const std::string &location)
         -> drogon::Task<std::optional<LoadForecast>>;
-    auto getGreennessForecast(const std::string &locationId)
+    auto getGreennessForecast(const std::string &location)
         -> drogon::Task<std::optional<GreennessForecast>>;
 
-    auto getDatacenter(const std::string &locationId)
+    auto getDatacenter(const std::string &datacenterName)
         -> drogon::Task<Datacenter>;
     auto getAllDatacenters() -> drogon::Task<std::vector<Datacenter>>;
 };

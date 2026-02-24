@@ -1,6 +1,6 @@
 #define BOOST_TEST_MODULE ControllerDeserializationTest
 #include "structs/JobRequest.hpp"
-#include "structs/JobIdentifierParam.hpp"
+#include "structs/ScheduleIdentifierParam.hpp"
 #include "structs/TimeIntervalParams.hpp"
 #include <boost/test/unit_test.hpp>
 #include <drogon/HttpRequest.h>
@@ -187,12 +187,12 @@ BOOST_AUTO_TEST_SUITE_END()
 BOOST_AUTO_TEST_SUITE(JobIdentifierParamValidation)
 
 BOOST_AUTO_TEST_CASE(valid_id) {
-    JobIdentifierParam param("12345");
-    BOOST_CHECK_EQUAL(param.getJobId(), "12345");
+    ScheduleIdentifierParam param("12345");
+    BOOST_CHECK_EQUAL(param.getScheduleId(), "12345");
 }
 
 BOOST_AUTO_TEST_CASE(empty_id_throws) {
-    BOOST_CHECK_THROW(JobIdentifierParam(""), ValidationException);
+    BOOST_CHECK_THROW(ScheduleIdentifierParam(""), ValidationException);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

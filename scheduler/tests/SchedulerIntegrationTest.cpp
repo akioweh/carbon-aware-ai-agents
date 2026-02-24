@@ -66,7 +66,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
 
     auto req = HttpRequest::newHttpJsonRequest(job);
     req->setMethod(drogon::Post);
-    req->setPath("/api/schedule");
+    req->setPath("/api/schedules");
 
     // Make synchronous request
     auto respPair = client->sendRequest(req);
@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 2. Retrieve the schedule (GET)
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
-    getReq->setPath("/api/schedule");
+    getReq->setPath("/api/schedules");
     getReq->setParameter("start_time", scheduler::utils::toIso8601(tomorrow));
     getReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
 
@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 3. Delete Schedule (Delete)
     auto deleteReq = HttpRequest::newHttpRequest();
     deleteReq->setMethod(drogon::Delete);
-    deleteReq->setPath("/api/schedule/" + jobId);
+    deleteReq->setPath("/api/schedules/" + jobId);
 
     auto deleteRespPair = client->sendRequest(deleteReq);
     BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 4. Verify Deletion (GET should not return the deleted blocks)
     auto verifyReq = HttpRequest::newHttpRequest();
     verifyReq->setMethod(drogon::Get);
-    verifyReq->setPath("/api/schedule");
+    verifyReq->setPath("/api/schedules");
     verifyReq->setParameter("start_time",
                             scheduler::utils::toIso8601(tomorrow));
     verifyReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
@@ -162,7 +162,7 @@ BOOST_AUTO_TEST_CASE(test_invalid_request) {
 
     auto req = HttpRequest::newHttpJsonRequest(job);
     req->setMethod(drogon::Post);
-    req->setPath("/api/schedule");
+    req->setPath("/api/schedules");
 
     auto respPair = client->sendRequest(req);
     BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE(test_delete_non_existent) {
     auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
     auto deleteReq = HttpRequest::newHttpRequest();
     deleteReq->setMethod(drogon::Delete);
-    deleteReq->setPath("/api/schedule/sched-99999999"); // Non-existent ID
+    deleteReq->setPath("/api/schedules/sched-99999999"); // Non-existent ID
 
     auto deleteRespPair = client->sendRequest(deleteReq);
     BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
@@ -192,7 +192,7 @@ BOOST_AUTO_TEST_CASE(test_delete_invalid_id) {
     auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
     auto deleteReq = HttpRequest::newHttpRequest();
     deleteReq->setMethod(drogon::Delete);
-    deleteReq->setPath("/api/schedule/invalidid"); // Invalid format (no dash)
+    deleteReq->setPath("/api/schedules/invalidid"); // Invalid format (no dash)
 
     auto deleteRespPair = client->sendRequest(deleteReq);
     BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
@@ -218,7 +218,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
 
         auto req = HttpRequest::newHttpJsonRequest(job);
         req->setMethod(drogon::Post);
-        req->setPath("/api/schedule");
+        req->setPath("/api/schedules");
 
         auto respPair = client->sendRequest(req);
         BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
@@ -239,7 +239,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // 2. List Jobs (GET /api/schedule/jobs)
     auto listReq = HttpRequest::newHttpRequest();
     listReq->setMethod(drogon::Get);
-    listReq->setPath("/api/schedule/jobs");
+    listReq->setPath("/api/schedules/scheduleSummaries");
 
     auto listRespPair = client->sendRequest(listReq);
     BOOST_REQUIRE_EQUAL(listRespPair.first, ReqResult::Ok);
@@ -255,10 +255,10 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // Verify both IDs are present
     bool found1 = false;
     bool found2 = false;
-    for (const auto &id : *listJson) {
-        if (id.asString() == id1)
+    for (const auto &obj : *listJson) {
+        if (obj["schedule_id"].asString() == id1)
             found1 = true;
-        if (id.asString() == id2)
+        if (obj["schedule_id"].asString() == id2)
             found2 = true;
     }
     BOOST_CHECK(found1);
@@ -267,7 +267,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // 3. Get Specific Job (GET /api/schedule/{id})
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
-    getReq->setPath("/api/schedule/" + id1);
+    getReq->setPath("/api/schedules/" + id1);
 
     auto getRespPair = client->sendRequest(getReq);
     BOOST_REQUIRE_EQUAL(getRespPair.first, ReqResult::Ok);
