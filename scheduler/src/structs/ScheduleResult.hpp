@@ -52,6 +52,25 @@ inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
 
 static_assert(Serializable<ScheduleResult>);
 
+/**
+ * @class ScheduleSummary
+ * @brief API DTO for the summary of a scheduling operation.
+ */
+struct ScheduleSummary {
+    std::string scheduleId;
+    ScheduleImpact impact{};
+};
+
+inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["schedule_id"] = obj.scheduleId;
+    res["message"] = "Success";
+    res["impact"] = toJson(obj.impact);
+    return res;
+}
+
+static_assert(Serializable<ScheduleSummary>);
+
 } // namespace scheduler
 
 #endif // SCHEDULER_SCHEDULE_RESULT_HPP

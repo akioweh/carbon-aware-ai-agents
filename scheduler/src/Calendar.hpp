@@ -40,7 +40,7 @@ auto get(time_point start = scheduler::utils::MIN_TIME,
 
 auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<>;
 
-auto listJobs() -> drogon::Task<std::vector<std::string>>;
+auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>>;
 
 }; // namespace scheduler::calendar
 
