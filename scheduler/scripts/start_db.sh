@@ -7,6 +7,6 @@ if pg_isready -h localhost -p "$PG_PORT" -q; then
 fi
 
 echo "Starting database server..."
-pg_ctl -D "$PG_DATA" -o "-p $PG_PORT" -l "$PG_LOG" start
+pg_ctl -D "$PG_DATA" -o "-p $PG_PORT -k /tmp" -l "$PG_LOG" start
 wait_for_db
 echo "Database started. Logs are in $PG_LOG"
