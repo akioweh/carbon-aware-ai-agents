@@ -1,8 +1,11 @@
 fastapi
 pandas==2.*
-prophet~=1.2.1
 matplotlib
 uvicorn
 pyyaml
+scikit-learn
 pytest
 schemathesis
+requests
+schedule
+uvicorn

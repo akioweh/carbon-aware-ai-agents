@@ -37,12 +37,13 @@ Their configuration files are tracked for consistent linting and formatting
 ### Quickstart
 
 0. Ensure your have a working toolchain and the two dependencies installed
-1. Find your appropriate preset in [`CMakePresets.json`](./CMakePresets.json) or
+1. Find an appropriate preset in [`CMakePresets.json`](./CMakePresets.json) or
    add what's missing
 2. Run `cmake --preset <preset name>` (in this directory) to generate build
    files
-3. Your editor should detect project settings now from
-   [`compile_commands.json`](./compile_commands.json)
+3. Your editor should detect project settings from
+   [`compile_commands.json`](./compile_commands.json) (if it doesn't, build at
+   least once)
 4. Build anytime using `cmake --build build/<preset name>`
 5. Output binary is at `./build/<preset name>/scheduler(.exe)`
 
@@ -63,15 +64,24 @@ To run the tests:
 2. Run via CTest:
 
    ```bash
-   cd build/<preset name>
-   ctest --output-on-failure
+   ctest --test-dir buld/<preset name> --output-on-failure
    ```
+
+   > [!TIP]  
+   > use the `-N` flag to list available tests, and use `-R <regex>` to run a
+   > subset matching the regex.
 
 **Build Configuration:**
 
 - The core (`src/`) is compiled as an Object Library `scheduler_core`.
 - The tests link against `scheduler_core` to test internal logic without
   recompilation.
+
+### Build Presets
+
+In addition to a preset for different platforms or toolchains, there are also
+additional variants for each, e.g. release and debug (with different
+sanitizers). Inspect [`CMakePresets.json`](./CMakePresets.json) for details.
 
 ## Implementation Details
 
