@@ -15,6 +15,8 @@ add_subdirectory(src)
 add_executable(scheduler main.cpp)
 target_link_libraries(scheduler PRIVATE scheduler_core)
 
+configure_file(config.json ${CMAKE_CURRENT_BINARY_DIR}/config.json COPYONLY)
+
 enable_testing()
 add_subdirectory(tests)
 
