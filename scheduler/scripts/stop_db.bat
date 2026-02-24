@@ -1,7 +1,7 @@
 @echo off
 call "%~dp0set_env.bat"
 
-pg_isready -h localhost -p %PG_PORT% >nul 2>nul
+pg_isready -q >nul 2>nul
 if %errorlevel% neq 0 (
     echo Database is not running.
     pause
