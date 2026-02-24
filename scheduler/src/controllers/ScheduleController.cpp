@@ -114,33 +114,6 @@ auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
     co_return HttpResponse::newHttpJsonResponse(toJson(result));
 }
 
-auto ScheduleController::calculateTrivialSchedule(HttpRequestPtr /*req*/,
-                                                  const JobRequest job_request) const
-    -> Task<HttpResponsePtr> {
-    TrivialScheduler tSched;
-    auto output = co_await tSched.scheduleJob(job_request);
-
-    auto schedule = vector<ScheduleBlock>{};
-    schedule.reserve(output.blocks.size());
-    for (auto &block : output.blocks)
-        schedule.push_back({
-            .timestamp = block.timestamp,
-            .scheduleId = "trivial",
-            .location = std::move(block.location),
-            .additionalLoad = block.additionalLoad,
-        });
-
-    auto result = ScheduleResult{
-        .scheduleId = "trivial",
-        .schedule = std::move(schedule),
-        .impact = output.impact,
-        .trivialSchedule = {},
-        .trivialImpact = {}
-    };
-
-    co_return HttpResponse::newHttpJsonResponse(toJson(result));
-}
-
 auto ScheduleController::getScheduleSummaries(HttpRequestPtr /*req*/) const
     -> Task<HttpResponsePtr> {
     const auto scheduleSummaries = co_await calendar::scheduleSummaries();

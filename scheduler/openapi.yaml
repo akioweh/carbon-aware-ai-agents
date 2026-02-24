@@ -60,6 +60,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/schedules/{schedule_id}/trivial:
+    get:
+      operationId: getScheduledJobTrivial
+      summary:
+        Fetch the unoptimized trivial schedule baseline for a specific schedule.
+        Optionally at a specific datacenter.
+      description: Gets the trivial schedule associated with a schedule_id.
+      parameters:
+        - $ref: "#/components/parameters/ScheduleIdParam"
+        - $ref: "#/components/parameters/DatacenterLocationParam"
+      responses:
+        "200":
+          description: Successful response with trivial schedule data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleDetailResponse"
+        "400":
+          description:
+            Malformed request (e.g. missing or unparseable path parameter)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: >
+            Semantically invalid request (e.g. invalid schedule_id format or
+            non-existent schedule_id)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/schedules/summary:
     get:
       operationId: getScheduleSummaries
@@ -131,58 +164,6 @@ paths:
       responses:
         "200":
           description: Schedule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ScheduleDetailResponse"
-        "400":
-          description: Malformed request (e.g. missing or unparseable JSON body)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "409":
-          description: >
-            Scheduling conflict: the request is valid but cannot be satisfied
-            given the current system state (e.g. insufficient capacity across
-            all locations, no available data centers, scheduling window too
-            narrow or in the past)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "422":
-          description: >
-            Semantically invalid request body (e.g. missing required fields,
-            invalid date format, non-positive workload_amount, latest_finish
-            before earliest_start)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "503":
-          description: >
-            Connection to Python API failed in some way. This results in our
-            service being no longer valid and available.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/schedules/trivialSchedule:
-    post:
-      operationId: scheduleTrivialJob
-      summary: Create a trivial Schedule
-      description: Submit a job and get back an un-optimized schedule impact.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/JobRequest"
-      responses:
-        "200":
-          description: Schedule calculated successfully
           content:
             application/json:
               schema:
@@ -342,6 +323,8 @@ components:
           $ref: "#/components/schemas/ScheduleDetailResponse/properties/schedule_id"
         impact:
           $ref: "#/components/schemas/ScheduleDetailResponse/properties/impact"
+        trivialImpact:
+          $ref: "#/components/schemas/ScheduleDetailResponse/properties/impact"
 
     ScheduleDetailResponse:
       type: object
@@ -382,6 +365,21 @@ components:
               type: number
               description: Software Carbon Intensity score for the schedule
               example: 20
+        unoptimizedResult:
+          type: object
+          description:
+            The unoptimized (trivial) schedule counterpart for comparison
+          properties:
+            schedule_id:
+              type: string
+              description: The job id that the trivial schedule is attached to
+              example: "sched-456"
+            impact:
+              $ref: "#/components/schemas/ScheduleDetailResponse/properties/impact"
+            scheduled_blocks:
+              type: array
+              items:
+                $ref: "#/components/schemas/ScheduleBlock"
 
     Error:
       type: object
@@ -392,4 +390,3 @@ components:
           type: string
           description: Human-readable error message
           example: "Invalid job specification"
-
