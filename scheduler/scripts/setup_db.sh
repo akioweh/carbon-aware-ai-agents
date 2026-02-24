@@ -1,8 +1,9 @@
 #!/bin/bash
 source "$(dirname "$0")/set_env.sh"
 
-if [ ! -d "$PG_DATA" ]; then
+if [ ! -f "$PG_DATA/PG_VERSION" ]; then
     echo "Initializing database cluster at $PG_DATA..."
+    rm -rf "$PG_DATA"/*
     mkdir -p "$PG_DATA"
     initdb -D "$PG_DATA" -U postgres -A trust -E UTF8
 else
@@ -13,7 +14,7 @@ if pg_isready -h localhost -p "$PG_PORT" -q; then
     echo "Database is already running."
 else
     echo "Starting database server..."
-    pg_ctl -D "$PG_DATA" -o "-p $PG_PORT" -l "$PG_LOG" start
+    pg_ctl -D "$PG_DATA" -o "-p $PG_PORT -k /tmp" -l "$PG_LOG" start
     wait_for_db
 fi
 
