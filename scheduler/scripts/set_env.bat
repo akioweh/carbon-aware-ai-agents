@@ -17,3 +17,18 @@ if %errorlevel% neq 0 (
 set "PG_DATA=%~dp0..\db_data"
 set "PG_PORT=5432"
 set "PG_LOG=%~dp0db.log"
+
+:: Standard Postgres environment variables
+set "PGHOST=localhost"
+set "PGUSER=postgres"
+set "PGDATABASE=calendar_db"
+
+:: Security check for PG_DATA (very basic for Windows)
+if "%PG_DATA%" == "\" (
+    echo Error: PG_DATA is set to a dangerous path: %PG_DATA%
+    exit /b 1
+)
+if "%PG_DATA:~1,2%" == ":\" if "%PG_DATA:~3%" == "" (
+    echo Error: PG_DATA is set to a dangerous path: %PG_DATA%
+    exit /b 1
+)

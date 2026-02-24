@@ -18,11 +18,22 @@ export PG_DATA="$SCRIPT_DIR/../db_data"
 export PG_PORT=5432
 export PG_LOG="$SCRIPT_DIR/db.log"
 
+# Standard Postgres environment variables
+export PGHOST=localhost
+export PGUSER=postgres
+export PGDATABASE=calendar_db
+
+# Security check for PG_DATA
+if [[ "$PG_DATA" == "/" ]] || [[ "$PG_DATA" == "/home" ]] || [[ "$PG_DATA" == "/root" ]]; then
+    echo "Error: PG_DATA is set to a dangerous path: $PG_DATA"
+    exit 1
+fi
+
 wait_for_db() {
     echo "Waiting for database on port $PG_PORT..."
     local retries=30
     while [ $retries -gt 0 ]; do
-        if pg_isready -h localhost -p "$PG_PORT" -q; then
+        if pg_isready -q; then
             echo "Database is ready."
             return 0
         fi
