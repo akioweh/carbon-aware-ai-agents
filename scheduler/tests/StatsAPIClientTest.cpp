@@ -2,7 +2,7 @@
 #include "DrogonTestUtils.hpp"
 #include <structs/Datacenter.hpp>
 #include <StatsAPIClient.hpp>
-#include <boost/test/included/unit_test.hpp>
+#include <boost/test/unit_test.hpp>
 #include <drogon/drogon.h>
 
 using namespace scheduler;

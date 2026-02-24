@@ -1,10 +1,10 @@
 #define BOOST_TEST_MODULE ControllerDeserializationTest
+#include "structs/JobRequest.hpp"
+#include "structs/JobIdentifierParam.hpp"
+#include "structs/TimeIntervalParams.hpp"
+#include <boost/test/unit_test.hpp>
 #include <drogon/HttpRequest.h>
 #include <json/json.h>
-#include <boost/test/included/unit_test.hpp>
-#include "structs/JobRequest.hpp"
-#include "structs/TimeIntervalParams.hpp"
-#include "structs/JobIdentifierParam.hpp"
 
 using namespace scheduler;
 using namespace scheduler::exceptions;
