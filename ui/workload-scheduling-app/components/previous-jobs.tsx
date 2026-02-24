@@ -9,13 +9,12 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 interface ScheduleBlock {
   timestamp: string
   location: string
-  job_id: string
+  schedule_id: string
   additional_load: number
 }
 
 interface JobSummary {
   schedule_id: string
-  job_id?: string
   scheduled_blocks: ScheduleBlock[]
   impact?: {
     carbon_intensity?: number
@@ -59,31 +58,30 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
             b &&
             typeof b.timestamp === "string" &&
             typeof b.location === "string" &&
-            typeof b.job_id === "string" &&
+            typeof b.schedule_id === "string" &&
             typeof b.additional_load === "number"
           )
         }) as ScheduleBlock[]
         
-        // Group blocks by job_id to create job summaries
+        // Group blocks by schedule_id to create job summaries
         const jobMap = new Map<string, ScheduleBlock[]>()
         
         for (const block of blocks) {
-          if (!jobMap.has(block.job_id)) {
-            jobMap.set(block.job_id, [])
+          if (!jobMap.has(block.schedule_id)) {
+            jobMap.set(block.schedule_id, [])
           }
-          jobMap.get(block.job_id)?.push(block)
+          jobMap.get(block.schedule_id)?.push(block)
         }
 
         // Convert to job summaries and fetch impact data for each
         const jobSummaries: JobSummary[] = await Promise.all(
-          Array.from(jobMap.entries()).map(async ([job_id, blocks]) => {
+          Array.from(jobMap.entries()).map(async ([schedule_id, blocks]) => {
             const timestamps = blocks.map(b => new Date(b.timestamp).getTime())
             const start_time = new Date(Math.min(...timestamps)).toISOString()
             const end_time = new Date(Math.max(...timestamps) + 5 * 60 * 1000).toISOString()
             
             const jobSummary: JobSummary = {
-              schedule_id: job_id,
-              job_id,
+              schedule_id,
               scheduled_blocks: blocks,
               start_time,
               end_time,
@@ -91,7 +89,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
 
             // Fetch full schedule details to get impact data
             try {
-              const scheduleResponse = await fetch(`/api/schedules/${job_id}`)
+              const scheduleResponse = await fetch(`/api/schedules/${schedule_id}`)
               if (scheduleResponse.ok) {
                 const scheduleData = await scheduleResponse.json()
                 if (scheduleData.impact) {
@@ -99,7 +97,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                 }
               }
             } catch (err) {
-              console.error(`Failed to fetch impact for job ${job_id}:`, err)
+              console.error(`Failed to fetch impact for schedule ${schedule_id}:`, err)
               // Continue anyway, impact will just be undefined
             }
 

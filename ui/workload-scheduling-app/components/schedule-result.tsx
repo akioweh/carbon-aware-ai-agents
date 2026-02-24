@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Leaf, ArrowLeft, Loader2, Trash2 } from "lucide-react"
+import { Leaf, ArrowLeft, Loader2, Trash2, TrendingDown, ArrowRight } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,7 @@ import {
 interface ScheduleBlock {
   timestamp: string
   location: string
-  job_id: string
+  schedule_id: string
   additional_load: number
 }
 
@@ -48,6 +48,15 @@ interface ScheduleResultProps {
     estimated_emissions_kg?: number
     sci_per_unit?: number
   }
+  unoptimizedResult?: {
+    schedule_id: string
+    scheduled_blocks?: ScheduleBlock[]
+    impact?: {
+      carbon_intensity?: number
+      total_emissions?: number
+      sci?: number
+    }
+  }
   // User's input time range
   earliestStart?: string
   latestFinish?: string
@@ -56,21 +65,21 @@ interface ScheduleResultProps {
 }
 
 const DATA_CENTERS = [
-  { id: "dc1", name: "Data Centre 1", location: "us-west-1" },
-  { id: "dc2", name: "Data Centre 2", location: "us-east-1" },
-  { id: "dc3", name: "Data Centre 3", location: "eu-central-1" },
-  { id: "dc4", name: "Data Centre 4", location: "ap-southeast-1" },
-  { id: "dc5", name: "Data Centre 5", location: "sa-east-1" },
+  { id: "dc1", name: "Data Centre 1", backendLocation: "Data-Center-1" },
+  { id: "dc2", name: "Data Centre 2", backendLocation: "Data-Center-2" },
+  { id: "dc3", name: "Data Centre 3", backendLocation: "Data-Center-3" },
+  { id: "dc4", name: "Data Centre 4", backendLocation: "Data-Center-4" },
+  { id: "dc5", name: "Data Centre 5", backendLocation: "Data-Center-5" },
 ]
 
 // Map location strings to DC IDs
 function locationToDcId(location: string): string | undefined {
-  const dc = DATA_CENTERS.find(d => d.location === location)
+  const dc = DATA_CENTERS.find(d => d.backendLocation === location)
   return dc?.id
 }
 
 // At the top of ScheduleResult.tsx, outside the component
-function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newJobId?: string) {
+function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newScheduleId?: string) {
   const intervalMs = 5 * 60 * 1000
   const intervals: WorkloadInterval[] = []
 
@@ -88,11 +97,11 @@ function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newJobId
     })
 
     const existing = matching
-      .filter(b => b.job_id !== newJobId)
+      .filter(b => b.schedule_id !== newScheduleId)
       .reduce((sum, b) => sum + (typeof b.additional_load === 'number' ? b.additional_load : 0), 0)
 
     const newJob = matching
-      .filter(b => b.job_id === newJobId)
+      .filter(b => b.schedule_id === newScheduleId)
       .reduce((sum, b) => sum + (typeof b.additional_load === 'number' ? b.additional_load : 0), 0)
 
     intervals.push({ 
@@ -114,7 +123,7 @@ function ceilToInterval(d: Date, ms: number) {
   return new Date(Math.ceil(d.getTime() / ms) * ms)
 }
 
-export function ScheduleResult({ result, earliestStart, latestFinish, onBack, onCancel }: ScheduleResultProps) {
+export function ScheduleResult({ result, unoptimizedResult, earliestStart, latestFinish, onBack, onCancel }: ScheduleResultProps) {
   const [selectedDC, setSelectedDC] = useState(DATA_CENTERS[0].id)
   const [workloadData, setWorkloadData] = useState<WorkloadInterval[]>([])
   const [loading, setLoading] = useState(false)
@@ -127,20 +136,29 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
   const totalEmissions = result.impact?.total_emissions ?? result.estimated_emissions_kg
   const sci = result.impact?.sci ?? result.sci_per_unit
 
-  // Calculate time range from user input or scheduled blocks
+  // Get unoptimized comparison values
+  const unoptimizedComparison = {
+    carbon_intensity: unoptimizedResult?.impact?.carbon_intensity,
+    total_emissions: unoptimizedResult?.impact?.total_emissions,
+    sci: unoptimizedResult?.impact?.sci,
+  }
+
+  // Calculate time range from scheduled blocks of THIS job only
   const getTimeRange = () => {
-    if (earliestStart && latestFinish) {
-      return {
-        start: new Date(earliestStart),
-        end: new Date(latestFinish)
-      }
-    }
-    
+    // Use only the new job's scheduled blocks for time range
     if (result.scheduled_blocks && result.scheduled_blocks.length > 0) {
       const timestamps = result.scheduled_blocks.map(b => new Date(b.timestamp).getTime())
       return {
         start: new Date(Math.min(...timestamps)),
         end: new Date(Math.max(...timestamps) + 5 * 60 * 1000)
+      }
+    }
+    
+    // Fallback to user input
+    if (earliestStart && latestFinish) {
+      return {
+        start: new Date(earliestStart),
+        end: new Date(latestFinish)
       }
     }
     
@@ -161,36 +179,48 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
     }
   }
 
-  // Fetch all blocks once on mount (approach A: load all data upfront)
+  // Fetch: (1) the new job's blocks, (2) all existing blocks, then combine
   useEffect(() => {
-    const loadAllBlocks = async () => {
+    const loadBlocks = async () => {
       setLoading(true)
       try {
-        // Fetch all blocks without time filtering - get complete picture of all workloads
-        const res = await fetch(`/api/schedules`)
-        
-        if (!res.ok) {
-          throw new Error(`Failed to fetch schedules: ${res.status}`)
+        // Fetch the specific schedule's blocks (the new job)
+        const scheduleRes = await fetch(`/api/schedules/${result.schedule_id}`)
+        if (!scheduleRes.ok) {
+          throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
+        }
+        const scheduleData = await scheduleRes.json()
+        const newJobBlocks = Array.isArray(scheduleData.scheduled_blocks) 
+          ? scheduleData.scheduled_blocks 
+          : []
+
+        // Fetch all blocks to get existing workload
+        const allRes = await fetch(`/api/schedules`)
+        if (!allRes.ok) {
+          throw new Error(`Failed to fetch all schedules: ${allRes.status}`)
+        }
+        const allData = await allRes.json()
+        const allBlocks = Array.isArray(allData) ? allData : []
+
+        // Combine: mark new job blocks and include all blocks
+        const combined = allBlocks.map((b: any) => ({
+          ...b,
+          // If this block is from the new job (by schedule_id), mark it
+          // Note: new job blocks will have schedule_id = result.schedule_id
+        }))
+
+        // Add new job blocks if not already included
+        const combinedWithNewJob = [...combined]
+        for (const block of newJobBlocks) {
+          if (!combinedWithNewJob.find((b: any) => 
+            b.timestamp === block.timestamp && 
+            b.schedule_id === block.schedule_id
+          )) {
+            combinedWithNewJob.push(block)
+          }
         }
 
-        const raw = await res.json()
-
-        if (!Array.isArray(raw)) {
-          throw new Error("Unexpected schedule response shape")
-        }
-
-        // Sanitize blocks (ensure required fields exist and are correct types)
-        const blocks = raw.filter((b: any) => {
-          return (
-            b &&
-            typeof b.timestamp === "string" &&
-            typeof b.location === "string" &&
-            typeof b.job_id === "string" &&
-            typeof b.additional_load === "number"
-          )
-        })
-
-        setAllBlocks(blocks)
+        setAllBlocks(combinedWithNewJob)
       } catch (err) {
         console.error("Failed to load blocks", err)
         setAllBlocks([])
@@ -199,26 +229,26 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
       }
     }
 
-    loadAllBlocks()
-  }, [])
+    loadBlocks()
+  }, [result.schedule_id])
 
   // Update workload data when data center changes (uses cached allBlocks)
   useEffect(() => {
     const { start, end } = getTimeRange()
 
-    // Filter blocks by selected DC
+    // Filter blocks by selected DC using backend location name
     const dcBlocks = allBlocks.filter(
       (b: any) => locationToDcId(b.location) === selectedDC
     )
 
-    // Determine new job id from result (prefer job_id then schedule_id)
-    const newJobId = result.job_id ?? result.schedule_id
+    // Use schedule_id to identify new job blocks
+    const newJobScheduleId = result.schedule_id
 
-    // Convert blocks → workload intervals for your chart
-    const intervals = convertBlocksToWorkload(dcBlocks, start, end, newJobId)
+    // Convert blocks → workload intervals for chart
+    const intervals = convertBlocksToWorkload(dcBlocks, start, end, newJobScheduleId)
 
     setWorkloadData(intervals)
-  }, [selectedDC, allBlocks, result.job_id, result.schedule_id, earliestStart, latestFinish])
+  }, [selectedDC, allBlocks, result.schedule_id])
 
   const handleCancel = async () => {
     setCancelling(true)
@@ -255,7 +285,8 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
     })
   }
 
-  const maxValue = Math.max(...workloadData.map(d => d.existing + d.newJob), 100)
+  // Fixed Y-axis: all data centers have capacity of 50
+  const maxValue = 50
   const { start: rangeStart, end: rangeEnd } = getTimeRange()
 
   return (
@@ -338,12 +369,108 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
         </Card>
       )}
 
+      {/* Impact Comparison Card */}
+      {unoptimizedResult && (
+        <Card className="border-2 border-orange-200 bg-orange-50/50">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-orange-600" />
+              <CardTitle>Impact Comparison</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Carbon Intensity Comparison */}
+              {carbonIntensity !== undefined && unoptimizedComparison.carbon_intensity !== undefined && (
+                <div className="rounded-lg border bg-background p-4">
+                  <p className="text-sm font-medium mb-3">Carbon Intensity</p>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Unoptimised</p>
+                      <p className="text-2xl font-bold text-orange-600">{unoptimizedComparison.carbon_intensity.toFixed(3)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">kg CO2/kWh</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Optimised</p>
+                      <p className="text-2xl font-bold text-primary">{carbonIntensity.toFixed(3)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">kg CO2/kWh</p>
+                    </div>
+                  </div>
+                  {unoptimizedComparison.carbon_intensity > 0 && (
+                    <div className="mt-3 text-center">
+                      <p className="text-sm font-medium text-emerald-600">
+                        {(((unoptimizedComparison.carbon_intensity - carbonIntensity) / unoptimizedComparison.carbon_intensity) * 100).toFixed(1)}% reduction
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Total Emissions Comparison */}
+              {totalEmissions !== undefined && unoptimizedComparison.total_emissions !== undefined && (
+                <div className="rounded-lg border bg-background p-4">
+                  <p className="text-sm font-medium mb-3">Total Emissions</p>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Unoptimised</p>
+                      <p className="text-2xl font-bold text-orange-600">{unoptimizedComparison.total_emissions.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">kg CO2</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Optimised</p>
+                      <p className="text-2xl font-bold text-primary">{totalEmissions.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">kg CO2</p>
+                    </div>
+                  </div>
+                  {unoptimizedComparison.total_emissions > 0 && (
+                    <div className="mt-3 text-center">
+                      <p className="text-sm font-medium text-emerald-600">
+                        {(((unoptimizedComparison.total_emissions - totalEmissions) / unoptimizedComparison.total_emissions) * 100).toFixed(1)}% reduction
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SCI Comparison */}
+              {sci !== undefined && unoptimizedComparison.sci !== undefined && (
+                <div className="rounded-lg border bg-background p-4">
+                  <p className="text-sm font-medium mb-3">SCI per Unit</p>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Unoptimised</p>
+                      <p className="text-2xl font-bold text-orange-600">{unoptimizedComparison.sci.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">kg CO2e/unit</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Optimised</p>
+                      <p className="text-2xl font-bold text-primary">{sci.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">kg CO2e/unit</p>
+                    </div>
+                  </div>
+                  {unoptimizedComparison.sci > 0 && (
+                    <div className="mt-3 text-center">
+                      <p className="text-sm font-medium text-emerald-600">
+                        {(((unoptimizedComparison.sci - sci) / unoptimizedComparison.sci) * 100).toFixed(1)}% reduction
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Data Center Workload View */}
       <Card>
         <CardHeader>
           <CardTitle>Data Centre Workload Distribution</CardTitle>
           <CardDescription>
-            Showing workload from {formatDateTime(rangeStart.toISOString())} to {formatDateTime(rangeEnd.toISOString())} (5-minute intervals)
+            Showing workload from {formatDateTime(rangeStart.toISOString())} to {formatDateTime(rangeEnd.toISOString())}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -381,13 +508,13 @@ export function ScheduleResult({ result, earliestStart, latestFinish, onBack, on
             </div>
           ) : (
             <div className="relative">
-              {/* Y-axis labels (kWh) */}
+              {/* Y-axis labels (fixed 0-50) */}
               <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-muted-foreground pr-2">
-                <span>{maxValue.toFixed(1)} kWh</span>
-                <span>{(maxValue * 0.75).toFixed(1)} kWh</span>
-                <span>{(maxValue * 0.5).toFixed(1)} kWh</span>
-                <span>{(maxValue * 0.25).toFixed(1)} kWh</span>
-                <span>0 kWh</span>
+                <span>50</span>
+                <span>37.5</span>
+                <span>25</span>
+                <span>12.5</span>
+                <span>0</span>
               </div>
               
               {/* Scrollable Chart Area */}

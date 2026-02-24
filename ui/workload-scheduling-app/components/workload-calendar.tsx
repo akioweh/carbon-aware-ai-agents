@@ -9,14 +9,14 @@ import { CalendarIcon, X, Loader2 } from "lucide-react"
 interface ScheduleBlock {
   timestamp: string
   location: string
-  job_id: string
+  schedule_id: string
   additional_load: number
 }
 
 interface AggregatedInterval {
   time: Date
   endTime: Date
-  jobs: { job_id: string; load: number }[]
+  jobs: { schedule_id: string; load: number }[]
 }
 
 interface WorkloadCalendarProps {
@@ -25,11 +25,11 @@ interface WorkloadCalendarProps {
 }
 
 const DATA_CENTERS = [
-  { id: "dc1", name: "Data Centre 1", location: "us-west-1" },
-  { id: "dc2", name: "Data Centre 2", location: "us-east-1" },
-  { id: "dc3", name: "Data Centre 3", location: "eu-central-1" },
-  { id: "dc4", name: "Data Centre 4", location: "ap-southeast-1" },
-  { id: "dc5", name: "Data Centre 5", location: "sa-east-1" },
+  { id: "dc1", name: "Data Centre 1", backendLocation: "Data-Center-1" },
+  { id: "dc2", name: "Data Centre 2", backendLocation: "Data-Center-2" },
+  { id: "dc3", name: "Data Centre 3", backendLocation: "Data-Center-3" },
+  { id: "dc4", name: "Data Centre 4", backendLocation: "Data-Center-4" },
+  { id: "dc5", name: "Data Centre 5", backendLocation: "Data-Center-5" },
 ]
 
 const BLOCK_DURATION_MS = 5 * 60 * 1000
@@ -121,26 +121,26 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     const spanMs = rangeEnd.getTime() - rangeStart.getTime()
     const dp = getDisplayParams(spanMs)
 
-    // Filter blocks for the selected DC
-    const dcLocation = DATA_CENTERS.find(dc => dc.id === selectedDC)?.location
-    const dcBlocks = dcLocation ? blocks.filter(b => b.location === dcLocation) : []
+    // Filter blocks for the selected DC using the backend location name
+    const dcBackendLocation = DATA_CENTERS.find(dc => dc.id === selectedDC)?.backendLocation
+    const dcBlocks = dcBackendLocation ? blocks.filter(b => b.location === dcBackendLocation) : []
 
     // Build aggregated intervals
     const intervals: AggregatedInterval[] = []
     for (let t = rangeStart.getTime(); t < rangeEnd.getTime(); t += dp.intervalMs) {
       const intervalEnd = t + dp.intervalMs
-      const activeJobs: { job_id: string; load: number }[] = []
+      const activeJobs: { schedule_id: string; load: number }[] = []
 
       for (const block of dcBlocks) {
         if (!block.timestamp || typeof block.additional_load !== "number") continue
         const blockStart = new Date(block.timestamp).getTime()
         const blockEnd = blockStart + BLOCK_DURATION_MS
         if (blockStart < intervalEnd && blockEnd > t) {
-          const existing = activeJobs.find(j => j.job_id === block.job_id)
+          const existing = activeJobs.find(j => j.schedule_id === block.schedule_id)
           if (existing) {
             existing.load += block.additional_load
           } else {
-            activeJobs.push({ job_id: block.job_id, load: block.additional_load })
+            activeJobs.push({ schedule_id: block.schedule_id, load: block.additional_load })
           }
         }
       }
@@ -155,10 +155,8 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     return { intervals, rangeStart, rangeEnd, displayParams: dp }
   }, [blocks, selectedDC])
 
-  const maxValue = Math.max(
-    ...intervals.map(d => d.jobs.reduce((sum, j) => sum + j.load, 0)),
-    1,
-  )
+  // Fixed Y-axis: all data centers have capacity of 50
+  const maxValue = 50
 
   // Day boundary markers
   const dayBoundaries = useMemo(() => {
@@ -247,7 +245,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
         <div className="flex items-center gap-6 text-sm">
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded bg-blue-500" />
-            <span className="text-muted-foreground">Scheduled Jobs (kWh)</span>
+            <span className="text-muted-foreground">Scheduled Jobs</span>
           </div>
         </div>
 
@@ -267,11 +265,11 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
               className="absolute left-0 top-6 flex flex-col justify-between text-xs text-muted-foreground pr-2 z-10 w-14"
               style={{ height: `${chartHeight}px` }}
             >
-              <span>{maxValue.toFixed(1)}</span>
-              <span>{(maxValue * 0.75).toFixed(1)}</span>
-              <span>{(maxValue * 0.5).toFixed(1)}</span>
-              <span>{(maxValue * 0.25).toFixed(1)}</span>
-              <span>0 kWh</span>
+              <span>50</span>
+              <span>37.5</span>
+              <span>25</span>
+              <span>12.5</span>
+              <span>0</span>
             </div>
 
             {/* Scrollable chart area */}
@@ -341,12 +339,12 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             {interval.jobs.length > 0 ? (
                               <div>
                                 <p className="text-muted-foreground">
-                                  Total: {jobsLoad.toFixed(2)} kWh
+                                  Total: {jobsLoad.toFixed(2)}
                                 </p>
                                 <div className="border-t mt-1 pt-1">
                                   {interval.jobs.map((job, j) => (
                                     <p key={j} className="text-blue-500">
-                                      {job.job_id}: {job.load.toFixed(2)} kWh
+                                      {job.schedule_id}: {job.load.toFixed(2)} 
                                     </p>
                                   ))}
                                 </div>

@@ -382,3 +382,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 package-lock.json
+
+# Frontend development Mock API data
+ui/mock-api/

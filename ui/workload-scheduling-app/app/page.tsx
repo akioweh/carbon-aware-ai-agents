@@ -10,12 +10,14 @@ import { History } from "lucide-react"
 
 export default function Home() {
   const [scheduleResult, setScheduleResult] = useState<any>(null)
+  const [unoptimizedResult, setUnoptimizedResult] = useState<any>(null)
   const [timeRange, setTimeRange] = useState<{ earliestStart: string; latestFinish: string } | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
   const [showPreviousJobs, setShowPreviousJobs] = useState(false)
 
-  const handleScheduleComplete = (result: any, earliestStart: string, latestFinish: string) => {
+  const handleScheduleComplete = (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => {
     setScheduleResult(result)
+    setUnoptimizedResult(unoptimizedResult)
     setTimeRange({ earliestStart, latestFinish })
     setShowCalendar(false)
     setShowPreviousJobs(false)
@@ -23,16 +25,19 @@ export default function Home() {
 
   const handleBack = () => {
     setScheduleResult(null)
+    setUnoptimizedResult(null)
     setTimeRange(null)
   }
 
   const handleCancel = () => {
     setScheduleResult(null)
+    setUnoptimizedResult(null)
     setTimeRange(null)
   }
 
   const handleSelectJob = (job: any) => {
     setScheduleResult(job)
+    setUnoptimizedResult(null)
     setTimeRange(null)
     setShowPreviousJobs(false)
   }
@@ -59,6 +64,7 @@ export default function Home() {
           ) : scheduleResult ? (
             <ScheduleResult
               result={scheduleResult}
+              unoptimizedResult={unoptimizedResult}
               earliestStart={timeRange?.earliestStart}
               latestFinish={timeRange?.latestFinish}
               onBack={handleBack}

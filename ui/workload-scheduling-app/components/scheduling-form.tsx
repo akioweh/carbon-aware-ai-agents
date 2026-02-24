@@ -25,7 +25,7 @@ const jobTypes = [
 ]
 
 interface SchedulingFormProps {
-  onScheduleComplete?: (result: any, earliestStart: string, latestFinish: string) => void
+  onScheduleComplete?: (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => void
   onViewCalendar?: () => void
 }
 
@@ -49,7 +49,8 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
     }
 
     try {
-      const response = await fetch("/api/schedules", {
+      // Fetch optimized schedule
+      const optimizedResponse = await fetch("/api/schedules", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -57,14 +58,28 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
         body: JSON.stringify(jobRequest),
       })
 
-      if (!response.ok) {
+      if (!optimizedResponse.ok) {
         throw new Error("Failed to schedule job")
       }
 
-      const result = await response.json()
+      const optimizedResult = await optimizedResponse.json()
+
+      // Fetch unoptimized (trivial) schedule
+      const trivialResponse = await fetch("/api/schedules/trivialSchedule", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(jobRequest),
+      })
+
+      let trivialResult = null
+      if (trivialResponse.ok) {
+        trivialResult = await trivialResponse.json()
+      }
 
       if (onScheduleComplete) {
-        onScheduleComplete(result, earliestStart, latestFinish)
+        onScheduleComplete(optimizedResult, trivialResult, earliestStart, latestFinish)
       }
     } catch (error) {
       console.error("Error scheduling job:", error)
