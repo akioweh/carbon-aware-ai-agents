@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE StatsAPIClientTest
 #include "DrogonTestUtils.hpp"
 #include <StatsAPIClient.hpp>
-#include <boost/test/included/unit_test.hpp>
+#include <boost/test/unit_test.hpp>
 #include <drogon/drogon.h>
 #include <structs/Datacenter.hpp>
 

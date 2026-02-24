@@ -2,7 +2,7 @@
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleIdentifierParam.hpp"
 #include "structs/TimeIntervalParams.hpp"
-#include <boost/test/included/unit_test.hpp>
+#include <boost/test/unit_test.hpp>
 #include <drogon/HttpRequest.h>
 #include <json/json.h>
 
