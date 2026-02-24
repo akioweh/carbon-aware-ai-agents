@@ -14,7 +14,8 @@ paths:
   /api/schedules/{schedule_id}:
     get:
       operationId: getScheduledJob
-      summary: Fetch blocks of specific schedule. Optionally at a specific datacenter.
+      summary:
+        Fetch blocks of specific schedule. Optionally at a specific datacenter.
       description: Gets schedule by its schedule_id.
       parameters:
         - $ref: "#/components/parameters/ScheduleIdParam"
@@ -35,7 +36,8 @@ paths:
                 $ref: "#/components/schemas/Error"
         "422":
           description: >
-            Semantically invalid request (e.g. invalid schedule_id format or non-existent schedule_id)
+            Semantically invalid request (e.g. invalid schedule_id format or
+            non-existent schedule_id)
           content:
             application/json:
               schema:
@@ -60,11 +62,9 @@ paths:
 
   /api/schedules/summary:
     get:
-      operationId: getSchedules Summaries
+      operationId: getScheduleSummaries
       summary: Fetch schedule ids and impacts of all schedules.
-      description:
-        Gets all the schedule ids and impacts of all scheduled jobs.
-      parameters:
+      description: Gets all the schedule ids and impacts of all scheduled jobs.
       responses:
         "200":
           description: Successful response with schedule data
@@ -72,8 +72,8 @@ paths:
             application/json:
               schema:
                 type: array
-                items: 
-                  $ref: '#/components/schemas/ScheduleSummary'
+                items:
+                  $ref: "#/components/schemas/ScheduleSummary"
         "400":
           description: Malformed request
           content:
@@ -84,7 +84,9 @@ paths:
   /api/schedules:
     get:
       operationId: getSchedule
-      summary: Fetch blocks across different schedules. Optionally those which are inside the specific datacenter.
+      summary:
+        Fetch blocks across different schedules. Optionally those which are
+        inside the specific datacenter.
       description:
         gets all already-scheduled jobs (gets all blocks) which start after
         start_time and end before end_time. Those arguments are optional, so
@@ -160,18 +162,18 @@ paths:
                 $ref: "#/components/schemas/Error"
         "503":
           description: >
-            Connection to Python API failed in some way. This results in our service being no longer valid and available.
+            Connection to Python API failed in some way. This results in our
+            service being no longer valid and available.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error" 
+                $ref: "#/components/schemas/Error"
 
   /api/schedules/trivialSchedule:
     post:
       operationId: scheduleTrivialJob
       summary: Create a trivial Schedule
-      description:
-        Submit a job and get back an un-optimized schedule impact.
+      description: Submit a job and get back an un-optimized schedule impact.
       requestBody:
         required: true
         content:
@@ -184,7 +186,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ScheduleDetailResponse'
+                $ref: "#/components/schemas/ScheduleDetailResponse"
         "400":
           description: Malformed request (e.g. missing or unparseable JSON body)
           content:
@@ -212,11 +214,12 @@ paths:
                 $ref: "#/components/schemas/Error"
         "503":
           description: >
-            Connection to Python API failed in some way. This results in our service being no longer valid and available.
+            Connection to Python API failed in some way. This results in our
+            service being no longer valid and available.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error" 
+                $ref: "#/components/schemas/Error"
 
 components:
   parameters:
@@ -316,7 +319,8 @@ components:
           example: "2025-12-08T02:00:00Z"
         location:
           type: string
-          description: Location of a datacenter in which this block has been scheduled.
+          description:
+            Location of a datacenter in which this block has been scheduled.
           example: "us-west-1"
         schedule_id:
           type: string
@@ -335,9 +339,9 @@ components:
         - impact
       properties:
         schedule_id:
-          $ref: '#/components/schemas/ScheduleDetailResponse/properties/schedule_id'
+          $ref: "#/components/schemas/ScheduleDetailResponse/properties/schedule_id"
         impact:
-          $ref: '#/components/schemas/ScheduleDetailResponse/properties/impact'
+          $ref: "#/components/schemas/ScheduleDetailResponse/properties/impact"
 
     ScheduleDetailResponse:
       type: object
@@ -388,3 +392,4 @@ components:
           type: string
           description: Human-readable error message
           example: "Invalid job specification"
+
