@@ -21,6 +21,15 @@ interface JobSummary {
     total_emissions?: number
     sci?: number
   }
+  unoptimizedResult?: {
+    schedule_id: string
+    scheduled_blocks?: ScheduleBlock[]
+    impact?: {
+      carbon_intensity?: number
+      total_emissions?: number
+      sci?: number
+    }
+  }
   start_time?: string
   end_time?: string
 }
@@ -94,6 +103,9 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                 const scheduleData = await scheduleResponse.json()
                 if (scheduleData.impact) {
                   jobSummary.impact = scheduleData.impact
+                }
+                if (scheduleData.unoptimizedResult) {
+                  jobSummary.unoptimizedResult = scheduleData.unoptimizedResult
                 }
               }
             } catch (err) {
@@ -230,21 +242,29 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                         </div>
                       </div>
 
-                      {/* Total Load */}
-                      <div className="flex items-center gap-2 pt-2 border-t">
-                        <Leaf className="h-4 w-4 text-primary" />
-                        <span className="text-xs text-muted-foreground">Total Load:</span>
-                        <span className="text-sm font-medium">{getTotalLoad(job.scheduled_blocks).toFixed(2)} kWh</span>
-                        {job.impact?.total_emissions && (
-                          <>
-                            <span className="text-xs text-muted-foreground mx-2">•</span>
-                            <span className="text-xs text-muted-foreground">Emissions:</span>
-                            <span className="text-sm font-medium text-primary">
-                              {job.impact.total_emissions.toFixed(2)} kg CO₂
-                            </span>
-                          </>
-                        )}
-                      </div>
+                        {/* Total Load */}
+                        <div className="flex items-center flex-wrap gap-2 pt-2 border-t">
+                          <Leaf className="h-4 w-4 text-primary" />
+                          <span className="text-xs text-muted-foreground">Total Load:</span>
+                          <span className="text-sm font-medium">{getTotalLoad(job.scheduled_blocks).toFixed(2)} kWh</span>
+                          {job.impact?.total_emissions && (
+                            <>
+                              <span className="text-xs text-muted-foreground mx-1">•</span>
+                              <span className="text-xs text-muted-foreground">Emissions:</span>
+                              <span className="text-sm font-medium text-primary">
+                                {job.impact.total_emissions.toFixed(2)} kg CO₂
+                              </span>
+                            </>
+                          )}
+                          {job.impact?.total_emissions && job.unoptimizedResult?.impact?.total_emissions && job.unoptimizedResult.impact.total_emissions > job.impact.total_emissions && (
+                            <>
+                              <span className="text-xs text-muted-foreground mx-1">•</span>
+                              <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-sm">
+                                {(((job.unoptimizedResult.impact.total_emissions - job.impact.total_emissions) / job.unoptimizedResult.impact.total_emissions) * 100).toFixed(1)}% savings
+                              </span>
+                            </>
+                          )}
+                        </div>
                     </div>
                   </CardContent>
                 </Card>

@@ -1,6 +1,7 @@
 #include "controllers/ScheduleController.hpp"
 #include "Calendar.hpp"
 #include "SchedulingQueue.hpp"
+#include "TrivialScheduler.hpp"
 #include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleBlock.hpp"
@@ -35,6 +36,27 @@ auto ScheduleController::getSpecificSchedule(
     const DatacenterIdentifierParam datacenter) const -> Task<HttpResponsePtr> {
     const auto res =
         co_await calendar::get(schedule_id.getScheduleId(), datacenter.name);
+    auto respRes = res;
+    
+    // Also include trivial data if available
+    try {
+        const auto trivialRes =
+            co_await calendar::getTrivial(schedule_id.getScheduleId(), datacenter.name);
+        respRes.trivialImpact = trivialRes.impact;
+        respRes.trivialSchedule = trivialRes.schedule;
+    } catch(const std::exception& e) {
+        LOG_WARN << "No trivial schedule found for " << schedule_id.getScheduleId() << " (or error): " << e.what();
+    }
+    
+    const auto resp = HttpResponse::newHttpJsonResponse(toJson(respRes));
+    co_return resp;
+}
+
+auto ScheduleController::getSpecificTrivialSchedule(
+    HttpRequestPtr /*req*/, const ScheduleIdentifierParam schedule_id,
+    const DatacenterIdentifierParam datacenter) const -> Task<HttpResponsePtr> {
+    const auto res =
+        co_await calendar::getTrivial(schedule_id.getScheduleId(), datacenter.name);
     const auto resp = HttpResponse::newHttpJsonResponse(toJson(res));
     co_return resp;
 }
@@ -53,6 +75,15 @@ auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
 
     // persist and get the DB-assigned job ID
     const auto schedule_id = co_await calendar::add(output);
+    
+    // Also compute trivial and persist
+    try {
+        TrivialScheduler tSched;
+        auto tOutput = co_await tSched.scheduleJob(job_request);
+        co_await calendar::addTrivial(tOutput, schedule_id);
+    } catch(const std::exception& e) {
+        LOG_WARN << "Failed to generate trivial schedule for " << schedule_id << ": " << e.what();
+    }
 
     // construct the API DTO with the real job ID
     auto schedule = vector<ScheduleBlock>{};
@@ -65,10 +96,46 @@ auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
             .additionalLoad = block.additionalLoad,
         });
 
-    const auto result = ScheduleResult{
+    auto result = ScheduleResult{
         .scheduleId = schedule_id,
         .schedule = std::move(schedule),
         .impact = output.impact,
+        .trivialSchedule = {},
+        .trivialImpact = {}
+    };
+    
+    try {
+        const auto trivialRes =
+            co_await calendar::getTrivial(schedule_id, "");
+        result.trivialImpact = trivialRes.impact;
+        result.trivialSchedule = trivialRes.schedule;
+    } catch(...) {}
+
+    co_return HttpResponse::newHttpJsonResponse(toJson(result));
+}
+
+auto ScheduleController::calculateTrivialSchedule(HttpRequestPtr /*req*/,
+                                                  const JobRequest job_request) const
+    -> Task<HttpResponsePtr> {
+    TrivialScheduler tSched;
+    auto output = co_await tSched.scheduleJob(job_request);
+
+    auto schedule = vector<ScheduleBlock>{};
+    schedule.reserve(output.blocks.size());
+    for (auto &block : output.blocks)
+        schedule.push_back({
+            .timestamp = block.timestamp,
+            .scheduleId = "trivial",
+            .location = std::move(block.location),
+            .additionalLoad = block.additionalLoad,
+        });
+
+    auto result = ScheduleResult{
+        .scheduleId = "trivial",
+        .schedule = std::move(schedule),
+        .impact = output.impact,
+        .trivialSchedule = {},
+        .trivialImpact = {}
     };
 
     co_return HttpResponse::newHttpJsonResponse(toJson(result));

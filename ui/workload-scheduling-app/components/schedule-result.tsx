@@ -39,6 +39,15 @@ interface ScheduleResultProps {
       total_emissions?: number
       sci?: number
     }
+    unoptimizedResult?: {
+      schedule_id: string
+      scheduled_blocks?: ScheduleBlock[]
+      impact?: {
+        carbon_intensity?: number
+        total_emissions?: number
+        sci?: number
+      }
+    }
     // Legacy fields for backwards compatibility
     job_id?: string
     location?: string
@@ -129,6 +138,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const [loading, setLoading] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [allBlocks, setAllBlocks] = useState<any[]>([])
+  const [showTrivial, setShowTrivial] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Get impact values (support both new and legacy format)
@@ -136,11 +146,14 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const totalEmissions = result.impact?.total_emissions ?? result.estimated_emissions_kg
   const sci = result.impact?.sci ?? result.sci_per_unit
 
+  // Use unoptimizedResult prop, or fallback to result.unoptimizedResult
+  const unoptData = unoptimizedResult || result.unoptimizedResult
+
   // Get unoptimized comparison values
   const unoptimizedComparison = {
-    carbon_intensity: unoptimizedResult?.impact?.carbon_intensity,
-    total_emissions: unoptimizedResult?.impact?.total_emissions,
-    sci: unoptimizedResult?.impact?.sci,
+    carbon_intensity: unoptData?.impact?.carbon_intensity,
+    total_emissions: unoptData?.impact?.total_emissions,
+    sci: unoptData?.impact?.sci,
   }
 
   // Calculate time range from scheduled blocks of THIS job only
@@ -200,17 +213,15 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           throw new Error(`Failed to fetch all schedules: ${allRes.status}`)
         }
         const allData = await allRes.json()
-        const allBlocks = Array.isArray(allData) ? allData : []
+        const allBlocksRaw = Array.isArray(allData) ? allData : []
 
         // Combine: mark new job blocks and include all blocks
-        const combined = allBlocks.map((b: any) => ({
+        const combined = allBlocksRaw.map((b: any) => ({
           ...b,
-          // If this block is from the new job (by schedule_id), mark it
-          // Note: new job blocks will have schedule_id = result.schedule_id
         }))
 
         // Add new job blocks if not already included
-        const combinedWithNewJob = [...combined]
+        let combinedWithNewJob = [...combined]
         for (const block of newJobBlocks) {
           if (!combinedWithNewJob.find((b: any) => 
             b.timestamp === block.timestamp && 
@@ -218,6 +229,17 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           )) {
             combinedWithNewJob.push(block)
           }
+        }
+        
+        if (unoptData?.scheduled_blocks) {
+            for (const block of unoptData.scheduled_blocks) {
+                if (!combinedWithNewJob.find((b: any) => 
+                    b.timestamp === block.timestamp && 
+                    b.schedule_id === block.schedule_id
+                  )) {
+                    combinedWithNewJob.push(block)
+                }
+            }
         }
 
         setAllBlocks(combinedWithNewJob)
@@ -242,13 +264,16 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     )
 
     // Use schedule_id to identify new job blocks
-    const newJobScheduleId = result.schedule_id
+    const newJobScheduleId = showTrivial && unoptData ? unoptData.schedule_id : result.schedule_id
+    
+    // Filter out trivial blocks if they are not the active one
+    const realBlocks = dcBlocks.filter((b: any) => b.schedule_id === newJobScheduleId || b.schedule_id !== unoptData?.schedule_id)
 
     // Convert blocks → workload intervals for chart
-    const intervals = convertBlocksToWorkload(dcBlocks, start, end, newJobScheduleId)
+    const intervals = convertBlocksToWorkload(realBlocks, start, end, newJobScheduleId)
 
     setWorkloadData(intervals)
-  }, [selectedDC, allBlocks, result.schedule_id])
+  }, [selectedDC, allBlocks, result.schedule_id, showTrivial, unoptData])
 
   const handleCancel = async () => {
     setCancelling(true)
@@ -370,7 +395,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
       )}
 
       {/* Impact Comparison Card */}
-      {unoptimizedResult && (
+      {unoptData && (
         <Card className="border-2 border-orange-200 bg-orange-50/50">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
@@ -468,10 +493,34 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
       {/* Data Center Workload View */}
       <Card>
         <CardHeader>
-          <CardTitle>Data Centre Workload Distribution</CardTitle>
-          <CardDescription>
-            Showing workload from {formatDateTime(rangeStart.toISOString())} to {formatDateTime(rangeEnd.toISOString())}
-          </CardDescription>
+          <div className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Data Centre Workload Distribution</CardTitle>
+              <CardDescription>
+                Showing workload from {formatDateTime(rangeStart.toISOString())} to {formatDateTime(rangeEnd.toISOString())}
+              </CardDescription>
+            </div>
+            {unoptData && (
+               <div className="flex items-center gap-2 text-sm bg-muted p-1 rounded-md">
+                 <Button
+                   variant={!showTrivial ? "default" : "ghost"}
+                   size="sm"
+                   className="h-8"
+                   onClick={() => setShowTrivial(false)}
+                 >
+                   Optimised
+                 </Button>
+                 <Button
+                   variant={showTrivial ? "default" : "ghost"}
+                   size="sm"
+                   className="h-8"
+                   onClick={() => setShowTrivial(true)}
+                 >
+                   Unoptimised
+                 </Button>
+               </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Data Center Tabs */}
@@ -496,8 +545,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               <span className="text-muted-foreground">Existing Workload</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded bg-emerald-500" />
-              <span className="text-muted-foreground">New Job</span>
+              <div className={`h-3 w-3 rounded ${showTrivial ? "bg-orange-500" : "bg-emerald-500"}`} />
+              <span className="text-muted-foreground">{showTrivial ? "Unoptimised Job" : "Optimised Job"}</span>
             </div>
           </div>
 
@@ -541,8 +590,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                         <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
                           <div className="bg-popover text-popover-foreground text-xs rounded-md px-2 py-1 shadow-md whitespace-nowrap border">
                             <p className="font-medium">{formatTime(interval.time)}</p>
-                            <p className="text-muted-foreground">Existing: {interval.existing} kWh</p>
-                            {interval.newJob > 0 && <p className="text-emerald-500">New Job: {interval.newJob} kWh</p>}
+                            <p className="text-muted-foreground">Existing: {interval.existing.toFixed(1)} kWh</p>
+                            {interval.newJob > 0 && <p className={showTrivial ? "text-orange-500" : "text-emerald-500"}>{showTrivial ? "Unoptimised" : "Optimised"}: {interval.newJob.toFixed(1)} kWh</p>}
                           </div>
                         </div>
                         
@@ -556,7 +605,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                           {/* New job (top) */}
                           {interval.newJob > 0 && (
                             <div 
-                              className="w-full bg-emerald-500 rounded-t-sm"
+                              className={`w-full ${showTrivial ? "bg-orange-500" : "bg-emerald-500"} rounded-t-sm`}
                               style={{ height: `${newJobPx}px` }}
                             />
                           )}

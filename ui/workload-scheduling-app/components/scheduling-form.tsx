@@ -1,28 +1,11 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarDays, Clock, Loader2, Server } from "lucide-react"
-
-const datacenters = [
-  { id: "dc1", name: "Data Centre 1", location: "Portland, OR" },
-  { id: "dc2", name: "Data Centre 2", location: "Ashburn, VA" },
-  { id: "dc3", name: "Data Centre 3", location: "Frankfurt, DE" },
-  { id: "dc4", name: "Data Centre 4", location: "Singapore, SG" },
-  { id: "dc5", name: "Data Centre 5", location: "São Paulo, BR" },
-]
-
-const jobTypes = [
-  { value: "training", label: "Training", description: "Model training workloads" },
-  { value: "inference", label: "Inference", description: "Model inference tasks" },
-  { value: "batch", label: "Batch", description: "Batch processing jobs" },
-]
+import { Button } from "@/components/ui/button"
+import { Calendar as CalendarIcon, Loader2, Sparkles, MapPin } from "lucide-react"
 
 interface SchedulingFormProps {
   onScheduleComplete?: (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => void
@@ -30,27 +13,37 @@ interface SchedulingFormProps {
 }
 
 export function SchedulingForm({ onScheduleComplete, onViewCalendar }: SchedulingFormProps) {
-  const [workload, setWorkload] = useState("")
-  const [datacenter, setDatacenter] = useState("")
-  const [jobType, setJobType] = useState("")
-  const [earliestStart, setEarliestStart] = useState("")
-  const [latestFinish, setLatestFinish] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [jobType, setJobType] = useState("training")
+  const [workloadAmount, setWorkloadAmount] = useState(10)
+  
+  // Set default dates
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  
+  // Format for datetime-local input: YYYY-MM-DDThh:mm
+  const [earliestStart, setEarliestStart] = useState(today.toISOString().slice(0, 16))
+  const [latestFinish, setLatestFinish] = useState(tomorrow.toISOString().slice(0, 16))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
+    setLoading(true)
+
+    // Convert local datetime to UTC ISO string for backend
+    const startDate = new Date(earliestStart)
+    const endDate = new Date(latestFinish)
 
     const jobRequest = {
       job_type: jobType,
-      workload_amount: Number.parseFloat(workload),
-      earliest_start: new Date(earliestStart).toISOString(),
-      latest_finish: new Date(latestFinish).toISOString(),
+      workload_amount: Number(workloadAmount),
+      earliest_start: startDate.toISOString(),
+      latest_finish: endDate.toISOString(),
     }
 
     try {
       // Fetch optimized schedule
-      const optimizedResponse = await fetch("/api/schedules", {
+      const response = await fetch("/api/schedules", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,176 +51,133 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
         body: JSON.stringify(jobRequest),
       })
 
-      if (!optimizedResponse.ok) {
-        throw new Error("Failed to schedule job")
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`)
       }
 
-      const optimizedResult = await optimizedResponse.json()
+      const optimizedResult = await response.json()
 
-      // Fetch unoptimized (trivial) schedule
-      const trivialResponse = await fetch("/api/schedules/trivialSchedule", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(jobRequest),
-      })
-
+      // The unoptimized result is now returned within the same object
       let trivialResult = null
-      if (trivialResponse.ok) {
-        trivialResult = await trivialResponse.json()
+      if (optimizedResult.unoptimizedResult) {
+        trivialResult = optimizedResult.unoptimizedResult
       }
 
       if (onScheduleComplete) {
-        onScheduleComplete(optimizedResult, trivialResult, earliestStart, latestFinish)
+        onScheduleComplete(optimizedResult, trivialResult, startDate.toISOString(), endDate.toISOString())
       }
     } catch (error) {
       console.error("Error scheduling job:", error)
       alert("Failed to schedule job. Please try again.")
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
   return (
-    <Card className="border-2 shadow-lg">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Server className="h-5 w-5 text-primary" />
-          Task Configuration
-        </CardTitle>
-        <CardDescription>Configure your computational workload and scheduling preferences</CardDescription>
-        {onViewCalendar && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onViewCalendar}
-            className="mt-2 gap-2 bg-transparent"
-          >
-            <CalendarDays className="h-4 w-4" />
-            View Workload Calendar
-          </Button>
-        )}
+    <Card className="w-full max-w-2xl mx-auto shadow-lg border-2">
+      <CardHeader className="space-y-1 pb-6">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <CardTitle className="text-2xl">Schedule Workload</CardTitle>
+        </div>
+        <CardDescription className="text-base">
+          Define your AI job requirements and let our carbon-aware scheduler find the most eco-friendly placement.
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Workload Amount */}
-          <div className="space-y-2">
-            <Label htmlFor="workload" className="text-sm font-medium">
-              Workload Amount
-            </Label>
-            <div className="relative">
-              <Input
-                id="workload"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="e.g., 1.5"
-                value={workload}
-                onChange={(e) => setWorkload(e.target.value)}
-                required
-                className="pr-20"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Units</span>
-            </div>
-            <p className="text-xs text-muted-foreground">Computational power required to complete the job</p>
-          </div>
-
+      <form onSubmit={handleSubmit}>
+        <CardContent className="space-y-6">
           <div className="grid gap-6 sm:grid-cols-2">
-            {/* Data Center Preference */}
             <div className="space-y-2">
-              <Label htmlFor="datacenter" className="text-sm font-medium">
-                Data Center Preference
-              </Label>
-              <Select value={datacenter} onValueChange={setDatacenter} required>
-                <SelectTrigger id="datacenter">
-                  <SelectValue placeholder="Select a data center" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    <span className="font-medium">No Preference</span>
-                    <span className="ml-2 text-xs text-muted-foreground">(Recommended)</span>
-                  </SelectItem>
-                  {datacenters.map((dc) => (
-                    <SelectItem key={dc.id} value={dc.id}>
-                      <span className="font-medium">{dc.name}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">{dc.location}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Select &quot;No Preference&quot; for optimal environmental impact
-              </p>
+              <Label htmlFor="jobType" className="text-sm font-medium">Job Type</Label>
+              <select
+                id="jobType"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={jobType}
+                onChange={(e) => setJobType(e.target.value)}
+              >
+                <option value="training">Model Training</option>
+                <option value="inference">Batch Inference</option>
+                <option value="data_prep">Data Preparation</option>
+              </select>
             </div>
-
+            
             <div className="space-y-2">
-              <Label htmlFor="job-type" className="text-sm font-medium">
-                Job Type
-              </Label>
-              <Select value={jobType} onValueChange={setJobType} required>
-                <SelectTrigger id="job-type">
-                  <SelectValue placeholder="Select job type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      <span className="font-medium">{type.label}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">{type.description}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Type of AI workload to process</p>
+              <Label htmlFor="workloadAmount" className="text-sm font-medium">Workload Amount (kWh)</Label>
+              <div className="relative">
+                <Input
+                  id="workloadAmount"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={workloadAmount}
+                  onChange={(e) => setWorkloadAmount(Number(e.target.value))}
+                  required
+                  className="pr-12"
+                />
+                <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">kWh</span>
+              </div>
             </div>
           </div>
 
-          {/* Time Constraints */}
-          <div className="grid gap-6 sm:grid-cols-2">
-            {/* Earliest Start */}
-            <div className="space-y-2">
-              <Label htmlFor="earliest-start" className="text-sm font-medium flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5" />
-                Earliest Start
-              </Label>
-              <Input
-                id="earliest-start"
-                type="datetime-local"
-                value={earliestStart}
-                onChange={(e) => setEarliestStart(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Latest Finish */}
-            <div className="space-y-2">
-              <Label htmlFor="latest-finish" className="text-sm font-medium flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5" />
-                Latest Finish
-              </Label>
-              <Input
-                id="latest-finish"
-                type="datetime-local"
-                value={latestFinish}
-                onChange={(e) => setLatestFinish(e.target.value)}
-                required
-              />
+          <div className="space-y-4 pt-2">
+            <h3 className="text-sm font-medium border-b pb-2">Scheduling Window</h3>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div className="space-y-2 relative">
+                <Label htmlFor="earliestStart" className="text-sm">Earliest Start</Label>
+                <Input
+                  id="earliestStart"
+                  type="datetime-local"
+                  value={earliestStart}
+                  onChange={(e) => setEarliestStart(e.target.value)}
+                  required
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="latestFinish" className="text-sm">Latest Finish</Label>
+                <Input
+                  id="latestFinish"
+                  type="datetime-local"
+                  value={latestFinish}
+                  onChange={(e) => setLatestFinish(e.target.value)}
+                  required
+                  className="w-full"
+                />
+              </div>
             </div>
           </div>
-
-          {/* Submit Button */}
-          <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? (
+        </CardContent>
+        <CardFooter className="flex flex-col sm:flex-row gap-4 pt-6 bg-muted/20 border-t">
+          <Button 
+            type="submit" 
+            className="w-full sm:w-auto min-w-[200px]" 
+            disabled={loading}
+            size="lg"
+          >
+            {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Scheduling...
+                Finding optimal placement...
               </>
             ) : (
-              "Schedule Task"
+              "Schedule Job"
             )}
           </Button>
-        </form>
-      </CardContent>
+          
+          {onViewCalendar && (
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full sm:w-auto gap-2"
+              onClick={onViewCalendar}
+            >
+              <MapPin className="h-4 w-4" />
+              View Global Workload
+            </Button>
+          )}
+        </CardFooter>
+      </form>
     </Card>
   )
 }

@@ -14,6 +14,7 @@ namespace scheduler::calendar {
 // functions
 static std::mutex g_mutex;
 static std::map<std::string, ScheduleResult> g_storage;
+static std::map<std::string, ScheduleResult> g_trivial_storage;
 static std::atomic<int> g_id_counter{1};
 
 auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
@@ -38,6 +39,25 @@ auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
     co_return id;
 }
 
+auto addTrivial(const SchedulerOutput &output, const std::string &scheduleIdString) -> drogon::Task<void> {
+    std::vector<ScheduleBlock> blocks;
+    blocks.reserve(output.blocks.size());
+    for (const auto &ib : output.blocks) {
+        blocks.push_back({.timestamp = ib.timestamp,
+                          .scheduleId = scheduleIdString,
+                          .location = ib.location,
+                          .additionalLoad = ib.additionalLoad});
+    }
+
+    ScheduleResult res{
+        .scheduleId = scheduleIdString, .schedule = blocks, .impact = output.impact};
+
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_trivial_storage[scheduleIdString] = res;
+
+    co_return;
+}
+
 auto get(const std::string &jobIdString, const std::string &datacenter)
     -> drogon::Task<ScheduleResult> {
     std::lock_guard<std::mutex> lock(g_mutex);
@@ -45,6 +65,15 @@ auto get(const std::string &jobIdString, const std::string &datacenter)
         co_return g_storage[jobIdString];
     }
     // Return empty result if not found
+    co_return ScheduleResult{};
+}
+
+auto getTrivial(const std::string &scheduleIdString, const std::string &datacenter)
+    -> drogon::Task<ScheduleResult> {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (g_trivial_storage.contains(scheduleIdString)) {
+        co_return g_trivial_storage[scheduleIdString];
+    }
     co_return ScheduleResult{};
 }
 
@@ -69,6 +98,7 @@ auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<> {
 
     std::lock_guard<std::mutex> lock(g_mutex);
     g_storage.erase(scheduleId);
+    g_trivial_storage.erase(scheduleId);
     co_return;
 }
 
@@ -77,7 +107,11 @@ auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>> {
     std::vector<ScheduleSummary> ids;
     ids.reserve(g_storage.size());
     for (const auto &[id, scheduleResult] : g_storage) {
-        ids.push_back({.scheduleId = id, .impact = scheduleResult.impact});
+        ScheduleSummary sum{.scheduleId = id, .impact = scheduleResult.impact};
+        if (g_trivial_storage.contains(id)) {
+            sum.trivialImpact = g_trivial_storage[id].impact;
+        }
+        ids.push_back(sum);
     }
     co_return ids;
 }
