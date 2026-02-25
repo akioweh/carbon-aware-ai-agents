@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Calendar as CalendarIcon, Loader2, Sparkles, MapPin } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Loader2, Sparkles, AlertCircle } from "lucide-react"
 
 interface SchedulingFormProps {
   onScheduleComplete?: (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => void
@@ -13,8 +14,9 @@ interface SchedulingFormProps {
 
 export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<{ title: string; message: string } | null>(null)
   const [jobType, setJobType] = useState("training")
-  const [workloadAmount, setWorkloadAmount] = useState(10)
+  const [workloadAmount, setWorkloadAmount] = useState<number | "">("")
   const [preferredDatacenter, setPreferredDatacenter] = useState<string>("none")
   
   // Set default dates
@@ -30,10 +32,28 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
   };
 
   const [earliestStart, setEarliestStart] = useState(getLocalIsoString(today))
-  const [latestFinish, setLatestFinish] = useState(getLocalIsoString(tomorrow))
+  const [latestFinish, setLatestFinish] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+
+    if (workloadAmount === "" || Number(workloadAmount) <= 0) {
+      setError({
+        title: "Invalid Input",
+        message: "Workload amount must be greater than 0.",
+      })
+      return
+    }
+
+    if (!earliestStart || !latestFinish) {
+      setError({
+        title: "Invalid Input",
+        message: "Please specify both earliest start and latest finish times.",
+      })
+      return
+    }
+
     setLoading(true)
 
     // Convert local datetime to UTC ISO string for backend
@@ -62,7 +82,25 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
       })
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`)
+        let errorMessage = "An unknown error occurred.";
+        let title = "Failed to Schedule";
+        try {
+          const errorData = await response.json();
+          if (errorData.message) errorMessage = errorData.message;
+        } catch (_) {}
+
+        if (response.status === 409) {
+          title = "Scheduling Conflict";
+        } else if (response.status === 422) {
+          title = "Validation Error";
+        } else if (response.status === 503) {
+          title = "Service Unavailable";
+          errorMessage = "Cannot connect to the forecasting service. Please try again later.";
+        }
+
+        setError({ title, message: errorMessage });
+        setLoading(false);
+        return;
       }
 
       const optimizedResult = await response.json()
@@ -78,7 +116,10 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
       }
     } catch (error) {
       console.error("Error scheduling job:", error)
-      alert("Failed to schedule job. Please try again.")
+      setError({
+        title: "Connection Error",
+        message: "Failed to connect to the scheduling service. Please check your network.",
+      })
     } finally {
       setLoading(false)
     }
@@ -97,6 +138,14 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{error.title}</AlertTitle>
+              <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
+          )}
+          
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="jobType" className="text-sm font-medium">Job Type</Label>
@@ -121,9 +170,10 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
                   min="0.1"
                   step="0.1"
                   value={workloadAmount}
-                  onChange={(e) => setWorkloadAmount(Number(e.target.value))}
+                  onChange={(e) => setWorkloadAmount(e.target.value === "" ? "" : Number(e.target.value))}
                   required
                   className="pr-12"
+                  placeholder="e.g. 100"
                 />
                 <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">kWh</span>
               </div>
