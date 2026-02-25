@@ -104,12 +104,18 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const [showTrivial, setShowTrivial] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Use unoptimizedResult prop, or fallback to result.unoptimizedResult
-  let unoptData = unoptimizedResult || result.unoptimizedResult || null
+  const [fetchedUnoptData, setFetchedUnoptData] = useState<ScheduleData | null>(null)
+  
+  // Use unoptimizedResult prop, or fallback to result.unoptimizedResult, or fetched data
+  let unoptData = fetchedUnoptData || unoptimizedResult || result.unoptimizedResult || null
   
   // Clean up if it's an error object or if the array of blocks is totally empty
   if (unoptData && (('error' in unoptData) || (unoptData.scheduled_blocks && unoptData.scheduled_blocks.length === 0))) {
-    unoptData = null;
+    // Only clean up if it's explicitly an error or if we have blocks and they are empty
+    // If blocks are undefined (like from summary), keep it!
+    if ('error' in unoptData || (unoptData.scheduled_blocks && unoptData.scheduled_blocks.length === 0)) {
+       unoptData = null;
+    }
   }
 
   // Get impact values
@@ -164,13 +170,17 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     }
   }
 
-  // Fetch: (1) the new job's blocks, (2) all existing blocks, then combine
+  // Fetch: (1) the new job's blocks and trivial blocks, (2) windowed existing blocks, then combine
   useEffect(() => {
     const loadBlocks = async () => {
       setLoading(true)
       try {
-        // Fetch the specific schedule's blocks (the new job)
-        const scheduleRes = await fetch(`/api/schedules/${result.schedule_id}`)
+        // Fetch the specific schedule's blocks (the new job and its trivial baseline)
+        const [scheduleRes, trivialRes] = await Promise.all([
+          fetch(`/api/schedules/${result.schedule_id}`),
+          fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null)
+        ])
+
         if (!scheduleRes.ok) {
           throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
         }
@@ -179,10 +189,38 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           ? scheduleData.scheduled_blocks 
           : []
 
-        // Fetch all blocks to get existing workload
-        const allRes = await fetch(`/api/schedules`)
+        // If the API returns the unoptimized blocks, we use them
+        const unoptDataFromApi = scheduleData.unoptimizedResult;
+        let unoptJobBlocks: any[] = [];
+        
+        let trivialData = null;
+        if (trivialRes && trivialRes.ok) {
+           trivialData = await trivialRes.json();
+           if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
+             unoptJobBlocks = trivialData.scheduled_blocks;
+           }
+        }
+        
+        // fallback to embedded unoptimizedResult if trivial fetch failed
+        if (unoptJobBlocks.length === 0 && unoptDataFromApi && Array.isArray(unoptDataFromApi.scheduled_blocks)) {
+           unoptJobBlocks = unoptDataFromApi.scheduled_blocks;
+           setFetchedUnoptData(unoptDataFromApi);
+        } else if (unoptJobBlocks.length === 0 && unoptData?.scheduled_blocks) {
+           unoptJobBlocks = unoptData.scheduled_blocks;
+        } else if (trivialData) {
+           setFetchedUnoptData(trivialData);
+        }
+
+        // Get the time range to limit the background workload fetch
+        const { start, end } = getTimeRange()
+        
+        // Fetch blocks in the time window to get existing workload
+        const startQuery = `start_time=${encodeURIComponent(start.toISOString())}`
+        const endQuery = `end_time=${encodeURIComponent(end.toISOString())}`
+        const allRes = await fetch(`/api/schedules?${startQuery}&${endQuery}`)
+        
         if (!allRes.ok) {
-          throw new Error(`Failed to fetch all schedules: ${allRes.status}`)
+          throw new Error(`Failed to fetch window schedules: ${allRes.status}`)
         }
         const allData = await allRes.json()
         const allBlocksRaw = Array.isArray(allData) ? allData : []
@@ -203,8 +241,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           }
         }
         
-        if (unoptData?.scheduled_blocks) {
-            for (const block of unoptData.scheduled_blocks) {
+        if (unoptJobBlocks.length > 0) {
+            for (const block of unoptJobBlocks) {
                 // Attach a suffix to distinguish trivial blocks from actual blocks since they share the same ID
                 const trivialBlock = { ...block, schedule_id: `${block.schedule_id}_trivial` }
                 if (!combinedWithNewJob.find((b: any) => 
