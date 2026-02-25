@@ -192,6 +192,13 @@ auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>> {
     auto context = getContext();
     auto res = co_await context.impactMapper.findAll();
 
+    // Also fetch trivial impacts if any
+    auto trivialRes = co_await context.trivialImpactMapper.findAll();
+    std::unordered_map<int, mappers::TrivialImpactModel> trivialMap;
+    for (const auto &item : trivialRes) {
+        trivialMap[item.getValueOfImpactId()] = item;
+    }
+
     std::vector<ScheduleSummary> scheduleSummaries;
     scheduleSummaries.reserve(res.size());
     for (const auto &item : res) {
@@ -199,6 +206,12 @@ auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>> {
         ScheduleSummary summary{
             .scheduleId = scheduler::utils::parseIntToStringID(impactId),
             .impact = scheduler::mappers::fromDto(item)};
+
+        if (trivialMap.contains(impactId)) {
+            summary.trivialImpact =
+                scheduler::mappers::fromDto(trivialMap[impactId]);
+        }
+
         scheduleSummaries.push_back(summary);
     }
     co_return scheduleSummaries;

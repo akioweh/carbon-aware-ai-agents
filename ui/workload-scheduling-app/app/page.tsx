@@ -44,8 +44,11 @@ export default function Home() {
   }
 
   const handleSelectJob = (job: any) => {
+    // Check if the backend gave us unoptimizedResult via job.unoptimizedResult OR job.trivialResult (etc)
+    const unopt = job.unoptimizedResult || job.trivialResult || null;
+    
     setScheduleResult(job)
-    setUnoptimizedResult(job.unoptimizedResult) // We assume job has it if previously fetched
+    setUnoptimizedResult(unopt) // Pass it directly
     setTimeRange(null)
     setShowPreviousJobs(false)
     setSource("history")

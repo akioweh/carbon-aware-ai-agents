@@ -144,7 +144,13 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Use unoptimizedResult prop, or fallback to result.unoptimizedResult
-  const unoptData = unoptimizedResult || result.unoptimizedResult
+  let unoptData = unoptimizedResult || result.unoptimizedResult || result.trivialResult || (result.trivialImpact ? { impact: result.trivialImpact, schedule_id: result.schedule_id, scheduled_blocks: [] } : null)
+  
+  // Clean up if it's an error object (like {"error": "Backend responded with status: 422"})
+  // Or if the array of blocks is totally empty, making it effectively useless to toggle
+  if (unoptData && (unoptData.error || (unoptData.scheduled_blocks && unoptData.scheduled_blocks.length === 0))) {
+    unoptData = null;
+  }
 
   // Get impact values
   const activeImpact = showTrivial && unoptData ? unoptData.impact : result.impact

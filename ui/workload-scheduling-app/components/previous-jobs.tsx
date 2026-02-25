@@ -104,8 +104,16 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                 if (scheduleData.impact) {
                   jobSummary.impact = scheduleData.impact
                 }
-                if (scheduleData.unoptimizedResult) {
-                  jobSummary.unoptimizedResult = scheduleData.unoptimizedResult
+                
+                // Fetch unoptimized baseline separately
+                try {
+                  const trivialResponse = await fetch(`/api/schedules/${schedule_id}/trivial`)
+                  if (trivialResponse.ok) {
+                    const trivialData = await trivialResponse.json()
+                    jobSummary.unoptimizedResult = trivialData
+                  }
+                } catch (e) {
+                  // it's fine if there is no trivial schedule
                 }
               }
             } catch (err) {

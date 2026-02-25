@@ -60,6 +60,7 @@ static_assert(Serializable<ScheduleResult>);
 struct ScheduleSummary {
     std::string scheduleId;
     ScheduleImpact impact{};
+    ScheduleImpact trivialImpact{};
 };
 
 inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
@@ -67,6 +68,10 @@ inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
     res["schedule_id"] = obj.scheduleId;
     res["message"] = "Success";
     res["impact"] = toJson(obj.impact);
+    if (obj.trivialImpact.carbon_intensity > 0 ||
+        obj.trivialImpact.total_emissions > 0) {
+        res["trivialImpact"] = toJson(obj.trivialImpact);
+    }
     return res;
 }
 
