@@ -2,6 +2,8 @@
 #include "exceptions/SchedulingException.hpp"
 #include <chrono>
 #include <vector>
+#include <numeric>
+#include <algorithm>
 
 using namespace std;
 using namespace drogon;
@@ -14,12 +16,27 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     const auto n_intervals = data.n_intervals;
     auto costs_f = data.generateCostsF();
 
+    // Reorder indices based on preferred_datacenter if it exists
+    vector<size_t> location_indices(n_locations);
+    std::iota(location_indices.begin(), location_indices.end(), 0);
+    
+    if (job.preferred_datacenter.has_value()) {
+        const auto& pref = job.preferred_datacenter.value();
+        auto it = std::find(data.location_ids.begin(), data.location_ids.end(), pref);
+        if (it != data.location_ids.end()) {
+            size_t pref_idx = std::distance(data.location_ids.begin(), it);
+            location_indices.erase(std::remove(location_indices.begin(), location_indices.end(), pref_idx), location_indices.end());
+            location_indices.insert(location_indices.begin(), pref_idx);
+        }
+    }
+
     // Trivial placement logic without loops that could hang
     vector<vector<double>> res(n_locations, vector<double>(n_intervals, 0.0));
     double rem_work = job.workload_amount;
     
     // Spread evenly across the first available interval for simplicity, just a naive approach
-    for (size_t i = 0; i < n_locations && rem_work > 1e-6; ++i) {
+    for (size_t iter_idx = 0; iter_idx < n_locations && rem_work > 1e-6; ++iter_idx) {
+        size_t i = location_indices[iter_idx];
         for (long long j = 0; j < n_intervals && rem_work > 1e-6; ++j) {
             double capacity = data.capacities_f[i][j];
             double existing = data.loads_f[i][j];

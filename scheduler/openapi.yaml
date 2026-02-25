@@ -279,6 +279,10 @@ components:
         additional_constraints:
           type: object
           additionalProperties: true
+        preferred_datacenter:
+          type: string
+          description: Optional preferred datacenter to prioritize allocating work on if possible (useful for trivial scheduler baseline comparisons)
+          example: "us-west-1"
 
     ScheduleResponse:
       type: array
