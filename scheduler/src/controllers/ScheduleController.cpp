@@ -42,10 +42,8 @@ auto ScheduleController::getSpecificSchedule(
     try {
         const auto trivialRes =
             co_await calendar::getTrivial(schedule_id.getScheduleId(), datacenter.name);
-        if (trivialRes) {
-            respRes.trivialImpact = trivialRes->impact;
-            respRes.trivialSchedule = trivialRes->schedule;
-        }
+        respRes.trivialImpact = trivialRes.impact;
+        respRes.trivialSchedule = trivialRes.schedule;
     } catch(const std::exception& e) {
         LOG_WARN << "No trivial schedule found for " << schedule_id.getScheduleId() << " (or error): " << e.what();
     }
@@ -59,13 +57,8 @@ auto ScheduleController::getSpecificTrivialSchedule(
     const DatacenterIdentifierParam datacenter) const -> Task<HttpResponsePtr> {
     const auto res =
         co_await calendar::getTrivial(schedule_id.getScheduleId(), datacenter.name);
-    
-    if (!res) {
-        throw scheduler::exceptions::ValidationException(
-            "No trivial scheduled job with id: " + schedule_id.getScheduleId());
-    }
         
-    const auto resp = HttpResponse::newHttpJsonResponse(toJson(*res));
+    const auto resp = HttpResponse::newHttpJsonResponse(toJson(res));
     co_return resp;
 }
 
@@ -115,11 +108,11 @@ auto ScheduleController::calculateSchedule(HttpRequestPtr /*req*/,
     try {
         const auto trivialRes =
             co_await calendar::getTrivial(schedule_id, "");
-        if (trivialRes) {
-            result.trivialImpact = trivialRes->impact;
-            result.trivialSchedule = trivialRes->schedule;
-        }
-    } catch(...) {}
+        result.trivialImpact = trivialRes.impact;
+        result.trivialSchedule = trivialRes.schedule;
+    } catch(const std::exception& e) {
+        LOG_WARN << "No trivial schedule found for " << schedule_id << " (or error): " << e.what();
+    }
 
     co_return HttpResponse::newHttpJsonResponse(toJson(result));
 }

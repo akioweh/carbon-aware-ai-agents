@@ -52,10 +52,7 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
          * precision issues. The controller will simply not attach a trivial 
          * result.
          */
-        co_return SchedulerOutput{
-            .blocks = {},
-            .impact = {0.0, 0.0, 0.0}
-        };
+        throw SchedulingException("Cannot fit trivial schedule inside the window and existing capacities");
     }
 
     auto total_emissions = 0.0;

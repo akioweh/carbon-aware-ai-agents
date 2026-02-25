@@ -37,7 +37,7 @@ auto get(const std::string &scheduleIdString,
 
 auto getTrivial(const std::string &scheduleIdString,
                 const std::string &datacenter = ANY_DATACENTER)
-    -> drogon::Task<std::optional<ScheduleResult>>;
+    -> drogon::Task<ScheduleResult>;
 
 auto get(time_point start = scheduler::utils::MIN_TIME,
          time_point end = scheduler::utils::MAX_TIME,
