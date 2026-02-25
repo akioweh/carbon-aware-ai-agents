@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarIcon, X, Loader2 } from "lucide-react"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 
 interface ScheduleBlock {
   timestamp: string
@@ -344,17 +345,17 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                         return null;
                       }}
                     />
-                    {/* Add day boundary markers via ReferenceLine */}
-                    {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, i) => (
-                      <ReferenceLine 
-                        key={`midnight-${i}`} 
-                        x={d.time.toISOString()} 
-                        stroke="hsl(var(--foreground))" 
-                        strokeDasharray="3 3" 
-                        opacity={0.3} 
-                        label={{ position: "insideTopLeft", value: formatDateShort(d.time), fill: "hsl(var(--foreground))", fontSize: 11 }}
-                      />
-                    ))}
+                  {/* Add day boundary markers via ReferenceLine */}
+                  {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, i) => (
+                    <ReferenceLine 
+                      key={`midnight-${i}`} 
+                      x={d.time.toISOString()} 
+                      stroke="hsl(var(--foreground))" 
+                      strokeDasharray="3 3" 
+                      opacity={0.3} 
+                      label={{ position: "insideTopLeft", value: formatDateShort(d.time), fill: "hsl(var(--foreground))", fontSize: 11 }}
+                    />
+                  ))}
                     <Area 
                       type="monotone" 
                       dataKey="totalLoad" 
