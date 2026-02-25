@@ -34,7 +34,12 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     }
 
     if (rem_work > 1e-6) {
-        throw SchedulingException("Cannot fit trivial schedule inside the window and existing capacities");
+        LOG_WARN << "Trivial schedule could not place all work. It will be empty.";
+        // We just return an empty schedule, the UI handles missing unoptimized result gracefully
+        co_return SchedulerOutput{
+            .blocks = {},
+            .impact = {0.0, 0.0, 0.0}
+        };
     }
 
     auto total_emissions = 0.0;
