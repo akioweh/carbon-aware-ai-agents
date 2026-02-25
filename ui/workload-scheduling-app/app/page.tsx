@@ -14,6 +14,7 @@ export default function Home() {
   const [timeRange, setTimeRange] = useState<{ earliestStart: string; latestFinish: string } | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
   const [showPreviousJobs, setShowPreviousJobs] = useState(false)
+  const [source, setSource] = useState<"form" | "history">("form")
 
   const handleScheduleComplete = (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => {
     setScheduleResult(result)
@@ -21,30 +22,38 @@ export default function Home() {
     setTimeRange({ earliestStart, latestFinish })
     setShowCalendar(false)
     setShowPreviousJobs(false)
+    setSource("form")
   }
 
   const handleBack = () => {
     setScheduleResult(null)
     setUnoptimizedResult(null)
     setTimeRange(null)
+    if (source === "history") {
+      setShowPreviousJobs(true)
+    }
   }
 
   const handleCancel = () => {
     setScheduleResult(null)
     setUnoptimizedResult(null)
     setTimeRange(null)
+    if (source === "history") {
+      setShowPreviousJobs(true)
+    }
   }
 
   const handleSelectJob = (job: any) => {
     setScheduleResult(job)
-    setUnoptimizedResult(null)
+    setUnoptimizedResult(job.unoptimizedResult) // We assume job has it if previously fetched
     setTimeRange(null)
     setShowPreviousJobs(false)
+    setSource("history")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Header */}
         <header className="mb-8 text-center">
           <h1 className="text-4xl font-bold tracking-tight mb-2 text-balance">
