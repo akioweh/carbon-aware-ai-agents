@@ -128,7 +128,7 @@ auto get(const std::string &scheduleIdString, const std::string &datacenter)
 }
 
 auto getTrivial(const std::string &scheduleIdString, const std::string &datacenter)
-    -> drogon::Task<ScheduleResult> {
+    -> drogon::Task<std::optional<ScheduleResult>> {
     auto context = getContext();
 
     const int jobIdInt = scheduler::utils::parseStringIDtoInt(scheduleIdString);
@@ -140,7 +140,7 @@ auto getTrivial(const std::string &scheduleIdString, const std::string &datacent
 
         auto trivialImpactModels = co_await context.trivialImpactMapper.findBy(impactCriteria);
         if (trivialImpactModels.empty()) {
-            throw scheduler::exceptions::ValidationException("No trivial scheduled job with id: " + scheduleIdString);
+            co_return std::nullopt;
         }
         auto impactModel = trivialImpactModels.front();
         const int trivialImpactId = impactModel.getValueOfId();
@@ -154,12 +154,9 @@ auto getTrivial(const std::string &scheduleIdString, const std::string &datacent
         co_return ScheduleResult{.scheduleId = scheduleIdString,
                                  .schedule = mappers::fromTrivialDtoAll(jobsModels, jobIdInt),
                                  .impact = mappers::fromDto(impactModel)};
-    } catch (const scheduler::exceptions::ValidationException&) {
-        throw;
     } catch (const std::exception &e) {
         LOG_ERROR << "Error fetching trivial schedule with id=" + scheduleIdString;
-        throw scheduler::exceptions::ValidationException(
-            "No trivial scheduled job with id: " + scheduleIdString);
+        co_return std::nullopt;
     }
 }
 
