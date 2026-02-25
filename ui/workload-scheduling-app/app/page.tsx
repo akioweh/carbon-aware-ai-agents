@@ -6,7 +6,7 @@ import { ScheduleResult } from "@/components/schedule-result"
 import { WorkloadCalendar } from "@/components/workload-calendar"
 import { PreviousJobs } from "@/components/previous-jobs"
 import { Button } from "@/components/ui/button"
-import { History } from "lucide-react"
+import { History, Globe } from "lucide-react"
 
 export default function Home() {
   const [scheduleResult, setScheduleResult] = useState<any>(null)
@@ -81,19 +81,26 @@ export default function Home() {
             />
           ) : (
             <div className="space-y-4">
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-3 max-w-2xl mx-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCalendar(true)}
+                  className="gap-2 bg-transparent hover:bg-muted/50"
+                >
+                  <Globe className="h-4 w-4" />
+                  View Global Workload
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setShowPreviousJobs(true)}
-                  className="gap-2 bg-transparent"
+                  className="gap-2 bg-transparent hover:bg-muted/50"
                 >
                   <History className="h-4 w-4" />
-                  View Previous Jobs
+                  View Scheduled Jobs
                 </Button>
               </div>
               <SchedulingForm
                 onScheduleComplete={handleScheduleComplete}
-                onViewCalendar={() => setShowCalendar(true)}
               />
             </div>
           )}

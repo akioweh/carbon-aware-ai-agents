@@ -277,112 +277,93 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
               <div
                 className="relative"
                 style={{
-                  width: `${totalWidth}px`,
+                  width: `${Math.max(intervals.length * 12, 600)}px`,
                   height: `${chartHeight + 52}px`,
                   paddingTop: "24px",
                 }}
               >
-                {/* Day labels + vertical separators */}
-                {dayBoundaries.map((boundary, i) => {
-                  const x = boundary.index * pxPerBar
-                  const nextX =
-                    i < dayBoundaries.length - 1
-                      ? dayBoundaries[i + 1].index * pxPerBar
-                      : totalWidth
-                  const dayWidth = nextX - x
-
-                  return (
-                    <div key={`day-${i}`}>
-                      {/* Day label above chart */}
-                      <div
-                        className="absolute top-0 text-[11px] font-medium text-foreground truncate"
-                        style={{ left: `${x + 2}px`, maxWidth: `${dayWidth - 4}px` }}
-                      >
-                        {formatDateShort(boundary.date)}
-                      </div>
-                      {/* Vertical dashed separator between days */}
-                      {i > 0 && (
-                        <div
-                          className="absolute border-l border-dashed border-muted-foreground/40"
-                          style={{ left: `${x}px`, top: "20px", height: `${chartHeight + 4}px` }}
-                        />
-                      )}
-                    </div>
-                  )
-                })}
-
-                {/* Bars */}
-                <div
-                  className="absolute flex items-end"
-                  style={{ top: "24px", left: 0, height: `${chartHeight}px` }}
-                >
-                  {intervals.map((interval, index) => {
-                    const jobsLoad = interval.jobs.reduce((sum, j) => sum + j.load, 0)
-                    const jobsPx = (jobsLoad / maxValue) * chartHeight
-
-                    return (
-                      <div
-                        key={index}
-                        className="relative group shrink-0"
-                        style={{ width: `${pxPerBar}px`, height: `${chartHeight}px` }}
-                      >
-                        {/* Tooltip */}
-                        <div
-                          className="absolute bottom-full mb-2 hidden group-hover:block z-20 pointer-events-none"
-                          style={{ left: "50%", transform: "translateX(-50%)" }}
-                        >
-                          <div className="bg-popover text-popover-foreground text-xs rounded-md px-2 py-1 shadow-md whitespace-nowrap border">
-                            <p className="font-medium">
-                              {interval.time.toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
-                              {interval.time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                            </p>
-                            {interval.jobs.length > 0 ? (
-                              <div>
-                                <p className="text-muted-foreground">
-                                  Total: {jobsLoad.toFixed(2)}
-                                </p>
-                                <div className="border-t mt-1 pt-1">
-                                  {interval.jobs.map((job, j) => (
-                                    <p key={j} className="text-blue-500">
-                                      {job.schedule_id}: {job.load.toFixed(2)} 
-                                    </p>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="text-muted-foreground">No scheduled load</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Coloured bar */}
-                        {jobsPx > 0 && (
-                          <div
-                            className="absolute bottom-0 bg-blue-500 rounded-t-sm"
-                            style={{
-                              height: `${Math.max(jobsPx, 1)}px`,
-                              width: `${displayParams.barWidth}px`,
-                            }}
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Time labels below chart */}
-                {timeLabels.map((label) => (
-                  <span
-                    key={`time-${label.index}`}
-                    className="absolute text-[10px] text-muted-foreground whitespace-nowrap"
-                    style={{
-                      left: `${label.index * pxPerBar}px`,
-                      top: `${chartHeight + 28}px`,
-                    }}
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={intervals.map(i => ({
+                      time: i.time.toISOString(),
+                      totalLoad: i.jobs.reduce((sum, j) => sum + j.load, 0),
+                      rawJobs: i.jobs
+                    }))}
+                    margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
                   >
-                    {label.text}
-                  </span>
-                ))}
+                    <defs>
+                      <linearGradient id="colorScheduled" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                    <XAxis 
+                      dataKey="time" 
+                      tickFormatter={(time) => {
+                        return new Date(time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+                      }} 
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      minTickGap={30}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      domain={[0, maxValue]} 
+                      hide={true}
+                    />
+                    <Tooltip 
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border">
+                              <p className="font-medium mb-1 border-b pb-1">
+                                {new Date(label).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
+                                {new Date(label).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                              {data.rawJobs && data.rawJobs.length > 0 ? (
+                                <div className="space-y-1">
+                                  <p className="text-muted-foreground font-semibold">
+                                    Total Load: {Number(payload[0].value).toFixed(2)} kWh
+                                  </p>
+                                  <div className="border-t mt-1 pt-1 space-y-0.5">
+                                    {data.rawJobs.map((job: any, j: number) => (
+                                      <p key={j} className="text-blue-500">
+                                        <span className="font-medium">{job.schedule_id}</span>: {Number(job.load).toFixed(2)} 
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-muted-foreground">No scheduled load</p>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    {/* Add day boundary markers via ReferenceLine */}
+                    {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, i) => (
+                      <ReferenceLine 
+                        key={`midnight-${i}`} 
+                        x={d.time.toISOString()} 
+                        stroke="hsl(var(--foreground))" 
+                        strokeDasharray="3 3" 
+                        opacity={0.3} 
+                        label={{ position: "insideTopLeft", value: formatDateShort(d.time), fill: "hsl(var(--foreground))", fontSize: 11 }}
+                      />
+                    ))}
+                    <Area 
+                      type="monotone" 
+                      dataKey="totalLoad" 
+                      stroke="#3b82f6" 
+                      fill="url(#colorScheduled)" 
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>

@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 
 interface ScheduleBlock {
   timestamp: string
@@ -377,7 +377,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
       {/* Impact Overview (Consolidated) */}
       {(carbonIntensity !== undefined || totalEmissions !== undefined || sci !== undefined) && (
         <Card className={`border-2 ${showTrivial ? "border-orange-200 bg-orange-50/50" : "border-primary/20 bg-primary/5"}`}>
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-2">
             <div className="flex flex-row items-center justify-between">
               <div className="flex items-center gap-2">
                 {showTrivial ? (
@@ -409,8 +409,13 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                  </div>
               )}
             </div>
+            <CardDescription className="mb-2">
+              {showTrivial 
+                ? "Estimated carbon footprint for the unoptimised baseline schedule" 
+                : "Estimated carbon footprint for this scheduled job"}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="grid gap-4 sm:grid-cols-3">
               {carbonIntensity !== undefined && (
                 <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
@@ -574,6 +579,15 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                       return null;
                     }}
                   />
+                  {workloadData.filter(d => new Date(d.time).getHours() === 0 && new Date(d.time).getMinutes() === 0).map((d, i) => (
+                    <ReferenceLine 
+                      key={`midnight-${i}`} 
+                      x={d.time} 
+                      stroke="hsl(var(--muted-foreground))" 
+                      strokeDasharray="3 3" 
+                      opacity={0.5} 
+                    />
+                  ))}
                   <Area 
                     type="monotone" 
                     dataKey="existing" 

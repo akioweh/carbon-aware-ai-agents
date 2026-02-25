@@ -9,10 +9,9 @@ import { Calendar as CalendarIcon, Loader2, Sparkles, MapPin } from "lucide-reac
 
 interface SchedulingFormProps {
   onScheduleComplete?: (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => void
-  onViewCalendar?: () => void
 }
 
-export function SchedulingForm({ onScheduleComplete, onViewCalendar }: SchedulingFormProps) {
+export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
   const [loading, setLoading] = useState(false)
   const [jobType, setJobType] = useState("training")
   const [workloadAmount, setWorkloadAmount] = useState(10)
@@ -87,7 +86,7 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg border-2">
-      <CardHeader className="space-y-1 pb-6">
+      <CardHeader className="space-y-1 pb-4">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
           <CardTitle className="text-2xl">Schedule Workload</CardTitle>
@@ -97,7 +96,7 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="jobType" className="text-sm font-medium">Job Type</Label>
@@ -159,7 +158,7 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
             </div>
           </div>
           
-          <div className="pt-2">
+          <div className="pt-2 pb-2">
             <div className="space-y-2">
               <Label htmlFor="preferredDatacenter" className="text-sm font-medium text-muted-foreground">Preferred Data Center (Optional)</Label>
               <select
@@ -194,18 +193,6 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
               "Schedule Job"
             )}
           </Button>
-          
-          {onViewCalendar && (
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full sm:w-auto gap-2"
-              onClick={onViewCalendar}
-            >
-              <MapPin className="h-4 w-4" />
-              View Global Workload
-            </Button>
-          )}
         </CardFooter>
       </form>
     </Card>
