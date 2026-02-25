@@ -91,6 +91,11 @@ struct ScheduleSummary {
     std::string scheduleId;
     ScheduleImpact impact{};
     std::optional<ScheduleImpact> trivialImpact;
+    std::string startTime;
+    std::string endTime;
+    std::vector<std::string> locations;
+    double totalLoad{};
+    int blockCount{};
 };
 
 inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
@@ -101,6 +106,19 @@ inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
     if (obj.trivialImpact.has_value()) {
         res["trivialImpact"] = toJson(obj.trivialImpact.value());
     }
+    if (!obj.startTime.empty()) {
+        res["start_time"] = obj.startTime;
+        res["end_time"] = obj.endTime;
+    }
+
+    auto locArray = Json::Value(Json::arrayValue);
+    for (const auto &loc : obj.locations) {
+        locArray.append(loc);
+    }
+    res["locations"] = locArray;
+    res["total_load"] = obj.totalLoad;
+    res["block_count"] = obj.blockCount;
+
     return res;
 }
 

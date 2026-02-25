@@ -68,6 +68,31 @@ auto specificTrivialDatacenterCriteria(const string &datacenter) {
                                  drogon::orm::CompareOperator::EQ, datacenter);
 }
 
+const std::string GET_SUMMARIES_SQL = R"(
+    SELECT
+        i.id AS impact_id,
+        i.carbon_intensity,
+        i.total_emissions,
+        i.sci,
+        MIN(j.time_stamp) AS start_time,
+        MAX(j.time_stamp) AS end_time,
+        array_agg(DISTINCT j.location_id) AS locations,
+        SUM(j.additional_load) AS total_load,
+        COUNT(j.id) AS block_count
+    FROM impacts i
+    LEFT JOIN jobs j ON i.id = j.impact_id
+    GROUP BY i.id
+)";
+
+const std::string GET_TRIVIAL_IMPACTS_SQL = R"(
+    SELECT
+        impact_id,
+        carbon_intensity,
+        total_emissions,
+        sci
+    FROM trivial_impacts
+)";
+
 } // namespace
 
 auto add(const SchedulerOutput &output) -> drogon::Task<string> {
@@ -194,28 +219,83 @@ auto get(time_point start, time_point end, const string &datacenter)
 }
 
 auto scheduleSummaries() -> drogon::Task<vector<ScheduleSummary>> {
-    auto context = getContext();
-    auto res = co_await context.impactMapper.findAll();
+    auto db = drogon::app().getDbClient();
+    auto res = co_await db->execSqlCoro(GET_SUMMARIES_SQL);
 
-    // Also fetch trivial impacts if any
-    auto trivialRes = co_await context.trivialImpactMapper.findAll();
-    auto trivialMap = unordered_map<int, mappers::TrivialImpactModel>{};
-    for (const auto &item : trivialRes) {
-        trivialMap[item.getValueOfImpactId()] = item;
+    auto trivialRes = co_await db->execSqlCoro(GET_TRIVIAL_IMPACTS_SQL);
+
+    auto trivialMap = unordered_map<int, ScheduleImpact>{};
+    for (auto row : trivialRes) {
+        trivialMap[row["impact_id"].as<int>()] = {
+            .carbon_intensity = row["carbon_intensity"].as<double>(),
+            .total_emissions = row["total_emissions"].as<double>(),
+            .sci = row["sci"].as<double>()};
     }
 
     auto scheduleSummaries = vector<ScheduleSummary>{};
     scheduleSummaries.reserve(res.size());
-    for (const auto &item : res) {
-        const auto impactId = item.getValueOfId();
+    for (auto row : res) {
+        const auto impactId = row["impact_id"].as<int>();
+
+        auto locStr = row["locations"].as<std::string>();
+        // strip '{' and '}'
+        if (locStr.length() >= 2) {
+            locStr = locStr.substr(1, locStr.length() - 2);
+        }
+        auto locations = std::vector<std::string>{};
+        if (!locStr.empty()) {
+            std::stringstream ss(locStr);
+            std::string item;
+            while (std::getline(ss, item, ',')) {
+                // If the strings are quoted, we might need to unquote them
+                if (item.front() == '"' && item.back() == '"') {
+                    item = item.substr(1, item.length() - 2);
+                }
+                locations.push_back(item);
+            }
+        }
+
+        std::string startTime = "";
+        std::string endTime = "";
+        double totalLoad = 0;
+        int blockCount = 0;
+
+        if (!row["start_time"].isNull()) {
+            auto sd = trantor::Date::fromDbStringLocal(
+                row["start_time"].as<std::string>());
+            startTime = scheduler::utils::toIso8601(
+                scheduler::utils::trantorToChrono(sd));
+        }
+        if (!row["end_time"].isNull()) {
+            auto ed = trantor::Date::fromDbStringLocal(
+                row["end_time"].as<std::string>());
+            // add 5 minutes to end time since it represents the start of the
+            // last block
+            ed = ed.after(5 * 60);
+            endTime = scheduler::utils::toIso8601(
+                scheduler::utils::trantorToChrono(ed));
+        }
+        if (!row["total_load"].isNull()) {
+            totalLoad = row["total_load"].as<double>();
+        }
+        if (!row["block_count"].isNull()) {
+            blockCount = row["block_count"].as<int>();
+        }
+
         auto summary = ScheduleSummary{
             .scheduleId = scheduler::utils::parseIntToStringID(impactId),
-            .impact = scheduler::mappers::fromDto(item),
-            .trivialImpact = {}};
+            .impact = {.carbon_intensity = row["carbon_intensity"].as<double>(),
+                       .total_emissions = row["total_emissions"].as<double>(),
+                       .sci = row["sci"].as<double>()},
+            .trivialImpact = {},
+            .startTime = startTime,
+            .endTime = endTime,
+            .locations = locations,
+            .totalLoad = totalLoad,
+            .blockCount = blockCount};
 
         if (trivialMap.contains(impactId)) {
-            summary.trivialImpact =
-                scheduler::mappers::fromDto(trivialMap[impactId]);
+            summary.trivialImpact = trivialMap[impactId];
         }
 
         scheduleSummaries.push_back(std::move(summary));

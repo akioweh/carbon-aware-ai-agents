@@ -329,6 +329,20 @@ components:
           $ref: "#/components/schemas/ScheduleImpact"
         trivialImpact:
           $ref: "#/components/schemas/ScheduleImpact"
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        locations:
+          type: array
+          items:
+            type: string
+        total_load:
+          type: number
+        block_count:
+          type: integer
 
     ScheduleDetailResponse:
       type: object

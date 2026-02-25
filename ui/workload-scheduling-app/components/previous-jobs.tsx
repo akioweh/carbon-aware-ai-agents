@@ -20,64 +20,26 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
     const fetchPreviousJobs = async () => {
       setLoading(true)
       try {
-        // Fetch all schedule blocks and summaries concurrently
-        const [blocksRes, summaryRes] = await Promise.all([
-          fetch("/api/schedules"),
-          fetch("/api/schedules/summary")
-        ])
-        
-        if (!blocksRes.ok) throw new Error(`Failed to fetch jobs: ${blocksRes.status}`)
+        const summaryRes = await fetch("/api/schedules/summary")
         if (!summaryRes.ok) throw new Error(`Failed to fetch summaries: ${summaryRes.status}`)
 
-        const rawBlocks = await blocksRes.json()
         const rawSummaries = await summaryRes.json()
-
-        if (!Array.isArray(rawBlocks)) throw new Error("Unexpected schedule blocks response shape")
         if (!Array.isArray(rawSummaries)) throw new Error("Unexpected schedule summaries response shape")
 
-        // Map summaries by ID for quick lookup
-        const summaryMap = new Map<string, any>()
-        for (const s of rawSummaries) {
-          summaryMap.set(s.schedule_id, s)
-        }
-
-        // Sanitize and group blocks by schedule_id
-        const blocks = rawBlocks.filter((b: any) => {
-          return (
-            b &&
-            typeof b.timestamp === "string" &&
-            typeof b.location === "string" &&
-            typeof b.schedule_id === "string" &&
-            typeof b.additional_load === "number"
-          )
-        }) as ScheduleBlock[]
-        
-        const jobMap = new Map<string, ScheduleBlock[]>()
-        for (const block of blocks) {
-          if (!jobMap.has(block.schedule_id)) {
-            jobMap.set(block.schedule_id, [])
-          }
-          jobMap.get(block.schedule_id)?.push(block)
-        }
-
-        // Convert to job summaries
-        const jobSummaries: JobSummary[] = Array.from(jobMap.entries()).map(([schedule_id, blocks]) => {
-          const timestamps = blocks.map(b => new Date(b.timestamp).getTime())
-          const start_time = new Date(Math.min(...timestamps)).toISOString()
-          const end_time = new Date(Math.max(...timestamps) + 5 * 60 * 1000).toISOString()
-          
-          const summaryData = summaryMap.get(schedule_id)
-          
+        // Convert to job summaries using the new enriched fields from the backend
+        const jobSummaries: JobSummary[] = rawSummaries.map((s: any) => {
           return {
-            schedule_id,
-            scheduled_blocks: blocks,
-            start_time,
-            end_time,
-            impact: summaryData?.impact,
-            // Construct the expected structure for unoptimizedResult based on the new API
-            unoptimizedResult: summaryData?.trivialImpact ? {
-              schedule_id: `${schedule_id}_trivial`,
-              impact: summaryData.trivialImpact
+            schedule_id: s.schedule_id,
+            start_time: s.start_time,
+            end_time: s.end_time,
+            impact: s.impact,
+            locations: s.locations || [],
+            total_load: s.total_load || 0,
+            block_count: s.block_count || 0,
+            scheduled_blocks: [], // Empty for now, will be fetched when selected
+            unoptimizedResult: s.trivialImpact ? {
+              schedule_id: s.schedule_id,
+              impact: s.trivialImpact
             } : undefined
           }
         })
@@ -163,7 +125,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                           <div className="flex flex-col">
                             <p className="font-semibold text-base text-primary tracking-tight">{job.schedule_id}</p>
                             <p className="text-xs text-muted-foreground">
-                              {job.scheduled_blocks.length} block{job.scheduled_blocks.length !== 1 && 's'}
+                              {(job as any).block_count || job.scheduled_blocks?.length || 0} block{((job as any).block_count || job.scheduled_blocks?.length || 0) !== 1 && 's'}
                             </p>
                           </div>
                           
@@ -179,7 +141,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <MapPin className="h-3.5 w-3.5" />
                               <span className="text-xs">
-                                {getUniqueLocations(job.scheduled_blocks).length} data centre(s) ({getUniqueLocations(job.scheduled_blocks).join(", ")})
+                                {((job as any).locations?.length) || getUniqueLocations(job.scheduled_blocks).length} data centre(s) ({((job as any).locations || getUniqueLocations(job.scheduled_blocks)).join(", ")})
                               </span>
                             </div>
                           </div>
@@ -202,7 +164,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                       <div className="flex items-center flex-wrap gap-x-4 gap-y-2 pt-3 mt-1 border-t border-border/50">
                         <div className="flex items-center gap-1.5">
                           <Leaf className="h-3.5 w-3.5 text-emerald-500" />
-                          <span className="text-xs font-medium">{getTotalLoad(job.scheduled_blocks).toFixed(2)} kWh</span>
+                          <span className="text-xs font-medium">{((job as any).total_load || getTotalLoad(job.scheduled_blocks)).toFixed(2)} kWh</span>
                         </div>
                         
                         {job.impact?.total_emissions && (
