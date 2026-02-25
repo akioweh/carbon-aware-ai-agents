@@ -314,10 +314,10 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             <ReferenceLine 
                               key={`midnight-${k}`} 
                               x={d.time.toISOString()} 
-                              stroke="hsl(var(--foreground))" 
-                              strokeDasharray="3 3" 
-                              opacity={0.3} 
-                              label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fill: "hsl(var(--foreground))", fontSize: 11 } : undefined}
+                              stroke="#94a3b8" 
+                              strokeDasharray="4 4" 
+                              strokeWidth={1}
+                              label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fill: "#64748b", fontSize: 11, offset: 10 } : undefined}
                             />
                           ))}
                           <Area 

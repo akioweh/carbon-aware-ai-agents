@@ -167,23 +167,25 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   }
 
   const getTimeRange = () => {
-    // Determine which blocks to use based on the current view (optimized vs unoptimized)
-    const activeBlocks = showTrivial && unoptData ? unoptData.scheduled_blocks : result.scheduled_blocks;
+    // If the user's explicit requested time window is available, use that as the bounding box!
+    if (earliestStart && latestFinish) {
+      return {
+        start: new Date(new Date(earliestStart).getTime() - 15 * 60 * 1000),
+        end: new Date(new Date(latestFinish).getTime() + 15 * 60 * 1000)
+      }
+    }
 
-    if (activeBlocks && activeBlocks.length > 0) {
-      const timestamps = activeBlocks.map((b: any) => new Date(b.timestamp).getTime())
+    // Determine the total bounds using BOTH block sets so the axes stay identical when toggling
+    const optBlocks = result.scheduled_blocks || [];
+    const unoptBlocks = unoptData?.scheduled_blocks || [];
+    const allRelevantBlocks = [...optBlocks, ...unoptBlocks];
+
+    if (allRelevantBlocks.length > 0) {
+      const timestamps = allRelevantBlocks.map((b: any) => new Date(b.timestamp).getTime())
       return {
         // Add 15 minutes padding to start and 20 minutes padding to end
         start: new Date(Math.min(...timestamps) - 15 * 60 * 1000),
         end: new Date(Math.max(...timestamps) + 20 * 60 * 1000)
-      }
-    }
-    
-    // Fallback to user input
-    if (earliestStart && latestFinish) {
-      return {
-        start: new Date(earliestStart),
-        end: new Date(latestFinish)
       }
     }
     
@@ -583,9 +585,10 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                     <ReferenceLine 
                       key={`midnight-${i}`} 
                       x={d.time} 
-                      stroke="hsl(var(--muted-foreground))" 
-                      strokeDasharray="3 3" 
-                      opacity={0.5} 
+                      stroke="#94a3b8" 
+                      strokeDasharray="4 4" 
+                      strokeWidth={1}
+                      label={{ position: "insideTopLeft", value: new Date(d.time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }), fill: "#64748b", fontSize: 11, offset: 10 }}
                     />
                   ))}
                   <Area 
