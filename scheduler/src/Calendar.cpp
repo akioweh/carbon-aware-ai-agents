@@ -8,8 +8,12 @@
 #include <drogon/orm/Criteria.h>
 #include <drogon/orm/Exception.h>
 #include <ranges>
+#include <unordered_map>
 
 namespace scheduler::calendar {
+
+using namespace std;
+using namespace drogon;
 
 using namespace scheduler;
 
@@ -44,7 +48,7 @@ auto jobTimestampBeforeEndCriteria(time_point end) {
                                  scheduler::utils::chronoToTrantor(end));
 }
 
-auto specificDatacenterCriteria(const std::string &datacenter) {
+auto specificDatacenterCriteria(const string &datacenter) {
     if (datacenter == ANY_DATACENTER)
         return drogon::orm::Criteria();
     return drogon::orm::Criteria(mappers::JobModel::Cols::_location_id,
@@ -57,7 +61,7 @@ auto trivialJobImpactIdEqualityCriteria(const int impactId) {
         drogon::orm::CompareOperator::EQ, impactId);
 }
 
-auto specificTrivialDatacenterCriteria(const std::string &datacenter) {
+auto specificTrivialDatacenterCriteria(const string &datacenter) {
     if (datacenter == ANY_DATACENTER)
         return drogon::orm::Criteria();
     return drogon::orm::Criteria(mappers::TrivialJobModel::Cols::_location_id,
@@ -66,7 +70,7 @@ auto specificTrivialDatacenterCriteria(const std::string &datacenter) {
 
 } // namespace
 
-auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
+auto add(const SchedulerOutput &output) -> drogon::Task<string> {
     auto transaction =
         co_await drogon::app().getDbClient()->newTransactionCoro();
     Context context(transaction);
@@ -77,20 +81,21 @@ auto add(const SchedulerOutput &output) -> drogon::Task<std::string> {
 
     for (auto &&jobModel :
          output.blocks |
-             std::views::transform(mappers::toDto.withImpactId(impactId))) {
+             views::transform(mappers::toDto.withImpactId(impactId))) {
         co_await context.jobsMapper.insert(jobModel);
     }
 
     co_return scheduler::utils::parseIntToStringID(impactId);
 }
 
-auto addTrivial(const SchedulerOutput &output,
-                const std::string &scheduleIdString) -> drogon::Task<void> {
+auto addTrivial(const SchedulerOutput &output, const string &scheduleIdString)
+    -> drogon::Task<void> {
     auto transaction =
         co_await drogon::app().getDbClient()->newTransactionCoro();
     Context context(transaction);
 
-    int impactId = scheduler::utils::parseStringIDtoInt(scheduleIdString);
+    const auto impactId =
+        scheduler::utils::parseStringIDtoInt(scheduleIdString);
 
     auto trivialImpactModel =
         mappers::toTrivialDto.withImpactId(impactId)(output.impact);
@@ -100,13 +105,13 @@ auto addTrivial(const SchedulerOutput &output,
 
     for (auto &&trivialJobModel :
          output.blocks |
-             std::views::transform(
+             views::transform(
                  mappers::toTrivialDto.withTrivialImpactId(trivialImpactId))) {
         co_await context.trivialJobsMapper.insert(trivialJobModel);
     }
 }
 
-auto get(const std::string &scheduleIdString, const std::string &datacenter)
+auto get(const string &scheduleIdString, const string &datacenter)
     -> drogon::Task<ScheduleResult> {
     auto context = getContext();
 
@@ -120,13 +125,13 @@ auto get(const std::string &scheduleIdString, const std::string &datacenter)
         auto &&[impactModel, jobsModels] = co_await scheduler::coro::when_all(
             to_task<mappers::ImpactModel>(
                 context.impactMapper.findByPrimaryKey(jobIdInt)),
-            to_task<std::vector<mappers::JobModel>>(
+            to_task<vector<mappers::JobModel>>(
                 context.jobsMapper.findBy(fullCriteria)));
 
         co_return ScheduleResult{.scheduleId = scheduleIdString,
                                  .schedule = mappers::fromDtoAll(jobsModels),
                                  .impact = mappers::fromDto(impactModel)};
-    } catch (const std::exception &e) {
+    } catch (const exception &e) {
         LOG_ERROR << "NO scheduled job with id=" + scheduleIdString
                   << " in the DB!";
         throw scheduler::exceptions::ValidationException(
@@ -134,8 +139,8 @@ auto get(const std::string &scheduleIdString, const std::string &datacenter)
     }
 }
 
-auto getTrivial(const std::string &scheduleIdString,
-                const std::string &datacenter) -> drogon::Task<ScheduleResult> {
+auto getTrivial(const string &scheduleIdString, const string &datacenter)
+    -> drogon::Task<ScheduleResult> {
     auto context = getContext();
 
     const int jobIdInt = scheduler::utils::parseStringIDtoInt(scheduleIdString);
@@ -167,7 +172,7 @@ auto getTrivial(const std::string &scheduleIdString,
             .impact = mappers::fromDto(impactModel)};
     } catch (const scheduler::exceptions::SchedulingException &) {
         throw;
-    } catch (const std::exception &e) {
+    } catch (const exception &e) {
         LOG_ERROR << "Error fetching trivial schedule with id=" +
                          scheduleIdString;
         throw scheduler::exceptions::SchedulingException(
@@ -175,8 +180,8 @@ auto getTrivial(const std::string &scheduleIdString,
     }
 }
 
-auto get(time_point start, time_point end, const std::string &datacenter)
-    -> drogon::Task<std::vector<ScheduleBlock>> {
+auto get(time_point start, time_point end, const string &datacenter)
+    -> drogon::Task<vector<ScheduleBlock>> {
     auto context = getContext();
 
     const auto fullCriteria =
@@ -188,36 +193,37 @@ auto get(time_point start, time_point end, const std::string &datacenter)
         co_await context.jobsMapper.findBy(fullCriteria));
 }
 
-auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>> {
+auto scheduleSummaries() -> drogon::Task<vector<ScheduleSummary>> {
     auto context = getContext();
     auto res = co_await context.impactMapper.findAll();
 
     // Also fetch trivial impacts if any
     auto trivialRes = co_await context.trivialImpactMapper.findAll();
-    std::unordered_map<int, mappers::TrivialImpactModel> trivialMap;
+    auto trivialMap = unordered_map<int, mappers::TrivialImpactModel>{};
     for (const auto &item : trivialRes) {
         trivialMap[item.getValueOfImpactId()] = item;
     }
 
-    std::vector<ScheduleSummary> scheduleSummaries;
+    auto scheduleSummaries = vector<ScheduleSummary>{};
     scheduleSummaries.reserve(res.size());
     for (const auto &item : res) {
-        int impactId = item.getValueOfId();
-        ScheduleSummary summary{
+        const auto impactId = item.getValueOfId();
+        auto summary = ScheduleSummary{
             .scheduleId = scheduler::utils::parseIntToStringID(impactId),
-            .impact = scheduler::mappers::fromDto(item)};
+            .impact = scheduler::mappers::fromDto(item),
+            .trivialImpact = {}};
 
         if (trivialMap.contains(impactId)) {
             summary.trivialImpact =
                 scheduler::mappers::fromDto(trivialMap[impactId]);
         }
 
-        scheduleSummaries.push_back(summary);
+        scheduleSummaries.push_back(std::move(summary));
     }
     co_return scheduleSummaries;
 }
 
-auto deleteSchedule(const std::string &scheduleId) -> drogon::Task<> {
+auto deleteSchedule(const string &scheduleId) -> drogon::Task<> {
     auto context = getContext();
     co_await context.impactMapper.deleteByPrimaryKey(
         scheduler::utils::parseStringIDtoInt(scheduleId));

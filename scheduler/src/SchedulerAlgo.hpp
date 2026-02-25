@@ -82,7 +82,7 @@ struct LocationCost {
     std::vector<double> &capacities;
     std::vector<double> &greenness_scores;
 
-    auto operator[](int i) const {
+    auto operator[](size_t i) const {
         const auto g = greenness_scores.at(i);
         const auto c = capacities.at(i);
         return [g, c](double load) -> double {
@@ -204,7 +204,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     const struct {
         decltype(cost_f) &cost_f_;
         double e_work;
-        auto operator[](int i) const {
+        auto operator[](size_t i) const {
             return [&, i](int load) -> double {
                 return cost_f_[i](load * e_work);
             };

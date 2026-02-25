@@ -3,12 +3,15 @@
 #include "structs/JobRequest.hpp"
 #include <vector>
 
+namespace scheduler {
+
 using namespace std;
 using namespace drogon;
-using namespace scheduler;
 using namespace scheduler::exceptions;
 
-auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
+constexpr double EPSILON = 1e-6;
+
+auto Scheduler::scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
     auto data = co_await fetchAndPrepareData(job);
     const auto n_intervals = data.n_intervals;
     auto costs_f = data.generateCostsF();
@@ -36,7 +39,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
 
         for (const auto j : views::iota(0LL, n_intervals)) {
             const auto load = schedule_vec[j];
-            if (load < 1e-6) // filter out negligible loads
+            if (load < EPSILON) // filter out negligible loads
                 continue;
             blocks.push_back({
                 .timestamp = index_to_time(j),
@@ -45,20 +48,22 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
             });
             ++blocks_count;
 
-            const auto g = std::max(greenness_vec[j], 0.01);
+            const auto g = max(greenness_vec[j], 0.01);
             const auto ci = 1.0 / g;
             total_emissions += load * ci;
             total_carbon_intensity_sum += ci;
         }
     }
 
-    co_return {
-        .blocks = std::move(blocks),
-        .impact = {
-            .carbon_intensity = blocks_count > 0
-                                    ? total_carbon_intensity_sum / blocks_count
-                                    : 0.0,
-            .total_emissions = total_emissions,
-            .sci = min_cost,
-        }};
+    co_return {.blocks = std::move(blocks),
+               .impact = {
+                   .carbon_intensity =
+                       blocks_count > 0 ? total_carbon_intensity_sum /
+                                              static_cast<double>(blocks_count)
+                                        : 0.0,
+                   .total_emissions = total_emissions,
+                   .sci = min_cost,
+               }};
 }
+
+} // namespace scheduler

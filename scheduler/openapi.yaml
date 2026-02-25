@@ -76,7 +76,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ScheduleDetailResponse"
+                $ref: "#/components/schemas/ScheduleData"
         "400":
           description:
             Malformed request (e.g. missing or unparseable path parameter)
@@ -326,7 +326,9 @@ components:
         schedule_id:
           $ref: "#/components/schemas/ScheduleDetailResponse/properties/schedule_id"
         impact:
-          $ref: "#/components/schemas/ScheduleDetailResponse/properties/impact"
+          $ref: "#/components/schemas/ScheduleImpact"
+        trivialImpact:
+          $ref: "#/components/schemas/ScheduleImpact"
 
     ScheduleDetailResponse:
       type: object
@@ -351,22 +353,43 @@ components:
           items:
             $ref: "#/components/schemas/ScheduleBlock"
         impact:
-          type: object
-          properties:
-            carbon_intensity:
-              type: number
-              description:
-                average carbon intensity during the scheduled period in kg
-                CO2/kWh
-              example: 50.0
-            total_emissions:
-              type: number
-              description: total predicted emissions in kg CO2
-              example: 0.14
-            sci:
-              type: number
-              description: Software Carbon Intensity score for the schedule
-              example: 20
+          $ref: "#/components/schemas/ScheduleImpact"
+        unoptimizedResult:
+          $ref: "#/components/schemas/ScheduleData"
+
+    ScheduleData:
+      type: object
+      required:
+        - schedule_id
+        - scheduled_blocks
+        - impact
+      properties:
+        schedule_id:
+          type: string
+        scheduled_blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleBlock"
+        impact:
+          $ref: "#/components/schemas/ScheduleImpact"
+
+    ScheduleImpact:
+      type: object
+      properties:
+        carbon_intensity:
+          type: number
+          description:
+            average carbon intensity during the scheduled period in kg
+            CO2/kWh
+          example: 50.0
+        total_emissions:
+          type: number
+          description: total predicted emissions in kg CO2
+          example: 0.14
+        sci:
+          type: number
+          description: Software Carbon Intensity score for the schedule
+          example: 20
 
     Error:
       type: object

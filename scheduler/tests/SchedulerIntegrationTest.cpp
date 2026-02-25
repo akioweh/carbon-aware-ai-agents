@@ -89,6 +89,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // Check fields in response
     BOOST_CHECK((*json).isMember("scheduled_blocks"));
     BOOST_CHECK((*json).isMember("impact"));
+    BOOST_CHECK((*json).isMember("unoptimizedResult"));
     BOOST_CHECK((*json)["scheduled_blocks"].isArray());
     BOOST_CHECK((*json)["scheduled_blocks"].size() > 0);
 

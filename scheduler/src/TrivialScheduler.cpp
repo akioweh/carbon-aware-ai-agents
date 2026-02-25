@@ -5,12 +5,17 @@
 #include <numeric>
 #include <vector>
 
+namespace scheduler {
+
 using namespace std;
 using namespace drogon;
-using namespace scheduler;
 using namespace scheduler::exceptions;
 
-auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
+constexpr double EPSILON = 1e-6;
+
+auto TrivialScheduler::scheduleJob(
+    JobRequest job) // NOLINT(readability-function-cognitive-complexity)
+    -> drogon::Task<SchedulerOutput> {
     auto data = co_await fetchAndPrepareData(job);
     const auto n_locations = data.location_ids.size();
     const auto n_intervals = data.n_intervals;
@@ -25,7 +30,7 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
         if (it != data.location_ids.end()) {
             const auto pref_idx = distance(data.location_ids.begin(), it);
             if (pref_idx)
-                std::swap(location_indices[0], location_indices[pref_idx]);
+                swap(location_indices[0], location_indices[pref_idx]);
         }
     }
 
@@ -33,7 +38,7 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     auto rem_work = job.workload_amount;
 
     // Spread evenly across the available intervals
-    for (auto iter_idx = 0UZ; iter_idx < n_locations && rem_work > 1e-6;
+    for (auto iter_idx = 0UZ; iter_idx < n_locations && rem_work > EPSILON;
          ++iter_idx) {
         const auto i = location_indices[iter_idx];
 
@@ -42,30 +47,31 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
         auto suffix_avail = vector(n_intervals + 1, 0.0);
         for (auto j = n_intervals; j--;) {
             const auto avail =
-                std::max(0.0, data.capacities_f[i][j] - data.loads_f[i][j]);
+                max(0.0, data.capacities_f[i][j] - data.loads_f[i][j]);
             suffix_avail[j] = suffix_avail[j + 1] + avail;
         }
 
-        for (auto j = 0LL; j < n_intervals && rem_work > 1e-6; ++j) {
+        for (auto j = 0LL; j < n_intervals && rem_work > EPSILON; ++j) {
             const auto capacity = data.capacities_f[i][j];
             const auto existing = data.loads_f[i][j];
-            const auto available = std::max(0.0, capacity - existing);
+            const auto available = max(0.0, capacity - existing);
 
-            if (available > 1e-6) {
+            if (available > EPSILON) {
                 // Determine if a penalty applies (new continuous run of work)
-                const auto penalty = (j == 0 || res[i][j - 1] < 1e-6)
+                const auto penalty = (j == 0 || res[i][j - 1] < EPSILON)
                                          ? data.penalties_f[i]
                                          : 0.0;
 
-                if (available > penalty + 1e-6) {
+                if (available > penalty + EPSILON) {
                     const auto ideal_take =
-                        (rem_work + penalty) / (n_intervals - j);
-                    const auto must_take = std::max(
-                        0.0, (rem_work + penalty) - suffix_avail[j + 1]);
+                        (rem_work / static_cast<double>(n_intervals - j)) +
+                        penalty;
+                    const auto must_take =
+                        max(0.0, (rem_work + penalty) - suffix_avail[j + 1]);
 
-                    auto to_take = std::max(ideal_take, must_take);
-                    to_take = std::min(available, to_take);
-                    to_take = std::min(to_take, rem_work + penalty);
+                    auto to_take = max(ideal_take, must_take);
+                    to_take = min(available, to_take);
+                    to_take = min(to_take, rem_work + penalty);
 
                     res[i][j] = to_take;
                     rem_work -= (to_take - penalty);
@@ -74,7 +80,7 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
         }
     }
 
-    if (rem_work > 1e-6) {
+    if (rem_work > EPSILON) {
         LOG_WARN
             << "Trivial schedule could not place all work. It will be empty.";
         /*
@@ -89,8 +95,9 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
          * precision issues. The controller will simply not attach a trivial
          * result.
          */
-        throw SchedulingException("Cannot fit trivial schedule inside the "
-                                  "window and existing capacities");
+        throw exceptions::SchedulingException(
+            "Cannot fit trivial schedule inside the "
+            "window and existing capacities");
     }
 
     auto total_emissions = 0.0;
@@ -111,7 +118,7 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
 
         for (const auto j : views::iota(0LL, n_intervals)) {
             const auto load = schedule_vec[j];
-            if (load < 1e-6)
+            if (load < EPSILON)
                 continue;
 
             blocks.push_back({
@@ -121,7 +128,7 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
             });
             ++blocks_count;
 
-            const auto g = std::max(greenness_vec[j], 0.01);
+            const auto g = max(greenness_vec[j], 0.01);
             const auto ci = 1.0 / g;
             total_emissions += load * ci;
             total_carbon_intensity_sum += ci;
@@ -130,13 +137,15 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
         }
     }
 
-    co_return {
-        .blocks = std::move(blocks),
-        .impact = {
-            .carbon_intensity = blocks_count > 0
-                                    ? total_carbon_intensity_sum / blocks_count
-                                    : 0.0,
-            .total_emissions = total_emissions,
-            .sci = sci,
-        }};
+    co_return {.blocks = std::move(blocks),
+               .impact = {
+                   .carbon_intensity =
+                       blocks_count > 0 ? total_carbon_intensity_sum /
+                                              static_cast<double>(blocks_count)
+                                        : 0.0,
+                   .total_emissions = total_emissions,
+                   .sci = sci,
+               }};
 }
+
+} // namespace scheduler

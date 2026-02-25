@@ -4,6 +4,7 @@
 
 #include "Serializable.hpp"
 #include "structs/ScheduleBlock.hpp"
+#include <optional>
 
 namespace scheduler {
 
@@ -31,7 +32,7 @@ static_assert(Serializable<ScheduleImpact>);
 
 /**
  * @class ScheduleResult
- * @brief API DTO for the result of a scheduling operation.
+ * @brief API DTO representing a pure, single schedule's data.
  */
 struct ScheduleResult {
     std::string scheduleId;
@@ -42,16 +43,45 @@ struct ScheduleResult {
 inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
     auto res = Json::Value{};
     res["schedule_id"] = obj.scheduleId;
+    res["scheduled_blocks"] = Json::Value(Json::arrayValue);
+    res["impact"] = toJson(obj.impact);
+    for (const auto &block : obj.schedule)
+        res["scheduled_blocks"].append(toJson(block));
+    return res;
+}
+
+static_assert(Serializable<ScheduleResult>);
+
+/**
+ * @class JobScheduleResponse
+ * @brief API DTO for the complete result of a job placement.
+ *        Includes the optimized schedule and optionally the unoptimized
+ * baseline.
+ */
+struct JobScheduleResponse {
+    std::string scheduleId;
+    std::vector<ScheduleBlock> schedule;
+    ScheduleImpact impact{};
+    std::optional<ScheduleResult> unoptimizedResult;
+};
+
+inline auto f_toJson(const JobScheduleResponse &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["schedule_id"] = obj.scheduleId;
     res["message"] = "Success";
     res["scheduled_blocks"] = Json::Value(Json::arrayValue);
     res["impact"] = toJson(obj.impact);
     for (const auto &block : obj.schedule)
         res["scheduled_blocks"].append(toJson(block));
 
+    if (obj.unoptimizedResult.has_value()) {
+        res["unoptimizedResult"] = toJson(obj.unoptimizedResult.value());
+    }
+
     return res;
 }
 
-static_assert(Serializable<ScheduleResult>);
+static_assert(Serializable<JobScheduleResponse>);
 
 /**
  * @class ScheduleSummary
@@ -60,7 +90,7 @@ static_assert(Serializable<ScheduleResult>);
 struct ScheduleSummary {
     std::string scheduleId;
     ScheduleImpact impact{};
-    ScheduleImpact trivialImpact{};
+    std::optional<ScheduleImpact> trivialImpact;
 };
 
 inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
@@ -68,9 +98,8 @@ inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
     res["schedule_id"] = obj.scheduleId;
     res["message"] = "Success";
     res["impact"] = toJson(obj.impact);
-    if (obj.trivialImpact.carbon_intensity > 0 ||
-        obj.trivialImpact.total_emissions > 0) {
-        res["trivialImpact"] = toJson(obj.trivialImpact);
+    if (obj.trivialImpact.has_value()) {
+        res["trivialImpact"] = toJson(obj.trivialImpact.value());
     }
     return res;
 }

@@ -3,13 +3,14 @@
 #include "exceptions/SchedulingException.hpp"
 #include "utils/Coro.hpp"
 
+namespace scheduler {
+
 using namespace std;
 using namespace drogon;
-using namespace scheduler;
 using namespace scheduler::exceptions;
 
 auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
-    -> Task<SchedulerData> {
+    -> drogon::Task<SchedulerData> {
     assert(job.workload_amount >= 0.);
     assert(job.earliest_start <= job.latest_finish);
 
@@ -28,7 +29,7 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
         time_gridder.toIndexCeil(job.latest_finish) - time_index_offset;
 
     if (n_intervals <= 0) {
-        throw SchedulingException("Time window too narrow");
+        throw exceptions::SchedulingException("Time window too narrow");
     }
 
     const auto time_start = index_to_time(0);
@@ -38,7 +39,7 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
         stats_api.getAllDatacenters(), calendar::get(time_start, time_end));
     const auto n_locations = locations.size();
 
-    SchedulerData data;
+    auto data = SchedulerData{};
     data.n_intervals = n_intervals;
     data.time_index_offset = time_index_offset;
     data.location_ids.reserve(n_locations);
@@ -80,8 +81,10 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
     data.penalties_f = vector(data.location_ids.size(), 1.);
 
     if (data.location_ids.empty())
-        throw SchedulingException(
+        throw exceptions::SchedulingException(
             "No data center locations available for scheduling");
 
     co_return data;
 }
+
+} // namespace scheduler
