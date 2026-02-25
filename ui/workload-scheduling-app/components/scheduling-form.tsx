@@ -16,15 +16,22 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
   const [loading, setLoading] = useState(false)
   const [jobType, setJobType] = useState("training")
   const [workloadAmount, setWorkloadAmount] = useState(10)
+  const [preferredDatacenter, setPreferredDatacenter] = useState<string>("none")
   
   // Set default dates
   const today = new Date()
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
   
-  // Format for datetime-local input: YYYY-MM-DDThh:mm
-  const [earliestStart, setEarliestStart] = useState(today.toISOString().slice(0, 16))
-  const [latestFinish, setLatestFinish] = useState(tomorrow.toISOString().slice(0, 16))
+  // Adjust time to local timezone for the datetime-local input
+  const getLocalIsoString = (date: Date) => {
+    const tzOffset = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - tzOffset);
+    return localDate.toISOString().slice(0, 16);
+  };
+
+  const [earliestStart, setEarliestStart] = useState(getLocalIsoString(today))
+  const [latestFinish, setLatestFinish] = useState(getLocalIsoString(tomorrow))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,11 +41,15 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
     const startDate = new Date(earliestStart)
     const endDate = new Date(latestFinish)
 
-    const jobRequest = {
+    const jobRequest: any = {
       job_type: jobType,
       workload_amount: Number(workloadAmount),
       earliest_start: startDate.toISOString(),
       latest_finish: endDate.toISOString(),
+    }
+    
+    if (preferredDatacenter !== "none") {
+      jobRequest.preferred_datacenter = preferredDatacenter
     }
 
     try {
@@ -120,7 +131,7 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
             </div>
           </div>
 
-          <div className="space-y-4 pt-2">
+            <div className="space-y-4 pt-2">
             <h3 className="text-sm font-medium border-b pb-2">Scheduling Window</h3>
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2 relative">
@@ -145,6 +156,25 @@ export function SchedulingForm({ onScheduleComplete, onViewCalendar }: Schedulin
                   className="w-full"
                 />
               </div>
+            </div>
+          </div>
+          
+          <div className="pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="preferredDatacenter" className="text-sm font-medium text-muted-foreground">Preferred Data Center (Optional)</Label>
+              <select
+                id="preferredDatacenter"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+                value={preferredDatacenter}
+                onChange={(e) => setPreferredDatacenter(e.target.value)}
+              >
+                <option value="none">Let optimizer decide</option>
+                <option value="Data-Center-1">Data Centre 1 (us-west-1)</option>
+                <option value="Data-Center-2">Data Centre 2 (us-east-1)</option>
+                <option value="Data-Center-3">Data Centre 3 (eu-west-1)</option>
+                <option value="Data-Center-4">Data Centre 4 (ap-northeast-1)</option>
+                <option value="Data-Center-5">Data Centre 5 (sa-east-1)</option>
+              </select>
             </div>
           </div>
         </CardContent>

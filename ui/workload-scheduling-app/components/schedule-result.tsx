@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 
 interface ScheduleBlock {
   timestamp: string
@@ -98,11 +99,12 @@ function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newSched
     const intervalEnd = t + intervalMs
 
     // Consider a block part of this interval if it overlaps the interval window
+    // (We match exact timestamp since blocks are exactly 5 mins long)
     const matching = blocks.filter(b => {
       if (!b || !b.timestamp) return false
-      const blockStart = new Date(b.timestamp).getTime()
-      const blockEnd = blockStart + intervalMs
-      return blockStart < intervalEnd && blockEnd > intervalStart
+      const blockTime = new Date(b.timestamp).getTime()
+      // Give a little leeway for parsing inconsistencies
+      return Math.abs(blockTime - intervalStart) < 60000 
     })
 
     const existing = matching
@@ -141,29 +143,39 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const [showTrivial, setShowTrivial] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Get impact values (support both new and legacy format)
-  const carbonIntensity = result.impact?.carbon_intensity ?? result.carbon_intensity
-  const totalEmissions = result.impact?.total_emissions ?? result.estimated_emissions_kg
-  const sci = result.impact?.sci ?? result.sci_per_unit
-
   // Use unoptimizedResult prop, or fallback to result.unoptimizedResult
   const unoptData = unoptimizedResult || result.unoptimizedResult
 
-  // Get unoptimized comparison values
+  // Get impact values
+  const activeImpact = showTrivial && unoptData ? unoptData.impact : result.impact
+  const carbonIntensity = activeImpact?.carbon_intensity ?? (!showTrivial ? result.carbon_intensity : undefined)
+  const totalEmissions = activeImpact?.total_emissions ?? (!showTrivial ? result.estimated_emissions_kg : undefined)
+  const sci = activeImpact?.sci ?? (!showTrivial ? result.sci_per_unit : undefined)
+
+  // Get unoptimized comparison values for savings calculation
+  const optEmissions = result.impact?.total_emissions ?? result.estimated_emissions_kg
+  const unoptEmissions = unoptData?.impact?.total_emissions
+  const emissionsSavings = optEmissions && unoptEmissions && unoptEmissions > optEmissions 
+    ? ((unoptEmissions - optEmissions) / unoptEmissions) * 100 
+    : 0
+
+  // Fallback for unoptimizedComparison that the UI below expects
   const unoptimizedComparison = {
     carbon_intensity: unoptData?.impact?.carbon_intensity,
     total_emissions: unoptData?.impact?.total_emissions,
     sci: unoptData?.impact?.sci,
   }
 
-  // Calculate time range from scheduled blocks of THIS job only
   const getTimeRange = () => {
-    // Use only the new job's scheduled blocks for time range
-    if (result.scheduled_blocks && result.scheduled_blocks.length > 0) {
-      const timestamps = result.scheduled_blocks.map(b => new Date(b.timestamp).getTime())
+    // Determine which blocks to use based on the current view (optimized vs unoptimized)
+    const activeBlocks = showTrivial && unoptData ? unoptData.scheduled_blocks : result.scheduled_blocks;
+
+    if (activeBlocks && activeBlocks.length > 0) {
+      const timestamps = activeBlocks.map((b: any) => new Date(b.timestamp).getTime())
       return {
-        start: new Date(Math.min(...timestamps)),
-        end: new Date(Math.max(...timestamps) + 5 * 60 * 1000)
+        // Add 15 minutes padding to start and 20 minutes padding to end
+        start: new Date(Math.min(...timestamps) - 15 * 60 * 1000),
+        end: new Date(Math.max(...timestamps) + 20 * 60 * 1000)
       }
     }
     
@@ -233,11 +245,13 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         
         if (unoptData?.scheduled_blocks) {
             for (const block of unoptData.scheduled_blocks) {
+                // Attach a suffix to distinguish trivial blocks from actual blocks since they share the same ID
+                const trivialBlock = { ...block, schedule_id: `${block.schedule_id}_trivial` }
                 if (!combinedWithNewJob.find((b: any) => 
-                    b.timestamp === block.timestamp && 
-                    b.schedule_id === block.schedule_id
+                    b.timestamp === trivialBlock.timestamp && 
+                    b.schedule_id === trivialBlock.schedule_id
                   )) {
-                    combinedWithNewJob.push(block)
+                    combinedWithNewJob.push(trivialBlock)
                 }
             }
         }
@@ -264,13 +278,19 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     )
 
     // Use schedule_id to identify new job blocks
-    const newJobScheduleId = showTrivial && unoptData ? unoptData.schedule_id : result.schedule_id
+    const newJobScheduleId = showTrivial && unoptData ? `${unoptData.schedule_id}_trivial` : result.schedule_id
     
-    // Filter out trivial blocks if they are not the active one
-    const realBlocks = dcBlocks.filter((b: any) => b.schedule_id === newJobScheduleId || b.schedule_id !== unoptData?.schedule_id)
+    // Filter out blocks that belong to the "other" variant of this job
+    const otherVariantScheduleId = showTrivial && unoptData ? result.schedule_id : `${unoptData?.schedule_id}_trivial`
+    const realBlocks = dcBlocks.filter((b: any) => b.schedule_id !== otherVariantScheduleId)
 
     // Convert blocks → workload intervals for chart
     const intervals = convertBlocksToWorkload(realBlocks, start, end, newJobScheduleId)
+    
+    // Fill empty arrays with 0s so Recharts doesn't look completely blank when there's no data
+    if (intervals.length > 0 && intervals.every(i => i.existing === 0 && i.newJob === 0)) {
+       // This just makes sure Recharts has something to draw at baseline
+    }
 
     setWorkloadData(intervals)
   }, [selectedDC, allBlocks, result.schedule_id, showTrivial, unoptData])
@@ -354,133 +374,78 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         </AlertDialog>
       </div>
 
-      {/* Environmental Impact - Now at Top */}
+      {/* Impact Overview (Consolidated) */}
       {(carbonIntensity !== undefined || totalEmissions !== undefined || sci !== undefined) && (
-        <Card className="border-2 border-primary/20 bg-primary/5">
+        <Card className={`border-2 ${showTrivial ? "border-orange-200 bg-orange-50/50" : "border-primary/20 bg-primary/5"}`}>
           <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <Leaf className="h-5 w-5 text-primary" />
-              <CardTitle>Environmental Impact</CardTitle>
+            <div className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                {showTrivial ? (
+                  <TrendingDown className="h-5 w-5 text-orange-600" />
+                ) : (
+                  <Leaf className="h-5 w-5 text-primary" />
+                )}
+                <CardTitle>Environmental Impact</CardTitle>
+              </div>
+              
+              {unoptData && (
+                 <div className="flex items-center gap-2 text-sm bg-background p-1 rounded-md border">
+                   <Button
+                     variant={!showTrivial ? "default" : "ghost"}
+                     size="sm"
+                     className="h-8"
+                     onClick={() => setShowTrivial(false)}
+                   >
+                     Optimised
+                   </Button>
+                   <Button
+                     variant={showTrivial ? "default" : "ghost"}
+                     size="sm"
+                     className="h-8"
+                     onClick={() => setShowTrivial(true)}
+                   >
+                     Unoptimised
+                   </Button>
+                 </div>
+              )}
             </div>
-            <CardDescription>Estimated carbon footprint for this scheduled job</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-3">
               {carbonIntensity !== undefined && (
-                <div className="rounded-lg bg-background p-4 space-y-1">
+                <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
                   <p className="text-xs text-muted-foreground">Carbon Intensity</p>
-                  <p className="text-3xl font-bold text-primary">{carbonIntensity.toFixed(3)}</p>
+                  <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{carbonIntensity.toFixed(3)}</p>
                   <p className="text-xs text-muted-foreground">kg CO2/kWh</p>
+                  {!showTrivial && unoptimizedComparison.carbon_intensity && unoptimizedComparison.carbon_intensity > carbonIntensity && (
+                    <div className="absolute top-2 right-2 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                      -{(((unoptimizedComparison.carbon_intensity - carbonIntensity) / unoptimizedComparison.carbon_intensity) * 100).toFixed(0)}%
+                    </div>
+                  )}
                 </div>
               )}
 
               {totalEmissions !== undefined && (
-                <div className="rounded-lg bg-background p-4 space-y-1">
+                <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
                   <p className="text-xs text-muted-foreground">Total Emissions</p>
-                  <p className="text-3xl font-bold text-primary">{totalEmissions.toFixed(2)}</p>
+                  <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{totalEmissions.toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">kg CO2</p>
+                  {!showTrivial && unoptimizedComparison.total_emissions && unoptimizedComparison.total_emissions > totalEmissions && (
+                    <div className="absolute top-2 right-2 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                      -{(((unoptimizedComparison.total_emissions - totalEmissions) / unoptimizedComparison.total_emissions) * 100).toFixed(0)}%
+                    </div>
+                  )}
                 </div>
               )}
 
               {sci !== undefined && (
-                <div className="rounded-lg bg-background p-4 space-y-1">
+                <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
                   <p className="text-xs text-muted-foreground">SCI per Unit</p>
-                  <p className="text-3xl font-bold text-primary">{sci.toFixed(2)}</p>
+                  <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{sci.toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">kg CO2e/unit</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Impact Comparison Card */}
-      {unoptData && (
-        <Card className="border-2 border-orange-200 bg-orange-50/50">
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-orange-600" />
-              <CardTitle>Impact Comparison</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Carbon Intensity Comparison */}
-              {carbonIntensity !== undefined && unoptimizedComparison.carbon_intensity !== undefined && (
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm font-medium mb-3">Carbon Intensity</p>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Unoptimised</p>
-                      <p className="text-2xl font-bold text-orange-600">{unoptimizedComparison.carbon_intensity.toFixed(3)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">kg CO2/kWh</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Optimised</p>
-                      <p className="text-2xl font-bold text-primary">{carbonIntensity.toFixed(3)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">kg CO2/kWh</p>
-                    </div>
-                  </div>
-                  {unoptimizedComparison.carbon_intensity > 0 && (
-                    <div className="mt-3 text-center">
-                      <p className="text-sm font-medium text-emerald-600">
-                        {(((unoptimizedComparison.carbon_intensity - carbonIntensity) / unoptimizedComparison.carbon_intensity) * 100).toFixed(1)}% reduction
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Total Emissions Comparison */}
-              {totalEmissions !== undefined && unoptimizedComparison.total_emissions !== undefined && (
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm font-medium mb-3">Total Emissions</p>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Unoptimised</p>
-                      <p className="text-2xl font-bold text-orange-600">{unoptimizedComparison.total_emissions.toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">kg CO2</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Optimised</p>
-                      <p className="text-2xl font-bold text-primary">{totalEmissions.toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">kg CO2</p>
-                    </div>
-                  </div>
-                  {unoptimizedComparison.total_emissions > 0 && (
-                    <div className="mt-3 text-center">
-                      <p className="text-sm font-medium text-emerald-600">
-                        {(((unoptimizedComparison.total_emissions - totalEmissions) / unoptimizedComparison.total_emissions) * 100).toFixed(1)}% reduction
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SCI Comparison */}
-              {sci !== undefined && unoptimizedComparison.sci !== undefined && (
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm font-medium mb-3">SCI per Unit</p>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Unoptimised</p>
-                      <p className="text-2xl font-bold text-orange-600">{unoptimizedComparison.sci.toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">kg CO2e/unit</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Optimised</p>
-                      <p className="text-2xl font-bold text-primary">{sci.toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">kg CO2e/unit</p>
-                    </div>
-                  </div>
-                  {unoptimizedComparison.sci > 0 && (
-                    <div className="mt-3 text-center">
-                      <p className="text-sm font-medium text-emerald-600">
-                        {(((unoptimizedComparison.sci - sci) / unoptimizedComparison.sci) * 100).toFixed(1)}% reduction
-                      </p>
+                  {!showTrivial && unoptimizedComparison.sci && unoptimizedComparison.sci > sci && (
+                    <div className="absolute top-2 right-2 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                      -{(((unoptimizedComparison.sci - sci) / unoptimizedComparison.sci) * 100).toFixed(0)}%
                     </div>
                   )}
                 </div>
@@ -501,24 +466,12 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               </CardDescription>
             </div>
             {unoptData && (
-               <div className="flex items-center gap-2 text-sm bg-muted p-1 rounded-md">
-                 <Button
-                   variant={!showTrivial ? "default" : "ghost"}
-                   size="sm"
-                   className="h-8"
-                   onClick={() => setShowTrivial(false)}
-                 >
-                   Optimised
-                 </Button>
-                 <Button
-                   variant={showTrivial ? "default" : "ghost"}
-                   size="sm"
-                   className="h-8"
-                   onClick={() => setShowTrivial(true)}
-                 >
-                   Unoptimised
-                 </Button>
-               </div>
+              <div className="text-right">
+                <span className="text-xs text-muted-foreground block">Currently viewing:</span>
+                <span className={`text-sm font-semibold ${showTrivial ? "text-orange-600" : "text-primary"}`}>
+                  {showTrivial ? "Unoptimised Baseline" : "Optimised Schedule"}
+                </span>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -550,84 +503,99 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
             </div>
           </div>
 
-          {/* Bar Chart */}
+          {/* Area Chart using Recharts */}
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="relative">
-              {/* Y-axis labels (fixed 0-50) */}
-              <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-muted-foreground pr-2">
-                <span>50</span>
-                <span>37.5</span>
-                <span>25</span>
-                <span>12.5</span>
-                <span>0</span>
-              </div>
-              
-              {/* Scrollable Chart Area */}
-              <div 
-                ref={scrollContainerRef}
-                className="ml-12 overflow-x-auto pb-8"
-              >
-                <div 
-                  className="flex items-end gap-1 min-w-max"
-                  style={{ width: `${Math.max(workloadData.length * 12, 400)}px`, height: "192px" }}
+            <div className="h-[250px] w-full mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={workloadData}
+                  margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                 >
-                  {workloadData.map((interval, index) => {
-                    const chartHeight = 192
-                    const existingPx = (interval.existing / maxValue) * chartHeight
-                    const newJobPx = (interval.newJob / maxValue) * chartHeight
-                    
-                    return (
-                      <div 
-                        key={index} 
-                        className="flex flex-col items-center group relative"
-                        style={{ width: "8px", height: `${chartHeight}px` }}
-                      >
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                          <div className="bg-popover text-popover-foreground text-xs rounded-md px-2 py-1 shadow-md whitespace-nowrap border">
-                            <p className="font-medium">{formatTime(interval.time)}</p>
-                            <p className="text-muted-foreground">Existing: {interval.existing.toFixed(1)} kWh</p>
-                            {interval.newJob > 0 && <p className={showTrivial ? "text-orange-500" : "text-emerald-500"}>{showTrivial ? "Unoptimised" : "Optimised"}: {interval.newJob.toFixed(1)} kWh</p>}
+                  <defs>
+                    <linearGradient id="colorExisting" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#9ca3af" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#9ca3af" stopOpacity={0.1}/>
+                    </linearGradient>
+                    <linearGradient id="colorNew" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                  <XAxis 
+                    dataKey="time" 
+                    tickFormatter={(time) => formatTime(time)} 
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    minTickGap={30}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    domain={[0, maxValue]} 
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={30}
+                    tickFormatter={(val) => Math.floor(val).toString()}
+                  />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border">
+                            <p className="font-medium mb-1 border-b pb-1">{formatTime(label)}</p>
+                            <div className="space-y-1">
+                              {payload.map((entry, index) => {
+                                const isNew = entry.dataKey === "newJob";
+                                if (entry.value === 0) return null;
+                                return (
+                                  <div key={`item-${index}`} className="flex justify-between gap-4">
+                                    <span className="flex items-center gap-1.5">
+                                      <div 
+                                        className="w-2 h-2 rounded-full" 
+                                        style={{ backgroundColor: entry.color }}
+                                      />
+                                      <span className="text-muted-foreground capitalize">
+                                        {isNew ? (showTrivial ? "Unoptimised" : "Optimised") : "Existing"}
+                                      </span>
+                                    </span>
+                                    <span className="font-medium">{Number(entry.value).toFixed(1)} kWh</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                        
-                        {/* Stacked Bar - positioned from bottom */}
-                        <div className="absolute bottom-0 w-full flex flex-col-reverse">
-                          {/* Existing workload (bottom) */}
-                          <div 
-                            className="w-full bg-gray-400 rounded-t-sm"
-                            style={{ height: `${existingPx}px` }}
-                          />
-                          {/* New job (top) */}
-                          {interval.newJob > 0 && (
-                            <div 
-                              className={`w-full ${showTrivial ? "bg-orange-500" : "bg-emerald-500"} rounded-t-sm`}
-                              style={{ height: `${newJobPx}px` }}
-                            />
-                          )}
-                        </div>
-                        
-                        {/* X-axis label (show every 6th = 30 min) */}
-                        {index % 6 === 0 && (
-                          <span className="absolute -bottom-6 text-[10px] text-muted-foreground whitespace-nowrap">
-                            {formatTime(interval.time)}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="existing" 
+                    stackId="1" 
+                    stroke="#9ca3af" 
+                    fill="url(#colorExisting)" 
+                    isAnimationActive={true}
+                    animationDuration={300}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="newJob" 
+                    stackId="1" 
+                    stroke={showTrivial ? "#ea580c" : "#059669"} 
+                    fill="url(#colorNew)" 
+                    isAnimationActive={true}
+                    animationDuration={300}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           )}
-
-          <p className="text-xs text-muted-foreground text-center">
-            Scroll horizontally to view all time intervals
-          </p>
         </CardContent>
       </Card>
 
