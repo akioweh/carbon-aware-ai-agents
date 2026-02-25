@@ -26,16 +26,32 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
             double available = std::max(0.0, capacity - existing);
             
             if (available > 1e-6) {
-                double to_take = std::min(available, rem_work);
-                res[i][j] = to_take;
-                rem_work -= to_take;
+                // Determine if a penalty applies (new continuous run of work)
+                double penalty = (j == 0 || res[i][j-1] < 1e-6) ? data.penalties_f[i] : 0.0;
+                
+                if (available > penalty + 1e-6) {
+                    double to_take = std::min(available, rem_work + penalty);
+                    res[i][j] = to_take;
+                    rem_work -= (to_take - penalty);
+                }
             }
         }
     }
 
     if (rem_work > 1e-6) {
         LOG_WARN << "Trivial schedule could not place all work. It will be empty.";
-        // We just return an empty schedule, the UI handles missing unoptimized result gracefully
+        /*
+         * Note: Mathematically, if the DP optimizer succeeded, the greedy 
+         * trivial algorithm should also succeed. The greedy algorithm packs 
+         * work sequentially, incurring at most the same number of penalties 
+         * as the DP algorithm. Thus, it consumes the same or less capacity 
+         * overall.
+         * 
+         * If this branch executes, it usually indicates either a bug in the 
+         * capacity constraint calculations or edge case floating point 
+         * precision issues. The controller will simply not attach a trivial 
+         * result.
+         */
         co_return SchedulerOutput{
             .blocks = {},
             .impact = {0.0, 0.0, 0.0}
