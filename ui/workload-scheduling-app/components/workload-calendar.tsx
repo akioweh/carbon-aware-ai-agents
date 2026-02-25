@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarIcon, X, Loader2 } from "lucide-react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
-
-interface ScheduleBlock {
-  timestamp: string
-  location: string
-  schedule_id: string
-  additional_load: number
-}
+import { ScheduleBlock } from "../types/schedule"
 
 interface AggregatedInterval {
   time: Date

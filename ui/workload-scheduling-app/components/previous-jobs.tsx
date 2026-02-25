@@ -5,34 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { History, X, Loader2, Calendar, MapPin, Leaf } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
-interface ScheduleBlock {
-  timestamp: string
-  location: string
-  schedule_id: string
-  additional_load: number
-}
-
-interface JobSummary {
-  schedule_id: string
-  scheduled_blocks: ScheduleBlock[]
-  impact?: {
-    carbon_intensity?: number
-    total_emissions?: number
-    sci?: number
-  }
-  unoptimizedResult?: {
-    schedule_id: string
-    scheduled_blocks?: ScheduleBlock[]
-    impact?: {
-      carbon_intensity?: number
-      total_emissions?: number
-      sci?: number
-    }
-  }
-  start_time?: string
-  end_time?: string
-}
+import { JobSummary, ScheduleBlock } from "../types/schedule"
 
 interface PreviousJobsProps {
   onClose: () => void
@@ -47,22 +20,29 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
     const fetchPreviousJobs = async () => {
       setLoading(true)
       try {
-        // Fetch all schedule blocks (no time filter = all jobs)
-        const response = await fetch("/api/schedules")
+        // Fetch all schedule blocks and summaries concurrently
+        const [blocksRes, summaryRes] = await Promise.all([
+          fetch("/api/schedules"),
+          fetch("/api/schedules/summary")
+        ])
         
-        if (!response.ok) {
-          throw new Error(`Failed to fetch jobs: ${response.status}`)
+        if (!blocksRes.ok) throw new Error(`Failed to fetch jobs: ${blocksRes.status}`)
+        if (!summaryRes.ok) throw new Error(`Failed to fetch summaries: ${summaryRes.status}`)
+
+        const rawBlocks = await blocksRes.json()
+        const rawSummaries = await summaryRes.json()
+
+        if (!Array.isArray(rawBlocks)) throw new Error("Unexpected schedule blocks response shape")
+        if (!Array.isArray(rawSummaries)) throw new Error("Unexpected schedule summaries response shape")
+
+        // Map summaries by ID for quick lookup
+        const summaryMap = new Map<string, any>()
+        for (const s of rawSummaries) {
+          summaryMap.set(s.schedule_id, s)
         }
 
-        const raw = await response.json()
-
-        // Validate response is an array of ScheduleBlock objects
-        if (!Array.isArray(raw)) {
-          throw new Error("Unexpected schedule response shape")
-        }
-
-        // Sanitize blocks (ensure required fields exist and are correct types)
-        const blocks = raw.filter((b: any) => {
+        // Sanitize and group blocks by schedule_id
+        const blocks = rawBlocks.filter((b: any) => {
           return (
             b &&
             typeof b.timestamp === "string" &&
@@ -72,9 +52,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
           )
         }) as ScheduleBlock[]
         
-        // Group blocks by schedule_id to create job summaries
         const jobMap = new Map<string, ScheduleBlock[]>()
-        
         for (const block of blocks) {
           if (!jobMap.has(block.schedule_id)) {
             jobMap.set(block.schedule_id, [])
@@ -82,48 +60,27 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
           jobMap.get(block.schedule_id)?.push(block)
         }
 
-        // Convert to job summaries and fetch impact data for each
-        const jobSummaries: JobSummary[] = await Promise.all(
-          Array.from(jobMap.entries()).map(async ([schedule_id, blocks]) => {
-            const timestamps = blocks.map(b => new Date(b.timestamp).getTime())
-            const start_time = new Date(Math.min(...timestamps)).toISOString()
-            const end_time = new Date(Math.max(...timestamps) + 5 * 60 * 1000).toISOString()
-            
-            const jobSummary: JobSummary = {
-              schedule_id,
-              scheduled_blocks: blocks,
-              start_time,
-              end_time,
-            }
-
-            // Fetch full schedule details to get impact data
-            try {
-              const scheduleResponse = await fetch(`/api/schedules/${schedule_id}`)
-              if (scheduleResponse.ok) {
-                const scheduleData = await scheduleResponse.json()
-                if (scheduleData.impact) {
-                  jobSummary.impact = scheduleData.impact
-                }
-                
-                // Fetch unoptimized baseline separately
-                try {
-                  const trivialResponse = await fetch(`/api/schedules/${schedule_id}/trivial`)
-                  if (trivialResponse.ok) {
-                    const trivialData = await trivialResponse.json()
-                    jobSummary.unoptimizedResult = trivialData
-                  }
-                } catch (e) {
-                  // it's fine if there is no trivial schedule
-                }
-              }
-            } catch (err) {
-              console.error(`Failed to fetch impact for schedule ${schedule_id}:`, err)
-              // Continue anyway, impact will just be undefined
-            }
-
-            return jobSummary
-          })
-        )
+        // Convert to job summaries
+        const jobSummaries: JobSummary[] = Array.from(jobMap.entries()).map(([schedule_id, blocks]) => {
+          const timestamps = blocks.map(b => new Date(b.timestamp).getTime())
+          const start_time = new Date(Math.min(...timestamps)).toISOString()
+          const end_time = new Date(Math.max(...timestamps) + 5 * 60 * 1000).toISOString()
+          
+          const summaryData = summaryMap.get(schedule_id)
+          
+          return {
+            schedule_id,
+            scheduled_blocks: blocks,
+            start_time,
+            end_time,
+            impact: summaryData?.impact,
+            // Construct the expected structure for unoptimizedResult based on the new API
+            unoptimizedResult: summaryData?.trivialImpact ? {
+              schedule_id: `${schedule_id}_trivial`,
+              impact: summaryData.trivialImpact
+            } : undefined
+          }
+        })
 
         // Sort by start time (most recent first)
         jobSummaries.sort((a, b) => {

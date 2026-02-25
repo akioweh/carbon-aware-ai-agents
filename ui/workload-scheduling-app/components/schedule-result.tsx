@@ -17,13 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
-
-interface ScheduleBlock {
-  timestamp: string
-  location: string
-  schedule_id: string
-  additional_load: number
-}
+import { JobScheduleResponse, ScheduleData, ScheduleBlock } from "../types/schedule"
 
 interface WorkloadInterval {
   time: string
@@ -32,41 +26,8 @@ interface WorkloadInterval {
 }
 
 interface ScheduleResultProps {
-  result: {
-    schedule_id: string
-    scheduled_blocks?: ScheduleBlock[]
-    impact?: {
-      carbon_intensity?: number
-      total_emissions?: number
-      sci?: number
-    }
-    unoptimizedResult?: {
-      schedule_id: string
-      scheduled_blocks?: ScheduleBlock[]
-      impact?: {
-        carbon_intensity?: number
-        total_emissions?: number
-        sci?: number
-      }
-    }
-    // Legacy fields for backwards compatibility
-    job_id?: string
-    location?: string
-    start_time?: string
-    end_time?: string
-    carbon_intensity?: number
-    estimated_emissions_kg?: number
-    sci_per_unit?: number
-  }
-  unoptimizedResult?: {
-    schedule_id: string
-    scheduled_blocks?: ScheduleBlock[]
-    impact?: {
-      carbon_intensity?: number
-      total_emissions?: number
-      sci?: number
-    }
-  }
+  result: JobScheduleResponse
+  unoptimizedResult?: ScheduleData
   // User's input time range
   earliestStart?: string
   latestFinish?: string
@@ -144,22 +105,21 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Use unoptimizedResult prop, or fallback to result.unoptimizedResult
-  let unoptData = unoptimizedResult || result.unoptimizedResult || result.trivialResult || (result.trivialImpact ? { impact: result.trivialImpact, schedule_id: result.schedule_id, scheduled_blocks: [] } : null)
+  let unoptData = unoptimizedResult || result.unoptimizedResult || null
   
-  // Clean up if it's an error object (like {"error": "Backend responded with status: 422"})
-  // Or if the array of blocks is totally empty, making it effectively useless to toggle
-  if (unoptData && (unoptData.error || (unoptData.scheduled_blocks && unoptData.scheduled_blocks.length === 0))) {
+  // Clean up if it's an error object or if the array of blocks is totally empty
+  if (unoptData && (('error' in unoptData) || (unoptData.scheduled_blocks && unoptData.scheduled_blocks.length === 0))) {
     unoptData = null;
   }
 
   // Get impact values
   const activeImpact = showTrivial && unoptData ? unoptData.impact : result.impact
-  const carbonIntensity = activeImpact?.carbon_intensity ?? (!showTrivial ? result.carbon_intensity : undefined)
-  const totalEmissions = activeImpact?.total_emissions ?? (!showTrivial ? result.estimated_emissions_kg : undefined)
-  const sci = activeImpact?.sci ?? (!showTrivial ? result.sci_per_unit : undefined)
+  const carbonIntensity = activeImpact?.carbon_intensity
+  const totalEmissions = activeImpact?.total_emissions
+  const sci = activeImpact?.sci
 
   // Get unoptimized comparison values for savings calculation
-  const optEmissions = result.impact?.total_emissions ?? result.estimated_emissions_kg
+  const optEmissions = result.impact?.total_emissions
   const unoptEmissions = unoptData?.impact?.total_emissions
   const emissionsSavings = optEmissions && unoptEmissions && unoptEmissions > optEmissions 
     ? ((unoptEmissions - optEmissions) / unoptEmissions) * 100 
@@ -192,14 +152,6 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         // Add 15 minutes padding to start and 20 minutes padding to end
         start: new Date(Math.min(...timestamps) - 15 * 60 * 1000),
         end: new Date(Math.max(...timestamps) + 20 * 60 * 1000)
-      }
-    }
-    
-    // Fallback to legacy fields or default
-    if (result.start_time && result.end_time) {
-      return {
-        start: new Date(result.start_time),
-        end: new Date(result.end_time)
       }
     }
     
@@ -628,12 +580,6 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           <span className="text-foreground font-medium">Schedule ID:</span>{" "}
           <span className="font-mono">{result.schedule_id}</span>
         </div>
-        {result.job_id && (
-          <div>
-            <span className="text-foreground font-medium">Job ID:</span>{" "}
-            <span className="font-mono">{result.job_id}</span>
-          </div>
-        )}
       </div>
     </div>
   )

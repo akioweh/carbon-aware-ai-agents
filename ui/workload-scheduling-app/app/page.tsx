@@ -45,11 +45,11 @@ export default function Home() {
 
   const handleSelectJob = (job: any) => {
     // Check if the backend gave us unoptimizedResult via job.unoptimizedResult OR job.trivialResult (etc)
-    const unopt = job.unoptimizedResult || job.trivialResult || null;
+    const unopt = job.unoptimizedResult || null;
     
     setScheduleResult(job)
     setUnoptimizedResult(unopt) // Pass it directly
-    setTimeRange(null)
+    setTimeRange({ earliestStart: job.start_time, latestFinish: job.end_time })
     setShowPreviousJobs(false)
     setSource("history")
   }
