@@ -95,13 +95,14 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
   }, [])
 
   // Derive time range, display params, and aggregated intervals
-  const { intervals, rangeStart, rangeEnd, displayParams } = useMemo(() => {
+  const { intervalsPerDC, rangeStart, rangeEnd } = useMemo(() => {
     if (blocks.length === 0) {
+      const defaultIntervals: Record<string, AggregatedInterval[]> = {}
+      for (const dc of DATA_CENTERS) defaultIntervals[dc.id] = []
       return {
-        intervals: [] as AggregatedInterval[],
+        intervalsPerDC: defaultIntervals,
         rangeStart: new Date(),
         rangeEnd: new Date(),
-        displayParams: getDisplayParams(0),
       }
     }
 
@@ -120,88 +121,51 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     }
 
     const spanMs = rangeEnd.getTime() - rangeStart.getTime()
-    const dp = getDisplayParams(spanMs)
+    // We remove the getDisplayParams downsampling because we want to see full resolution
 
-    // Filter blocks for the selected DC using the backend location name
-    const dcBackendLocation = DATA_CENTERS.find(dc => dc.id === selectedDC)?.backendLocation
-    const dcBlocks = dcBackendLocation ? blocks.filter(b => b.location === dcBackendLocation) : []
+    // Build aggregated intervals per DC
+    const intervalsPerDC: Record<string, AggregatedInterval[]> = {}
+    for (const dc of DATA_CENTERS) {
+      intervalsPerDC[dc.id] = []
+      const dcBlocks = blocks.filter(b => b.location === dc.backendLocation)
+      
+      for (let t = rangeStart.getTime(); t < rangeEnd.getTime(); t += BLOCK_DURATION_MS) {
+        const intervalEnd = t + BLOCK_DURATION_MS
+        const activeJobs: { schedule_id: string; load: number }[] = []
 
-    // Build aggregated intervals
-    const intervals: AggregatedInterval[] = []
-    for (let t = rangeStart.getTime(); t < rangeEnd.getTime(); t += dp.intervalMs) {
-      const intervalEnd = t + dp.intervalMs
-      const activeJobs: { schedule_id: string; load: number }[] = []
-
-      for (const block of dcBlocks) {
-        if (!block.timestamp || typeof block.additional_load !== "number") continue
-        const blockStart = new Date(block.timestamp).getTime()
-        const blockEnd = blockStart + BLOCK_DURATION_MS
-        if (blockStart < intervalEnd && blockEnd > t) {
-          const existing = activeJobs.find(j => j.schedule_id === block.schedule_id)
-          if (existing) {
-            existing.load += block.additional_load
-          } else {
-            activeJobs.push({ schedule_id: block.schedule_id, load: block.additional_load })
+        for (const block of dcBlocks) {
+          if (!block.timestamp || typeof block.additional_load !== "number") continue
+          const blockStart = new Date(block.timestamp).getTime()
+          const blockEnd = blockStart + BLOCK_DURATION_MS
+          if (blockStart < intervalEnd && blockEnd > t) {
+            const existing = activeJobs.find(j => j.schedule_id === block.schedule_id)
+            if (existing) {
+              existing.load += block.additional_load
+            } else {
+              activeJobs.push({ schedule_id: block.schedule_id, load: block.additional_load })
+            }
           }
         }
-      }
 
-      intervals.push({
-        time: new Date(t),
-        endTime: new Date(intervalEnd),
-        jobs: activeJobs,
-      })
-    }
-
-    return { intervals, rangeStart, rangeEnd, displayParams: dp }
-  }, [blocks, selectedDC])
-
-  // Fixed Y-axis: all data centers have capacity of 50
-  const maxValue = 50
-
-  // Day boundary markers
-  const dayBoundaries = useMemo(() => {
-    const boundaries: { index: number; date: Date }[] = []
-    let lastDateStr = ""
-    intervals.forEach((interval, index) => {
-      const dateStr = interval.time.toDateString()
-      if (dateStr !== lastDateStr) {
-        boundaries.push({ index, date: new Date(interval.time) })
-        lastDateStr = dateStr
-      }
-    })
-    return boundaries
-  }, [intervals])
-
-  // Time-axis labels (shown when there is enough horizontal space)
-  const timeLabels = useMemo(() => {
-    const labels: { index: number; text: string }[] = []
-    const pxPerBar = displayParams.barWidth + displayParams.gap
-    const barsPerHour = 60 * 60 * 1000 / displayParams.intervalMs
-    const pxPerHour = barsPerHour * pxPerBar
-
-    let labelFreqHours: number
-    if (pxPerHour >= 40) labelFreqHours = 3
-    else if (pxPerHour >= 15) labelFreqHours = 6
-    else if (pxPerHour >= 4) labelFreqHours = 12
-    else return labels // too compressed for time labels
-
-    intervals.forEach((interval, index) => {
-      const h = interval.time.getHours()
-      const m = interval.time.getMinutes()
-      if (m === 0 && h % labelFreqHours === 0) {
-        labels.push({
-          index,
-          text: interval.time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        intervalsPerDC[dc.id].push({
+          time: new Date(t),
+          endTime: new Date(intervalEnd),
+          jobs: activeJobs,
         })
       }
-    })
-    return labels
-  }, [intervals, displayParams])
+    }
 
-  const chartHeight = 192
-  const pxPerBar = displayParams.barWidth + displayParams.gap
-  const totalWidth = intervals.length * pxPerBar
+    return { intervalsPerDC, rangeStart, rangeEnd }
+  }, [blocks])
+
+  const maxValue = 50
+  const chartHeight = 120 // compact height since we are stacking 5 of them
+
+  // Use the first DC's intervals to calculate total width and shared boundaries
+  const sampleIntervals = intervalsPerDC[DATA_CENTERS[0].id] || []
+  const hasData = sampleIntervals.length > 0
+  const pxPerBar = 2 // very compact
+  const totalWidth = sampleIntervals.length * pxPerBar
 
   const formatDateShort = (date: Date) =>
     date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
@@ -230,24 +194,18 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
         </Button>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Data Centre Tabs */}
-        <Tabs value={selectedDC} onValueChange={setSelectedDC}>
-          <TabsList className="grid w-full grid-cols-5">
-            {DATA_CENTERS.map((dc) => (
-              <TabsTrigger key={dc.id} value={dc.id} className="text-xs sm:text-sm">
-                DC {dc.id.slice(-1)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
+      <CardContent className="space-y-4 pt-4">
         {/* Legend */}
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex items-center justify-between gap-6 text-sm pb-2 border-b">
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded bg-blue-500" />
             <span className="text-muted-foreground">Scheduled Jobs</span>
           </div>
+          {hasData && (
+            <p className="text-xs text-muted-foreground">
+              Scroll horizontally to view the full timeline
+            </p>
+          )}
         </div>
 
         {/* Chart */}
@@ -255,125 +213,128 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : intervals.length === 0 ? (
+        ) : !hasData ? (
           <div className="flex items-center justify-center h-64 text-muted-foreground">
-            {scheduleId ? "No scheduled blocks for this data centre" : "Schedule a job to see workload data"}
+            {scheduleId ? "No scheduled blocks found" : "Schedule a job to see workload data"}
           </div>
         ) : (
           <div className="relative">
-            {/* Y-axis labels */}
-            <div
-              className="absolute left-0 top-6 flex flex-col justify-between text-xs text-muted-foreground pr-2 z-10 w-14"
-              style={{ height: `${chartHeight}px` }}
-            >
-              <span>50</span>
-              <span>37.5</span>
-              <span>25</span>
-              <span>12.5</span>
-              <span>0</span>
-            </div>
-
-            {/* Scrollable chart area */}
-            <div ref={scrollContainerRef} className="ml-14 overflow-x-auto pb-2">
+            {/* Scrollable container for ALL DCs synchronized */}
+            <div ref={scrollContainerRef} className="overflow-x-auto pb-4 custom-scrollbar">
               <div
-                className="relative"
+                className="relative flex flex-col gap-4"
                 style={{
-                  width: `${Math.max(intervals.length * 12, 600)}px`,
-                  height: `${chartHeight + 52}px`,
-                  paddingTop: "24px",
+                  width: `${Math.max(sampleIntervals.length * pxPerBar, 800)}px`,
+                  paddingLeft: "40px",
+                  paddingRight: "20px"
                 }}
               >
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={intervals.map(i => ({
-                      time: i.time.toISOString(),
-                      totalLoad: i.jobs.reduce((sum, j) => sum + j.load, 0),
-                      rawJobs: i.jobs
-                    }))}
-                    margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="colorScheduled" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                    <XAxis 
-                      dataKey="time" 
-                      tickFormatter={(time) => {
-                        return new Date(time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                      }} 
-                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      minTickGap={30}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis 
-                      domain={[0, maxValue]} 
-                      hide={true}
-                    />
-                    <Tooltip 
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border">
-                              <p className="font-medium mb-1 border-b pb-1">
-                                {new Date(label).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
-                                {new Date(label).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                              </p>
-                              {data.rawJobs && data.rawJobs.length > 0 ? (
-                                <div className="space-y-1">
-                                  <p className="text-muted-foreground font-semibold">
-                                    Total Load: {Number(payload[0].value).toFixed(2)} kWh
-                                  </p>
-                                  <div className="border-t mt-1 pt-1 space-y-0.5">
-                                    {data.rawJobs.map((job: any, j: number) => (
-                                      <p key={j} className="text-blue-500">
-                                        <span className="font-medium">{job.schedule_id}</span>: {Number(job.load).toFixed(2)} 
-                                      </p>
-                                    ))}
+                {DATA_CENTERS.map((dc, i) => {
+                  const intervals = intervalsPerDC[dc.id]
+                  return (
+                    <div key={dc.id} className="relative w-full" style={{ height: `${chartHeight}px` }}>
+                      {/* Fixed Y-axis labels per chart */}
+                      <div className="absolute -left-10 top-0 bottom-0 flex flex-col justify-between text-[10px] text-muted-foreground z-10 w-8 text-right pr-2">
+                        <span>{maxValue}</span>
+                        <span>{maxValue / 2}</span>
+                        <span>0</span>
+                      </div>
+                      
+                      {/* Floating Data Center Label */}
+                      <div className="absolute top-2 left-2 z-20 bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-semibold border shadow-sm">
+                        {dc.name}
+                      </div>
+
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                          data={intervals.map(i => ({
+                            time: i.time.toISOString(),
+                            totalLoad: i.jobs.reduce((sum, j) => sum + j.load, 0),
+                            rawJobs: i.jobs
+                          }))}
+                          margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+                        >
+                          <defs>
+                            <linearGradient id={`colorScheduled-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                          
+                          {/* Only show XAxis on the very last chart to save space */}
+                          <XAxis 
+                            dataKey="time" 
+                            tickFormatter={(time) => {
+                              return new Date(time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+                            }} 
+                            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                            minTickGap={60}
+                            axisLine={false}
+                            tickLine={false}
+                            hide={i !== DATA_CENTERS.length - 1}
+                          />
+                          
+                          <YAxis domain={[0, maxValue]} hide={true} />
+                          
+                          <Tooltip 
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border z-50 relative">
+                                    <p className="font-medium mb-1 border-b pb-1">
+                                      {new Date(label).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
+                                      {new Date(label).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                                    </p>
+                                    {data.rawJobs && data.rawJobs.length > 0 ? (
+                                      <div className="space-y-1">
+                                        <p className="text-muted-foreground font-semibold">
+                                          Total Load: {Number(payload[0].value).toFixed(2)} kWh
+                                        </p>
+                                        <div className="border-t mt-1 pt-1 space-y-0.5">
+                                          {data.rawJobs.map((job: any, j: number) => (
+                                            <p key={j} className="text-blue-500">
+                                              <span className="font-medium">{job.schedule_id}</span>: {Number(job.load).toFixed(2)} 
+                                            </p>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <p className="text-muted-foreground">No scheduled load</p>
+                                    )}
                                   </div>
-                                </div>
-                              ) : (
-                                <p className="text-muted-foreground">No scheduled load</p>
-                              )}
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                  {/* Add day boundary markers via ReferenceLine */}
-                  {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, i) => (
-                    <ReferenceLine 
-                      key={`midnight-${i}`} 
-                      x={d.time.toISOString()} 
-                      stroke="hsl(var(--foreground))" 
-                      strokeDasharray="3 3" 
-                      opacity={0.3} 
-                      label={{ position: "insideTopLeft", value: formatDateShort(d.time), fill: "hsl(var(--foreground))", fontSize: 11 }}
-                    />
-                  ))}
-                    <Area 
-                      type="monotone" 
-                      dataKey="totalLoad" 
-                      stroke="#3b82f6" 
-                      fill="url(#colorScheduled)" 
-                      isAnimationActive={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          {/* Add day boundary markers via ReferenceLine */}
+                          {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
+                            <ReferenceLine 
+                              key={`midnight-${k}`} 
+                              x={d.time.toISOString()} 
+                              stroke="hsl(var(--foreground))" 
+                              strokeDasharray="3 3" 
+                              opacity={0.3} 
+                              label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fill: "hsl(var(--foreground))", fontSize: 11 } : undefined}
+                            />
+                          ))}
+                          <Area 
+                            type="monotone" 
+                            dataKey="totalLoad" 
+                            stroke="#3b82f6" 
+                            fill={`url(#colorScheduled-${dc.id})`} 
+                            isAnimationActive={false}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
-        )}
-
-        {intervals.length > 0 && (
-          <p className="text-xs text-muted-foreground text-center">
-            Scroll horizontally to view the full schedule
-          </p>
         )}
       </CardContent>
     </Card>

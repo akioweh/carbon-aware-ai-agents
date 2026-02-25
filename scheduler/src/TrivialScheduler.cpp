@@ -34,9 +34,18 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     vector<vector<double>> res(n_locations, vector<double>(n_intervals, 0.0));
     double rem_work = job.workload_amount;
     
-    // Spread evenly across the first available interval for simplicity, just a naive approach
+    // Spread evenly across the available intervals, maintaining a flat profile where possible
     for (size_t iter_idx = 0; iter_idx < n_locations && rem_work > 1e-6; ++iter_idx) {
         size_t i = location_indices[iter_idx];
+        
+        // Precompute suffix available capacity to guarantee we never fail if it's possible to fit
+        vector<double> suffix_avail(n_intervals + 1, 0.0);
+        for (long long j = n_intervals - 1; j >= 0; --j) {
+            double penalty = (j == 0) ? data.penalties_f[i] : 0.0; // Approximation for suffix check
+            double avail = std::max(0.0, data.capacities_f[i][j] - data.loads_f[i][j]);
+            suffix_avail[j] = suffix_avail[j+1] + avail;
+        }
+
         for (long long j = 0; j < n_intervals && rem_work > 1e-6; ++j) {
             double capacity = data.capacities_f[i][j];
             double existing = data.loads_f[i][j];
@@ -47,7 +56,13 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
                 double penalty = (j == 0 || res[i][j-1] < 1e-6) ? data.penalties_f[i] : 0.0;
                 
                 if (available > penalty + 1e-6) {
-                    double to_take = std::min(available, rem_work + penalty);
+                    double ideal_take = (rem_work + penalty) / (n_intervals - j);
+                    double must_take = std::max(0.0, (rem_work + penalty) - suffix_avail[j+1]);
+                    
+                    double to_take = std::max(ideal_take, must_take);
+                    to_take = std::min(available, to_take);
+                    to_take = std::min(to_take, rem_work + penalty);
+                    
                     res[i][j] = to_take;
                     rem_work -= (to_take - penalty);
                 }

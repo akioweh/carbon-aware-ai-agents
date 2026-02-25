@@ -192,79 +192,69 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                 >
                   <CardContent className="p-4">
                     <div className="space-y-3">
-                      {/* Job ID Header */}
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-mono text-sm font-medium">{job.schedule_id}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {job.scheduled_blocks.length} blocks
-                          </p>
+                      {/* Compact Card Details */}
+                      <div className="flex flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="flex flex-col">
+                            <p className="font-semibold text-base text-primary tracking-tight">{job.schedule_id}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {job.scheduled_blocks.length} block{job.scheduled_blocks.length !== 1 && 's'}
+                            </p>
+                          </div>
+                          
+                          <div className="hidden sm:flex h-8 w-px bg-border mx-2" />
+
+                          <div className="flex flex-col gap-1 text-sm">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span className="text-xs font-medium text-foreground">
+                                {job.start_time ? formatDateTime(job.start_time) : "N/A"} - {job.end_time ? new Date(job.end_time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <MapPin className="h-3.5 w-3.5" />
+                              <span className="text-xs">
+                                {getUniqueLocations(job.scheduled_blocks).length} data centre(s) ({getUniqueLocations(job.scheduled_blocks).join(", ")})
+                              </span>
+                            </div>
+                          </div>
                         </div>
+
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-primary hover:text-primary h-8"
+                          className="shrink-0 h-8"
                           onClick={(e) => {
                             e.stopPropagation()
                             onSelectJob(job)
                           }}
                         >
-                          View Details →
+                          View Details &rarr;
                         </Button>
                       </div>
 
-                      {/* Job Details */}
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="flex items-start gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs text-muted-foreground">Time Range</p>
-                            <p className="text-xs font-medium truncate">
-                              {job.start_time ? formatDateTime(job.start_time) : "N/A"}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              to {job.end_time ? new Date(job.end_time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "N/A"}
-                            </p>
-                          </div>
+                      {/* Total Load and Impacts */}
+                      <div className="flex items-center flex-wrap gap-x-4 gap-y-2 pt-3 mt-1 border-t border-border/50">
+                        <div className="flex items-center gap-1.5">
+                          <Leaf className="h-3.5 w-3.5 text-emerald-500" />
+                          <span className="text-xs font-medium">{getTotalLoad(job.scheduled_blocks).toFixed(2)} kWh</span>
                         </div>
-
-                        <div className="flex items-start gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs text-muted-foreground">Locations</p>
-                            <p className="text-xs font-medium">
-                              {getUniqueLocations(job.scheduled_blocks).length} data centre(s)
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {getUniqueLocations(job.scheduled_blocks).join(", ")}
-                            </p>
+                        
+                        {job.impact?.total_emissions && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">Emissions:</span>
+                            <span className="text-xs font-semibold">{job.impact.total_emissions.toFixed(2)} kg CO₂</span>
                           </div>
-                        </div>
+                        )}
+                        
+                        {job.impact?.total_emissions && job.unoptimizedResult?.impact?.total_emissions && job.unoptimizedResult.impact.total_emissions > job.impact.total_emissions && (
+                          <div className="flex items-center">
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                              -{(((job.unoptimizedResult.impact.total_emissions - job.impact.total_emissions) / job.unoptimizedResult.impact.total_emissions) * 100).toFixed(1)}% savings
+                            </span>
+                          </div>
+                        )}
                       </div>
-
-                        {/* Total Load */}
-                        <div className="flex items-center flex-wrap gap-2 pt-2 border-t">
-                          <Leaf className="h-4 w-4 text-primary" />
-                          <span className="text-xs text-muted-foreground">Total Load:</span>
-                          <span className="text-sm font-medium">{getTotalLoad(job.scheduled_blocks).toFixed(2)} kWh</span>
-                          {job.impact?.total_emissions && (
-                            <>
-                              <span className="text-xs text-muted-foreground mx-1">•</span>
-                              <span className="text-xs text-muted-foreground">Emissions:</span>
-                              <span className="text-sm font-medium text-primary">
-                                {job.impact.total_emissions.toFixed(2)} kg CO₂
-                              </span>
-                            </>
-                          )}
-                          {job.impact?.total_emissions && job.unoptimizedResult?.impact?.total_emissions && job.unoptimizedResult.impact.total_emissions > job.impact.total_emissions && (
-                            <>
-                              <span className="text-xs text-muted-foreground mx-1">•</span>
-                              <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-sm">
-                                {(((job.unoptimizedResult.impact.total_emissions - job.impact.total_emissions) / job.unoptimizedResult.impact.total_emissions) * 100).toFixed(1)}% savings
-                              </span>
-                            </>
-                          )}
-                        </div>
                     </div>
                   </CardContent>
                 </Card>
