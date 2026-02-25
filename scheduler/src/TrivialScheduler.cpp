@@ -1,9 +1,9 @@
 #include "TrivialScheduler.hpp"
 #include "exceptions/SchedulingException.hpp"
-#include <chrono>
-#include <vector>
-#include <numeric>
+#include "structs/SchedulerOutput.hpp"
 #include <algorithm>
+#include <numeric>
+#include <vector>
 
 using namespace std;
 using namespace drogon;
@@ -17,52 +17,56 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     auto costs_f = data.generateCostsF();
 
     // Reorder indices based on preferred_datacenter if it exists
-    vector<size_t> location_indices(n_locations);
-    std::iota(location_indices.begin(), location_indices.end(), 0);
-    
+    auto location_indices = vector<size_t>(n_locations);
+    ranges::iota(location_indices, 0);
     if (job.preferred_datacenter.has_value()) {
-        const auto& pref = job.preferred_datacenter.value();
-        auto it = std::find(data.location_ids.begin(), data.location_ids.end(), pref);
+        const auto &pref = job.preferred_datacenter.value();
+        auto it = ranges::find(data.location_ids, pref);
         if (it != data.location_ids.end()) {
-            size_t pref_idx = std::distance(data.location_ids.begin(), it);
-            location_indices.erase(std::remove(location_indices.begin(), location_indices.end(), pref_idx), location_indices.end());
-            location_indices.insert(location_indices.begin(), pref_idx);
+            const auto pref_idx = distance(data.location_ids.begin(), it);
+            if (pref_idx)
+                std::swap(location_indices[0], location_indices[pref_idx]);
         }
     }
 
-    // Trivial placement logic without loops that could hang
-    vector<vector<double>> res(n_locations, vector<double>(n_intervals, 0.0));
-    double rem_work = job.workload_amount;
-    
-    // Spread evenly across the available intervals, maintaining a flat profile where possible
-    for (size_t iter_idx = 0; iter_idx < n_locations && rem_work > 1e-6; ++iter_idx) {
-        size_t i = location_indices[iter_idx];
-        
-        // Precompute suffix available capacity to guarantee we never fail if it's possible to fit
-        vector<double> suffix_avail(n_intervals + 1, 0.0);
-        for (long long j = n_intervals - 1; j >= 0; --j) {
-            double penalty = (j == 0) ? data.penalties_f[i] : 0.0; // Approximation for suffix check
-            double avail = std::max(0.0, data.capacities_f[i][j] - data.loads_f[i][j]);
-            suffix_avail[j] = suffix_avail[j+1] + avail;
+    auto res = vector(n_locations, vector(n_intervals, 0.0));
+    auto rem_work = job.workload_amount;
+
+    // Spread evenly across the available intervals
+    for (auto iter_idx = 0UZ; iter_idx < n_locations && rem_work > 1e-6;
+         ++iter_idx) {
+        const auto i = location_indices[iter_idx];
+
+        // Precompute suffix available capacity to guarantee we never fail if
+        // it's possible to fit
+        auto suffix_avail = vector(n_intervals + 1, 0.0);
+        for (auto j = n_intervals; j--;) {
+            const auto avail =
+                std::max(0.0, data.capacities_f[i][j] - data.loads_f[i][j]);
+            suffix_avail[j] = suffix_avail[j + 1] + avail;
         }
 
-        for (long long j = 0; j < n_intervals && rem_work > 1e-6; ++j) {
-            double capacity = data.capacities_f[i][j];
-            double existing = data.loads_f[i][j];
-            double available = std::max(0.0, capacity - existing);
-            
+        for (auto j = 0LL; j < n_intervals && rem_work > 1e-6; ++j) {
+            const auto capacity = data.capacities_f[i][j];
+            const auto existing = data.loads_f[i][j];
+            const auto available = std::max(0.0, capacity - existing);
+
             if (available > 1e-6) {
                 // Determine if a penalty applies (new continuous run of work)
-                double penalty = (j == 0 || res[i][j-1] < 1e-6) ? data.penalties_f[i] : 0.0;
-                
+                const auto penalty = (j == 0 || res[i][j - 1] < 1e-6)
+                                         ? data.penalties_f[i]
+                                         : 0.0;
+
                 if (available > penalty + 1e-6) {
-                    double ideal_take = (rem_work + penalty) / (n_intervals - j);
-                    double must_take = std::max(0.0, (rem_work + penalty) - suffix_avail[j+1]);
-                    
-                    double to_take = std::max(ideal_take, must_take);
+                    const auto ideal_take =
+                        (rem_work + penalty) / (n_intervals - j);
+                    const auto must_take = std::max(
+                        0.0, (rem_work + penalty) - suffix_avail[j + 1]);
+
+                    auto to_take = std::max(ideal_take, must_take);
                     to_take = std::min(available, to_take);
                     to_take = std::min(to_take, rem_work + penalty);
-                    
+
                     res[i][j] = to_take;
                     rem_work -= (to_take - penalty);
                 }
@@ -71,20 +75,22 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     }
 
     if (rem_work > 1e-6) {
-        LOG_WARN << "Trivial schedule could not place all work. It will be empty.";
+        LOG_WARN
+            << "Trivial schedule could not place all work. It will be empty.";
         /*
-         * Note: Mathematically, if the DP optimizer succeeded, the greedy 
-         * trivial algorithm should also succeed. The greedy algorithm packs 
-         * work sequentially, incurring at most the same number of penalties 
-         * as the DP algorithm. Thus, it consumes the same or less capacity 
+         * Note: Mathematically, if the DP optimizer succeeded, the greedy
+         * trivial algorithm should also succeed. The greedy algorithm packs
+         * work sequentially, incurring at most the same number of penalties
+         * as the DP algorithm. Thus, it consumes the same or less capacity
          * overall.
-         * 
-         * If this branch executes, it usually indicates either a bug in the 
-         * capacity constraint calculations or edge case floating point 
-         * precision issues. The controller will simply not attach a trivial 
+         *
+         * If this branch executes, it usually indicates either a bug in the
+         * capacity constraint calculations or edge case floating point
+         * precision issues. The controller will simply not attach a trivial
          * result.
          */
-        throw SchedulingException("Cannot fit trivial schedule inside the window and existing capacities");
+        throw SchedulingException("Cannot fit trivial schedule inside the "
+                                  "window and existing capacities");
     }
 
     auto total_emissions = 0.0;
@@ -93,8 +99,8 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     auto blocks = vector<InternalBlock>{};
     auto blocks_count = 0;
 
-    const auto index_to_time =
-        [&](const long long i) -> decltype(scheduler::time_gridder)::time_point_t {
+    const auto index_to_time = [&](const long long i)
+        -> decltype(scheduler::time_gridder)::time_point_t {
         return scheduler::time_gridder.toTimePoint(i + data.time_index_offset);
     };
 
@@ -105,8 +111,9 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
 
         for (const auto j : views::iota(0LL, n_intervals)) {
             const auto load = schedule_vec[j];
-            if (load < 1e-6) continue;
-            
+            if (load < 1e-6)
+                continue;
+
             blocks.push_back({
                 .timestamp = index_to_time(j),
                 .location = loc_id,
@@ -118,16 +125,18 @@ auto TrivialScheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
             const auto ci = 1.0 / g;
             total_emissions += load * ci;
             total_carbon_intensity_sum += ci;
-            sci += costs_f[i][j](data.loads_f[i][j] + load) - costs_f[i][j](data.loads_f[i][j]);
+            sci += costs_f[i][j](data.loads_f[i][j] + load) -
+                   costs_f[i][j](data.loads_f[i][j]);
         }
     }
 
     co_return {
         .blocks = std::move(blocks),
         .impact = {
-            .carbon_intensity = blocks_count > 0 ? total_carbon_intensity_sum / blocks_count : 0.0,
+            .carbon_intensity = blocks_count > 0
+                                    ? total_carbon_intensity_sum / blocks_count
+                                    : 0.0,
             .total_emissions = total_emissions,
             .sci = sci,
-        }
-    };
+        }};
 }

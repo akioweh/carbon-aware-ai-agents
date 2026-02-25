@@ -105,10 +105,15 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
 
       const optimizedResult = await response.json()
 
-      // The unoptimized result is now returned within the same object
+      // After optimization succeeds, fetch the trivial schedule for comparison
       let trivialResult = null
-      if (optimizedResult.unoptimizedResult) {
-        trivialResult = optimizedResult.unoptimizedResult
+      try {
+        const trivialRes = await fetch(`/api/schedules/${optimizedResult.schedule_id}/trivial`)
+        if (trivialRes.ok) {
+          trivialResult = await trivialRes.json()
+        }
+      } catch (err) {
+        console.error("Failed to fetch trivial baseline:", err)
       }
 
       if (onScheduleComplete) {

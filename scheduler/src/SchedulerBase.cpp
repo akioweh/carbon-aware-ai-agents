@@ -2,7 +2,6 @@
 #include "Calendar.hpp"
 #include "exceptions/SchedulingException.hpp"
 #include "utils/Coro.hpp"
-#include <chrono>
 
 using namespace std;
 using namespace drogon;
@@ -27,7 +26,7 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
 
     const auto n_intervals =
         time_gridder.toIndexCeil(job.latest_finish) - time_index_offset;
-    
+
     if (n_intervals <= 0) {
         throw SchedulingException("Time window too narrow");
     }
@@ -66,7 +65,7 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
         data.greennesses.push_back(std::move(greenness));
         data.loads_f.push_back(std::move(load));
     }
-    
+
     for (const auto &block : existing_schedule) {
         auto loc_it = ranges::find(data.location_ids, block.location);
         if (loc_it == data.location_ids.end())
@@ -77,8 +76,8 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
             data.loads_f[loc_index][time_index] += block.additionalLoad;
         }
     }
-    
-    data.penalties_f = vector(data.location_ids.size(), 1.); 
+
+    data.penalties_f = vector(data.location_ids.size(), 1.);
 
     if (data.location_ids.empty())
         throw SchedulingException(

@@ -29,7 +29,8 @@ using time_point = std::chrono::system_clock::time_point;
  */
 auto add(const SchedulerOutput &output) -> drogon::Task<std::string>;
 
-auto addTrivial(const SchedulerOutput &output, const std::string &scheduleIdString) -> drogon::Task<void>;
+auto addTrivial(const SchedulerOutput &output,
+                const std::string &scheduleIdString) -> drogon::Task<void>;
 
 auto get(const std::string &scheduleIdString,
          const std::string &datacenter = ANY_DATACENTER)

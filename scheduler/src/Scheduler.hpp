@@ -3,6 +3,7 @@
 #pragma once
 
 #include "SchedulerBase.hpp"
+#include "structs/SchedulerOutput.hpp"
 
 namespace scheduler {
 

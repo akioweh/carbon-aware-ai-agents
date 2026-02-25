@@ -108,9 +108,6 @@ auto scheduleSummaries() -> drogon::Task<std::vector<ScheduleSummary>> {
     ids.reserve(g_storage.size());
     for (const auto &[id, scheduleResult] : g_storage) {
         ScheduleSummary sum{.scheduleId = id, .impact = scheduleResult.impact};
-        if (g_trivial_storage.contains(id)) {
-            sum.trivialImpact = g_trivial_storage[id].impact;
-        }
         ids.push_back(sum);
     }
     co_return ids;

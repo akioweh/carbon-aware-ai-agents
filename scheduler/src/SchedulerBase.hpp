@@ -2,19 +2,19 @@
 #define SCHEDULER_SCHEDULER_BASE_HPP
 #pragma once
 
+#include "SchedulerAlgo.hpp"
 #include "StatsAPIClient.hpp"
 #include "structs/JobRequest.hpp"
-#include "structs/SchedulerOutput.hpp"
 #include "utils/TimeGridder.hpp"
-#include "SchedulerAlgo.hpp"
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace scheduler {
 
 using FiveMinutes = std::chrono::duration<int, std::ratio<300>>;
 
-inline constexpr auto time_gridder = scheduler::utils::TimeGridder<FiveMinutes>{};
+inline constexpr auto time_gridder =
+    scheduler::utils::TimeGridder<FiveMinutes>{};
 
 struct SchedulerData {
     std::vector<std::string> location_ids;
@@ -29,7 +29,9 @@ struct SchedulerData {
         std::vector<LocationCost> costs_f;
         costs_f.reserve(capacities_f.size());
         for (size_t i = 0; i < capacities_f.size(); ++i) {
-            costs_f.emplace_back(LocationCost{capacities_f[i], greennesses[i]});
+            costs_f.emplace_back(
+                LocationCost{.capacities = capacities_f[i],
+                             .greenness_scores = greennesses[i]});
         }
         return costs_f;
     }
@@ -44,7 +46,8 @@ class SchedulerBase {
     virtual ~SchedulerBase() = default;
 
   protected:
-    auto fetchAndPrepareData(const JobRequest& job) -> drogon::Task<SchedulerData>;
+    auto fetchAndPrepareData(const JobRequest &job)
+        -> drogon::Task<SchedulerData>;
 };
 
 } // namespace scheduler

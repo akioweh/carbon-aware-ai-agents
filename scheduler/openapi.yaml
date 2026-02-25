@@ -327,8 +327,6 @@ components:
           $ref: "#/components/schemas/ScheduleDetailResponse/properties/schedule_id"
         impact:
           $ref: "#/components/schemas/ScheduleDetailResponse/properties/impact"
-        trivialImpact:
-          $ref: "#/components/schemas/ScheduleDetailResponse/properties/impact"
 
     ScheduleDetailResponse:
       type: object
@@ -369,21 +367,6 @@ components:
               type: number
               description: Software Carbon Intensity score for the schedule
               example: 20
-        unoptimizedResult:
-          type: object
-          description:
-            The unoptimized (trivial) schedule counterpart for comparison
-          properties:
-            schedule_id:
-              type: string
-              description: The job id that the trivial schedule is attached to
-              example: "sched-456"
-            impact:
-              $ref: "#/components/schemas/ScheduleDetailResponse/properties/impact"
-            scheduled_blocks:
-              type: array
-              items:
-                $ref: "#/components/schemas/ScheduleBlock"
 
     Error:
       type: object

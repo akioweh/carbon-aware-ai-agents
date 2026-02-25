@@ -74,7 +74,7 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
         if (workload_amount < 0.)
             throw scheduler::exceptions::ValidationException(
                 "workload_amount must be non-negative");
-                
+
         std::optional<std::string> pref_dc = std::nullopt;
         if (!json["preferred_datacenter"].isNull()) {
             if (!json["preferred_datacenter"].isString()) {
@@ -83,7 +83,7 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
             }
             pref_dc = json["preferred_datacenter"].asString();
         }
-                
+
         return scheduler::JobRequest{
             .job_type = json["job_type"].asString(),
             .workload_amount = workload_amount,

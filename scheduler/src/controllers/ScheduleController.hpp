@@ -1,8 +1,8 @@
 #ifndef SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #define SCHEDULER_SCHEDULE_CONTROLLER_HPP
-#include "structs/DatacenterIdentifierParam.hpp"
 #pragma once
 
+#include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleIdentifierParam.hpp"
 #include "structs/TimeIntervalParams.hpp"
@@ -45,9 +45,10 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                                            ScheduleIdentifierParam,
                                            DatacenterIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
-    [[nodiscard]] auto getSpecificTrivialSchedule(drogon::HttpRequestPtr,
-                                                  ScheduleIdentifierParam,
-                                                  DatacenterIdentifierParam) const
+    [[nodiscard]] auto
+        getSpecificTrivialSchedule(drogon::HttpRequestPtr,
+                                   ScheduleIdentifierParam,
+                                   DatacenterIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
     [[nodiscard]] auto getScheduleSummaries(drogon::HttpRequestPtr) const
         -> drogon::Task<drogon::HttpResponsePtr>;

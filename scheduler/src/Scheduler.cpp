@@ -1,8 +1,6 @@
 #include "Scheduler.hpp"
 #include "SchedulerAlgo.hpp"
 #include "structs/JobRequest.hpp"
-#include "exceptions/SchedulingException.hpp"
-#include <chrono>
 #include <vector>
 
 using namespace std;
@@ -16,8 +14,9 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     auto costs_f = data.generateCostsF();
 
     // calculate
-    auto [min_cost, optimal_schedule] = calc_multiple(
-        data.loads_f, data.capacities_f, costs_f, data.penalties_f, job.workload_amount);
+    auto [min_cost, optimal_schedule] =
+        calc_multiple(data.loads_f, data.capacities_f, costs_f,
+                      data.penalties_f, job.workload_amount);
 
     // transform optimizer output into InternalBlocks + impact metrics
     auto total_emissions = 0.0;
@@ -25,8 +24,8 @@ auto Scheduler::scheduleJob(JobRequest job) -> Task<SchedulerOutput> {
     auto blocks = vector<InternalBlock>{};
     auto blocks_count = 0;
 
-    const auto index_to_time =
-        [&](const long long i) -> decltype(scheduler::time_gridder)::time_point_t {
+    const auto index_to_time = [&](const long long i)
+        -> decltype(scheduler::time_gridder)::time_point_t {
         return scheduler::time_gridder.toTimePoint(i + data.time_index_offset);
     };
 
