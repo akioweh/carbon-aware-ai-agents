@@ -8,8 +8,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Carbon-Aware Workload Scheduler',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  description: 'AI workload scheduling dashboard for minimizing carbon impact.',
   icons: {
     icon: [
       {
