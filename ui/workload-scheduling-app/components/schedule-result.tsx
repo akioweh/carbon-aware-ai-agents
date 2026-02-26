@@ -66,7 +66,7 @@ function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newSched
       if (!b || !b.timestamp) return false
       const blockTime = new Date(b.timestamp).getTime()
       // Give a little leeway for parsing inconsistencies
-      return Math.abs(blockTime - intervalStart) < 60000 
+      return Math.abs(blockTime - intervalStart) < 60000
     })
 
     const existing = matching
@@ -87,9 +87,9 @@ function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newSched
       }
     }
 
-    intervals.push({ 
-      time: timestamp.toISOString(), 
-      existing, 
+    intervals.push({
+      time: timestamp.toISOString(),
+      existing,
       newJob,
       greenness: currentGreenness
     })
@@ -119,19 +119,19 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
   const [fetchedOptData, setFetchedOptData] = useState<any>(null)
   const [fetchedUnoptData, setFetchedUnoptData] = useState<ScheduleData | null>(null)
-  
+
   // Use fetched data if we have it (since POST might only return an ID now), otherwise fallback to props
   const optData = fetchedOptData || result
-  
+
   // Use unoptimizedResult prop, or fetched data
   let unoptData = fetchedUnoptData || unoptimizedResult || null
-  
+
   // Clean up if it's an error object or if the array of blocks is totally empty
   if (unoptData && (('error' in unoptData) || (unoptData.scheduled_blocks && unoptData.scheduled_blocks.length === 0))) {
     // Only clean up if it's explicitly an error or if we have blocks and they are empty
     // If blocks are undefined (like from summary), keep it!
     if ('error' in unoptData || (unoptData.scheduled_blocks && unoptData.scheduled_blocks.length === 0)) {
-       unoptData = null;
+      unoptData = null;
     }
   }
 
@@ -144,8 +144,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   // Get unoptimized comparison values for savings calculation
   const optEmissions = optData.impact?.total_emissions
   const unoptEmissions = unoptData?.impact?.total_emissions
-  const emissionsSavings = optEmissions && unoptEmissions && unoptEmissions > optEmissions 
-    ? ((unoptEmissions - optEmissions) / unoptEmissions) * 100 
+  const emissionsSavings = optEmissions && unoptEmissions && unoptEmissions > optEmissions
+    ? ((unoptEmissions - optEmissions) / unoptEmissions) * 100
     : 0
 
   // Fallback for unoptimizedComparison that the UI below expects
@@ -174,7 +174,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         end: new Date(Math.max(...timestamps) + 20 * 60 * 1000)
       }
     }
-    
+
     // If the user's explicit requested time window is available, use that as the fallback bounding box!
     if (earliestStart && latestFinish) {
       return {
@@ -199,7 +199,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
       try {
         let newJobBlocks: any[] = [];
         let unoptJobBlocks: any[] = [];
-        
+
         // Fetch specific schedule details and its trivial baseline
         const [scheduleRes, trivialRes, ...greennessRes] = await Promise.all([
           fetch(`/api/schedules/${result.schedule_id}`),
@@ -210,9 +210,9 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         const newGreenness: Record<string, any[]> = {}
         DATA_CENTERS.forEach((dc, i) => {
           if (greennessRes[i] && greennessRes[i].data) {
-             newGreenness[dc.id] = greennessRes[i].data
+            newGreenness[dc.id] = greennessRes[i].data
           } else {
-             newGreenness[dc.id] = []
+            newGreenness[dc.id] = []
           }
         })
         setGreennessCache(newGreenness)
@@ -220,29 +220,29 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         if (!scheduleRes.ok) {
           throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
         }
-        
+
         const scheduleData = await scheduleRes.json()
         setFetchedOptData(scheduleData)
-        newJobBlocks = Array.isArray(scheduleData.scheduled_blocks) 
-          ? scheduleData.scheduled_blocks 
+        newJobBlocks = Array.isArray(scheduleData.scheduled_blocks)
+          ? scheduleData.scheduled_blocks
           : []
 
         if (trivialRes && trivialRes.ok) {
-           const trivialData = await trivialRes.json();
-           if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
-             unoptJobBlocks = trivialData.scheduled_blocks;
-             setFetchedUnoptData(trivialData);
-           }
+          const trivialData = await trivialRes.json();
+          if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
+            unoptJobBlocks = trivialData.scheduled_blocks;
+            setFetchedUnoptData(trivialData);
+          }
         }
 
         // Get the time range to limit the background workload fetch
         const { start, end } = getTimeRange([...newJobBlocks, ...unoptJobBlocks])
-        
+
         // Fetch blocks in the time window to get existing workload
         const startQuery = `start_time=${encodeURIComponent(start.toISOString())}`
         const endQuery = `end_time=${encodeURIComponent(end.toISOString())}`
         const allRes = await fetch(`/api/schedules?${startQuery}&${endQuery}`)
-        
+
         if (!allRes.ok) {
           throw new Error(`Failed to fetch window schedules: ${allRes.status}`)
         }
@@ -257,38 +257,38 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         // Add new job blocks if not already included
         let combinedWithNewJob = [...combined]
         for (const block of newJobBlocks) {
-          if (!combinedWithNewJob.find((b: any) => 
-            b.timestamp === block.timestamp && 
+          if (!combinedWithNewJob.find((b: any) =>
+            b.timestamp === block.timestamp &&
             b.schedule_id === block.schedule_id
           )) {
             combinedWithNewJob.push(block)
           }
         }
-        
+
         if (unoptJobBlocks.length > 0) {
-            for (const block of unoptJobBlocks) {
-                // Attach a suffix to distinguish trivial blocks from actual blocks since they share the same ID
-                const trivialBlock = { ...block, schedule_id: `${block.schedule_id}_trivial` }
-                if (!combinedWithNewJob.find((b: any) => 
-                    b.timestamp === trivialBlock.timestamp && 
-                    b.schedule_id === trivialBlock.schedule_id
-                  )) {
-                    combinedWithNewJob.push(trivialBlock)
-                }
+          for (const block of unoptJobBlocks) {
+            // Attach a suffix to distinguish trivial blocks from actual blocks since they share the same ID
+            const trivialBlock = { ...block, schedule_id: `${block.schedule_id}_trivial` }
+            if (!combinedWithNewJob.find((b: any) =>
+              b.timestamp === trivialBlock.timestamp &&
+              b.schedule_id === trivialBlock.schedule_id
+            )) {
+              combinedWithNewJob.push(trivialBlock)
             }
+          }
         }
 
         setAllBlocks(combinedWithNewJob)
-        
+
         // Auto-select a data center that actually has workload if current selected DC has none
         if (newJobBlocks.length > 0) {
-            const hasLoadOnCurrentDc = newJobBlocks.some((b: any) => locationToDcId(b.location) === selectedDC);
-            if (!hasLoadOnCurrentDc) {
-                const firstActiveDc = locationToDcId(newJobBlocks[0].location);
-                if (firstActiveDc) {
-                    setSelectedDC(firstActiveDc);
-                }
+          const hasLoadOnCurrentDc = newJobBlocks.some((b: any) => locationToDcId(b.location) === selectedDC);
+          if (!hasLoadOnCurrentDc) {
+            const firstActiveDc = locationToDcId(newJobBlocks[0].location);
+            if (firstActiveDc) {
+              setSelectedDC(firstActiveDc);
             }
+          }
         }
       } catch (err) {
         console.error("Failed to load blocks", err)
@@ -313,17 +313,17 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
     // Use schedule_id to identify new job blocks
     const newJobScheduleId = showTrivial && unoptData ? `${unoptData.schedule_id}_trivial` : result.schedule_id
-    
+
     // Filter out blocks that belong to the "other" variant of this job
     const otherVariantScheduleId = showTrivial && unoptData ? result.schedule_id : `${unoptData?.schedule_id}_trivial`
     const realBlocks = dcBlocks.filter((b: any) => b.schedule_id !== otherVariantScheduleId)
 
     // Convert blocks → workload intervals for chart
     const intervals = convertBlocksToWorkload(realBlocks, start, end, newJobScheduleId, greennessCache[selectedDC])
-    
+
     // Fill empty arrays with 0s so Recharts doesn't look completely blank when there's no data
     if (intervals.length > 0 && intervals.every(i => i.existing === 0 && i.newJob === 0)) {
-       // This just makes sure Recharts has something to draw at baseline
+      // This just makes sure Recharts has something to draw at baseline
     }
 
     setWorkloadData(intervals)
@@ -335,7 +335,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
       const response = await fetch(`/api/schedules/${result.schedule_id}`, {
         method: "DELETE",
       })
-      
+
       if (response.ok) {
         onCancel?.()
       } else {
@@ -354,7 +354,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
       minute: "2-digit",
     })
   }
-  
+
   const formatDateTime = (isoString: string) => {
     return new Date(isoString).toLocaleString("en-US", {
       month: "short",
@@ -378,7 +378,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
             Schedule Another Job
           </Button>
         )}
-        
+
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" className="gap-2" disabled={cancelling}>
@@ -394,7 +394,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel Scheduled Job?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will remove the job (ID: {result.schedule_id}) from the schedule. 
+                This will remove the job (ID: {result.schedule_id}) from the schedule.
                 This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -421,31 +421,31 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                 )}
                 <CardTitle>Environmental Impact</CardTitle>
               </div>
-              
+
               {unoptData && (
-                 <div className="flex items-center gap-2 text-sm bg-background p-1 rounded-md border">
-                   <Button
-                     variant={!showTrivial ? "default" : "ghost"}
-                     size="sm"
-                     className="h-8"
-                     onClick={() => setShowTrivial(false)}
-                   >
-                     Optimised
-                   </Button>
-                   <Button
-                     variant={showTrivial ? "default" : "ghost"}
-                     size="sm"
-                     className="h-8"
-                     onClick={() => setShowTrivial(true)}
-                   >
-                     Unoptimised
-                   </Button>
-                 </div>
+                <div className="flex items-center gap-2 text-sm bg-background p-1 rounded-md border">
+                  <Button
+                    variant={!showTrivial ? "default" : "ghost"}
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setShowTrivial(false)}
+                  >
+                    Optimised
+                  </Button>
+                  <Button
+                    variant={showTrivial ? "default" : "ghost"}
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setShowTrivial(true)}
+                  >
+                    Unoptimised
+                  </Button>
+                </div>
               )}
             </div>
             <CardDescription className="mb-2">
-              {showTrivial 
-                ? "Estimated carbon footprint for the unoptimised baseline schedule" 
+              {showTrivial
+                ? "Estimated carbon footprint for the unoptimised baseline schedule"
                 : "Estimated carbon footprint for this scheduled job"}
             </CardDescription>
           </CardHeader>
@@ -519,8 +519,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           <Tabs value={selectedDC} onValueChange={setSelectedDC}>
             <TabsList className="grid w-full grid-cols-5">
               {DATA_CENTERS.map((dc) => (
-                <TabsTrigger 
-                  key={dc.id} 
+                <TabsTrigger
+                  key={dc.id}
                   value={dc.id}
                   className="text-xs sm:text-sm"
                 >
@@ -542,7 +542,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
             </div>
             <div className="flex items-center gap-2">
               <div className="h-0.5 w-4 bg-emerald-500" />
-              <span className="text-muted-foreground">Grid Carbon Intensity</span>
+              <span className="text-muted-foreground">Energy Greenness</span>
             </div>
           </div>
 
@@ -560,39 +560,39 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                 >
                   <defs>
                     <linearGradient id="colorExisting" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#9ca3af" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#9ca3af" stopOpacity={0.1}/>
+                      <stop offset="5%" stopColor="#9ca3af" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#9ca3af" stopOpacity={0.1} />
                     </linearGradient>
                     <linearGradient id="colorNew" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.1}/>
+                      <stop offset="5%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.1} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                  <XAxis 
-                    dataKey="time" 
-                    tickFormatter={(time) => formatTime(time)} 
+                  <XAxis
+                    dataKey="time"
+                    tickFormatter={(time) => formatTime(time)}
                     tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                     minTickGap={30}
                     axisLine={false}
                     tickLine={false}
                   />
-                  <YAxis 
+                  <YAxis
                     yAxisId="left"
-                    domain={[0, maxValue]} 
+                    domain={[0, maxValue]}
                     tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                     axisLine={false}
                     tickLine={false}
                     width={30}
                     tickFormatter={(val) => Math.floor(val).toString()}
                   />
-                  <YAxis 
-                    yAxisId="right" 
-                    orientation="right" 
-                    domain={['auto', 'auto']} 
-                    hide={true} 
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    domain={['auto', 'auto']}
+                    hide={true}
                   />
-                  <Tooltip 
+                  <Tooltip
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length) {
                         return (
@@ -613,8 +613,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                                 return (
                                   <div key={`item-${index}`} className="flex justify-between gap-4">
                                     <span className="flex items-center gap-1.5">
-                                      <div 
-                                        className="w-2 h-2 rounded-full" 
+                                      <div
+                                        className="w-2 h-2 rounded-full"
                                         style={{ backgroundColor: entry.color }}
                                       />
                                       <span className="text-muted-foreground capitalize">
@@ -633,33 +633,33 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                     }}
                   />
                   {workloadData.filter(d => new Date(d.time).getHours() === 0 && new Date(d.time).getMinutes() === 0).map((d, i) => (
-                    <ReferenceLine 
-                      key={`midnight-${i}`} 
+                    <ReferenceLine
+                      key={`midnight-${i}`}
                       yAxisId="left"
-                      x={d.time} 
-                      stroke="#94a3b8" 
-                      strokeDasharray="4 4" 
+                      x={d.time}
+                      stroke="#94a3b8"
+                      strokeDasharray="4 4"
                       strokeWidth={1}
                       label={{ position: "insideTopLeft", value: new Date(d.time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }), fill: "#64748b", fontSize: 11, offset: 10 }}
                     />
                   ))}
-                  <Area 
+                  <Area
                     yAxisId="left"
-                    type="monotone" 
-                    dataKey="existing" 
-                    stackId="1" 
-                    stroke="#9ca3af" 
-                    fill="url(#colorExisting)" 
+                    type="monotone"
+                    dataKey="existing"
+                    stackId="1"
+                    stroke="#9ca3af"
+                    fill="url(#colorExisting)"
                     isAnimationActive={true}
                     animationDuration={300}
                   />
-                  <Area 
+                  <Area
                     yAxisId="left"
-                    type="monotone" 
-                    dataKey="newJob" 
-                    stackId="1" 
-                    stroke={showTrivial ? "#ea580c" : "#059669"} 
-                    fill="url(#colorNew)" 
+                    type="monotone"
+                    dataKey="newJob"
+                    stackId="1"
+                    stroke={showTrivial ? "#ea580c" : "#059669"}
+                    fill="url(#colorNew)"
                     isAnimationActive={true}
                     animationDuration={300}
                   />

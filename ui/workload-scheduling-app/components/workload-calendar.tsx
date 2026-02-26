@@ -35,12 +35,12 @@ function getDisplayParams(spanMs: number) {
   const spanDays = spanMs / (1000 * 60 * 60 * 24)
 
   const tiers = [
-    { maxDays: 1.5,      intervalMin: 5,   barWidth: 4 },
-    { maxDays: 3,        intervalMin: 5,   barWidth: 3 },
-    { maxDays: 7,        intervalMin: 15,  barWidth: 3 },
-    { maxDays: 14,       intervalMin: 30,  barWidth: 3 },
-    { maxDays: 30,       intervalMin: 60,  barWidth: 3 },
-    { maxDays: 60,       intervalMin: 120, barWidth: 2 },
+    { maxDays: 1.5, intervalMin: 5, barWidth: 4 },
+    { maxDays: 3, intervalMin: 5, barWidth: 3 },
+    { maxDays: 7, intervalMin: 15, barWidth: 3 },
+    { maxDays: 14, intervalMin: 30, barWidth: 3 },
+    { maxDays: 30, intervalMin: 60, barWidth: 3 },
+    { maxDays: 60, intervalMin: 120, barWidth: 2 },
     { maxDays: Infinity, intervalMin: 360, barWidth: 2 },
   ]
 
@@ -67,7 +67,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       try {
         const [scheduleRes, ...greennessRes] = await Promise.all([
           fetch(`/api/schedules`),
-          ...DATA_CENTERS.map(dc => 
+          ...DATA_CENTERS.map(dc =>
             fetch(`/api/locations/${dc.backendLocation}/greenness`).then(res => res.ok ? res.json() : null).catch(() => null)
           )
         ])
@@ -75,9 +75,9 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
         const newGreenness: Record<string, any[]> = {}
         DATA_CENTERS.forEach((dc, i) => {
           if (greennessRes[i] && greennessRes[i].data) {
-             newGreenness[dc.id] = greennessRes[i].data
+            newGreenness[dc.id] = greennessRes[i].data
           } else {
-             newGreenness[dc.id] = []
+            newGreenness[dc.id] = []
           }
         })
         setGreenness(newGreenness)
@@ -140,7 +140,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       intervalsPerDC[dc.id] = []
       const dcBlocks = blocks.filter(b => b.location === dc.backendLocation)
       const dcGreenness = greenness[dc.id] || []
-      
+
       for (let t = rangeStart.getTime(); t < rangeEnd.getTime(); t += BLOCK_DURATION_MS) {
         const intervalEnd = t + BLOCK_DURATION_MS
         const activeJobs: { schedule_id: string; load: number }[] = []
@@ -163,14 +163,14 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
         // Assuming greenness data points are timestamps representing instantaneous or interval metrics
         let currentGreenness = undefined;
         if (dcGreenness.length > 0) {
-           // simple approach: find the last data point <= t
-           const pastPoints = dcGreenness.filter(g => new Date(g.timestamp).getTime() <= t);
-           if (pastPoints.length > 0) {
-             currentGreenness = pastPoints[pastPoints.length - 1].value;
-           } else {
-             // fallback to first point
-             currentGreenness = dcGreenness[0].value;
-           }
+          // simple approach: find the last data point <= t
+          const pastPoints = dcGreenness.filter(g => new Date(g.timestamp).getTime() <= t);
+          if (pastPoints.length > 0) {
+            currentGreenness = pastPoints[pastPoints.length - 1].value;
+          } else {
+            // fallback to first point
+            currentGreenness = dcGreenness[0].value;
+          }
         }
 
         intervalsPerDC[dc.id].push({
@@ -231,7 +231,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
             </div>
             <div className="flex items-center gap-2">
               <div className="h-0.5 w-4 bg-emerald-500" />
-              <span className="text-muted-foreground">Grid Carbon Intensity</span>
+              <span className="text-muted-foreground">Energy Greenness</span>
             </div>
           </div>
           {hasData && (
@@ -272,13 +272,13 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                         <span>{maxValue / 2}</span>
                         <span>0</span>
                       </div>
-                      
+
                       {/* Floating Data Center Label */}
                       <div className="absolute top-2 left-2 z-20 bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-semibold border shadow-sm">
                         {dc.name}
                       </div>
 
-                          <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                           data={intervals.map(i => ({
                             time: i.time.toISOString(),
@@ -290,29 +290,29 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                         >
                           <defs>
                             <linearGradient id={`colorScheduled-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                          
+
                           {/* Only show XAxis on the very last chart to save space */}
-                          <XAxis 
-                            dataKey="time" 
+                          <XAxis
+                            dataKey="time"
                             tickFormatter={(time) => {
                               return new Date(time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                            }} 
+                            }}
                             tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                             minTickGap={60}
                             axisLine={false}
                             tickLine={false}
                             hide={i !== DATA_CENTERS.length - 1}
                           />
-                          
+
                           <YAxis yAxisId="left" domain={[0, maxValue]} hide={true} />
                           <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} hide={true} />
-                          
-                          <Tooltip 
+
+                          <Tooltip
                             content={({ active, payload, label }) => {
                               if (active && payload && payload.length) {
                                 const data = payload[0].payload;
@@ -336,7 +336,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                                           <div className="space-y-0.5 mt-1">
                                             {data.rawJobs.map((job: any, j: number) => (
                                               <p key={j} className="text-blue-500">
-                                                <span className="font-medium">{job.schedule_id}</span>: {Number(job.load).toFixed(2)} 
+                                                <span className="font-medium">{job.schedule_id}</span>: {Number(job.load).toFixed(2)}
                                               </p>
                                             ))}
                                           </div>
@@ -353,22 +353,22 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                           />
                           {/* Add day boundary markers via ReferenceLine */}
                           {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
-                            <ReferenceLine 
-                              key={`midnight-${k}`} 
-                              x={d.time.toISOString()} 
+                            <ReferenceLine
+                              key={`midnight-${k}`}
+                              x={d.time.toISOString()}
                               yAxisId="left"
-                              stroke="#94a3b8" 
-                              strokeDasharray="4 4" 
+                              stroke="#94a3b8"
+                              strokeDasharray="4 4"
                               strokeWidth={1}
                               label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fill: "#64748b", fontSize: 11, offset: 10 } : undefined}
                             />
                           ))}
-                          <Area 
+                          <Area
                             yAxisId="left"
-                            type="monotone" 
-                            dataKey="totalLoad" 
-                            stroke="#3b82f6" 
-                            fill={`url(#colorScheduled-${dc.id})`} 
+                            type="monotone"
+                            dataKey="totalLoad"
+                            stroke="#3b82f6"
+                            fill={`url(#colorScheduled-${dc.id})`}
                             isAnimationActive={false}
                           />
                           <Line
