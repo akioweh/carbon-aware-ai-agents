@@ -153,8 +153,7 @@ paths:
       operationId: scheduleJob
       summary: Create a Schedule
       description:
-        Submit a job and get back an optimized schedule placement (only blocks
-        of this new job)
+        Submit a job and get back a schedule ID
       requestBody:
         required: true
         content:
@@ -167,7 +166,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ScheduleDetailResponse"
+                $ref: "#/components/schemas/ScheduleCreatedResponse"
         "400":
           description: Malformed request (e.g. missing or unparseable JSON body)
           content:
@@ -324,7 +323,9 @@ components:
         - impact
       properties:
         schedule_id:
-          $ref: "#/components/schemas/ScheduleDetailResponse/properties/schedule_id"
+          type: string
+          description: assigned id for the job
+          example: "sched-456"
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
         trivialImpact:
@@ -346,9 +347,7 @@ components:
 
     ScheduleDetailResponse:
       type: object
-      description:
-        Response after scheduling a job, indicating success and server-assigned
-        schedule ID
+      description: Response when fetching a scheduled job
       required:
         - schedule_id
         - scheduled_blocks
@@ -370,6 +369,22 @@ components:
           $ref: "#/components/schemas/ScheduleImpact"
         unoptimizedResult:
           $ref: "#/components/schemas/ScheduleData"
+
+    ScheduleCreatedResponse:
+      type: object
+      description: Response after successfully submitting a job request
+      required:
+        - schedule_id
+        - message
+      properties:
+        schedule_id:
+          type: string
+          description: assigned id for the newly created job
+          example: "sched-456"
+        message:
+          type: string
+          description: status message
+          example: "Success"
 
     ScheduleData:
       type: object

@@ -94,22 +94,13 @@ auto ScheduleController::
         auto tOutput = co_await tSched.scheduleJob(job_request);
         co_await calendar::addTrivial(tOutput, schedule_id);
 
-        trivialResult = ScheduleResult{
-            .scheduleId = schedule_id,
-            .schedule = vector<ScheduleBlock>{}, // Do not send blocks to save bandwidth, UI will fetch if needed
-            .impact = tOutput.impact
-        };
     } catch (const exception &e) {
         LOG_WARN << "Failed to generate trivial schedule for " << schedule_id
                  << ": " << e.what();
     }
 
     // construct the API DTO with the real job ID
-    auto result =
-        JobScheduleResponse{.scheduleId = schedule_id,
-                            .schedule = vector<ScheduleBlock>{}, // Do not send blocks to save bandwidth, UI will fetch if needed
-                            .impact = output.impact,
-                            .unoptimizedResult = std::move(trivialResult)};
+    auto result = scheduler::ScheduleCreatedResponse{.scheduleId = schedule_id};
 
     co_return HttpResponse::newHttpJsonResponse(toJson(result));
 }

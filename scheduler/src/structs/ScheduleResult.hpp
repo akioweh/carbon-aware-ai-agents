@@ -84,6 +84,23 @@ inline auto f_toJson(const JobScheduleResponse &obj) -> Json::Value {
 static_assert(Serializable<JobScheduleResponse>);
 
 /**
+ * @class ScheduleCreatedResponse
+ * @brief API DTO for the response of a successful job placement.
+ */
+struct ScheduleCreatedResponse {
+    std::string scheduleId;
+};
+
+inline auto f_toJson(const ScheduleCreatedResponse &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["schedule_id"] = obj.scheduleId;
+    res["message"] = "Success";
+    return res;
+}
+
+static_assert(Serializable<ScheduleCreatedResponse>);
+
+/**
  * @class ScheduleSummary
  * @brief API DTO for the summary of a scheduling operation.
  */
