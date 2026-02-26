@@ -12,6 +12,8 @@ using namespace drogon;
 using namespace scheduler::exceptions;
 
 constexpr double EPSILON = 1e-6;
+constexpr double MIN_CAPACITY_THRESHOLD = 0.1;
+constexpr double TARGET_UTILIZATION = 0.5;
 
 auto TrivialScheduler::scheduleJob(
     JobRequest job) // NOLINT(readability-function-cognitive-complexity)
@@ -37,18 +39,28 @@ auto TrivialScheduler::scheduleJob(
     auto res = vector(n_locations, vector(n_intervals, 0.0));
     auto rem_work = job.workload_amount;
 
-    // Spread evenly across the available intervals
+    // Greedily allocate, starting from the earliest allowed start, using 50%
+    // of the available capacity, avoiding <10% total capacity blocks
     for (auto iter_idx = 0UZ; iter_idx < n_locations && rem_work > EPSILON;
          ++iter_idx) {
         const auto i = location_indices[iter_idx];
 
         // Precompute suffix available capacity to guarantee we never fail if
-        // it's possible to fit
+        // it's possible to fit. Also precompute 50% rule capacity.
         auto suffix_avail = vector(n_intervals + 1, 0.0);
+        auto suffix_50_avail = vector(n_intervals + 1, 0.0);
         for (auto j = n_intervals; j--;) {
-            const auto avail =
-                max(0.0, data.capacities_f[i][j] - data.loads_f[i][j]);
+            const auto capacity = data.capacities_f[i][j];
+            const auto existing = data.loads_f[i][j];
+            const auto avail = max(0.0, capacity - existing);
+
             suffix_avail[j] = suffix_avail[j + 1] + avail;
+
+            double rule_avail = 0.0;
+            if (avail >= MIN_CAPACITY_THRESHOLD * capacity) {
+                rule_avail = TARGET_UTILIZATION * avail;
+            }
+            suffix_50_avail[j] = suffix_50_avail[j + 1] + rule_avail;
         }
 
         for (auto j = 0LL; j < n_intervals && rem_work > EPSILON; ++j) {
@@ -63,9 +75,16 @@ auto TrivialScheduler::scheduleJob(
                                          : 0.0;
 
                 if (available > penalty + EPSILON) {
-                    const auto ideal_take =
-                        (rem_work / static_cast<double>(n_intervals - j)) +
-                        penalty;
+                    double ideal_take = 0.0;
+
+                    if (rem_work + penalty > suffix_50_avail[j]) {
+                        // Greedily fill all capacity if the 50% rule is
+                        // insufficient
+                        ideal_take = available;
+                    } else if (available >= MIN_CAPACITY_THRESHOLD * capacity) {
+                        ideal_take = TARGET_UTILIZATION * available;
+                    }
+
                     const auto must_take =
                         max(0.0, (rem_work + penalty) - suffix_avail[j + 1]);
 
@@ -73,16 +92,17 @@ auto TrivialScheduler::scheduleJob(
                     to_take = min(available, to_take);
                     to_take = min(to_take, rem_work + penalty);
 
-                    res[i][j] = to_take;
-                    rem_work -= (to_take - penalty);
+                    if (to_take > penalty + EPSILON) {
+                        res[i][j] = to_take;
+                        rem_work -= (to_take - penalty);
+                    }
                 }
             }
         }
     }
 
     if (rem_work > EPSILON) {
-        LOG_WARN
-            << "Trivial schedule could not place all work. It will be empty.";
+        LOG_WARN << "Trivial schedule could not place all work. It will be empty. rem_work: " << rem_work;
         /*
          * Note: Mathematically, if the DP optimizer succeeded, the greedy
          * trivial algorithm should also succeed. The greedy algorithm packs
