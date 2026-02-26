@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarIcon, X, Loader2 } from "lucide-react"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
+import { Area, Line, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 import { ScheduleBlock } from "../types/schedule"
 
 interface AggregatedInterval {
   time: Date
   endTime: Date
   jobs: { schedule_id: string; load: number }[]
+  greenness?: number
 }
 
 interface WorkloadCalendarProps {
@@ -55,6 +56,7 @@ function getDisplayParams(spanMs: number) {
 export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps) {
   const [selectedDC, setSelectedDC] = useState(DATA_CENTERS[0].id)
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([])
+  const [greenness, setGreenness] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -63,14 +65,29 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     const fetchData = async () => {
       setLoading(true)
       try {
-        // Fetch all schedules across all datacenters (no schedule_id or datacenter filter)
-        const response = await fetch(`/api/schedules`)
-        if (!response.ok) {
-          console.error(`Failed to fetch schedules: ${response.status}`)
+        const [scheduleRes, ...greennessRes] = await Promise.all([
+          fetch(`/api/schedules`),
+          ...DATA_CENTERS.map(dc => 
+            fetch(`/api/locations/${dc.backendLocation}/greenness`).then(res => res.ok ? res.json() : null).catch(() => null)
+          )
+        ])
+
+        const newGreenness: Record<string, any[]> = {}
+        DATA_CENTERS.forEach((dc, i) => {
+          if (greennessRes[i] && greennessRes[i].data) {
+             newGreenness[dc.id] = greennessRes[i].data
+          } else {
+             newGreenness[dc.id] = []
+          }
+        })
+        setGreenness(newGreenness)
+
+        if (!scheduleRes.ok) {
+          console.error(`Failed to fetch schedules: ${scheduleRes.status}`)
           setBlocks([])
           return
         }
-        const data = await response.json()
+        const data = await scheduleRes.json()
         // Response should be an array of ScheduleBlock objects
         if (Array.isArray(data)) {
           setBlocks(data)
@@ -79,7 +96,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           setBlocks([])
         }
       } catch (err) {
-        console.error("Error fetching schedules:", err)
+        console.error("Error fetching data:", err)
         setBlocks([])
       } finally {
         setLoading(false)
@@ -122,6 +139,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     for (const dc of DATA_CENTERS) {
       intervalsPerDC[dc.id] = []
       const dcBlocks = blocks.filter(b => b.location === dc.backendLocation)
+      const dcGreenness = greenness[dc.id] || []
       
       for (let t = rangeStart.getTime(); t < rangeEnd.getTime(); t += BLOCK_DURATION_MS) {
         const intervalEnd = t + BLOCK_DURATION_MS
@@ -141,16 +159,31 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           }
         }
 
+        // Find the closest greenness data point that applies to this interval
+        // Assuming greenness data points are timestamps representing instantaneous or interval metrics
+        let currentGreenness = undefined;
+        if (dcGreenness.length > 0) {
+           // simple approach: find the last data point <= t
+           const pastPoints = dcGreenness.filter(g => new Date(g.timestamp).getTime() <= t);
+           if (pastPoints.length > 0) {
+             currentGreenness = pastPoints[pastPoints.length - 1].value;
+           } else {
+             // fallback to first point
+             currentGreenness = dcGreenness[0].value;
+           }
+        }
+
         intervalsPerDC[dc.id].push({
           time: new Date(t),
           endTime: new Date(intervalEnd),
           jobs: activeJobs,
+          greenness: currentGreenness,
         })
       }
     }
 
     return { intervalsPerDC, rangeStart, rangeEnd }
-  }, [blocks])
+  }, [blocks, greenness])
 
   const maxValue = 50
   const chartHeight = 120 // compact height since we are stacking 5 of them
@@ -191,9 +224,15 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       <CardContent className="space-y-4 pt-4">
         {/* Legend */}
         <div className="flex items-center justify-between gap-6 text-sm pb-2 border-b">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded bg-blue-500" />
-            <span className="text-muted-foreground">Scheduled Jobs</span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded bg-blue-500" />
+              <span className="text-muted-foreground">Scheduled Jobs</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-0.5 w-4 bg-emerald-500" />
+              <span className="text-muted-foreground">Grid Carbon Intensity</span>
+            </div>
           </div>
           {hasData && (
             <p className="text-xs text-muted-foreground">
@@ -239,12 +278,13 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                         {dc.name}
                       </div>
 
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
+                          <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart
                           data={intervals.map(i => ({
                             time: i.time.toISOString(),
                             totalLoad: i.jobs.reduce((sum, j) => sum + j.load, 0),
-                            rawJobs: i.jobs
+                            rawJobs: i.jobs,
+                            greenness: i.greenness
                           }))}
                           margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
                         >
@@ -269,7 +309,8 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             hide={i !== DATA_CENTERS.length - 1}
                           />
                           
-                          <YAxis domain={[0, maxValue]} hide={true} />
+                          <YAxis yAxisId="left" domain={[0, maxValue]} hide={true} />
+                          <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} hide={true} />
                           
                           <Tooltip 
                             content={({ active, payload, label }) => {
@@ -281,22 +322,29 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                                       {new Date(label).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
                                       {new Date(label).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                                     </p>
-                                    {data.rawJobs && data.rawJobs.length > 0 ? (
-                                      <div className="space-y-1">
-                                        <p className="text-muted-foreground font-semibold">
-                                          Total Load: {Number(payload[0].value).toFixed(2)} kWh
+                                    <div className="space-y-1">
+                                      {data.greenness !== undefined && (
+                                        <p className="text-emerald-600 font-medium">
+                                          Carbon Intensity: {Number(data.greenness).toFixed(3)}
                                         </p>
-                                        <div className="border-t mt-1 pt-1 space-y-0.5">
-                                          {data.rawJobs.map((job: any, j: number) => (
-                                            <p key={j} className="text-blue-500">
-                                              <span className="font-medium">{job.schedule_id}</span>: {Number(job.load).toFixed(2)} 
-                                            </p>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <p className="text-muted-foreground">No scheduled load</p>
-                                    )}
+                                      )}
+                                      {data.rawJobs && data.rawJobs.length > 0 ? (
+                                        <>
+                                          <p className="text-muted-foreground font-semibold mt-1 pt-1 border-t">
+                                            Total Load: {Number(data.totalLoad).toFixed(2)} kWh
+                                          </p>
+                                          <div className="space-y-0.5 mt-1">
+                                            {data.rawJobs.map((job: any, j: number) => (
+                                              <p key={j} className="text-blue-500">
+                                                <span className="font-medium">{job.schedule_id}</span>: {Number(job.load).toFixed(2)} 
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <p className="text-muted-foreground mt-1 pt-1 border-t">No scheduled load</p>
+                                      )}
+                                    </div>
                                   </div>
                                 );
                               }
@@ -308,6 +356,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             <ReferenceLine 
                               key={`midnight-${k}`} 
                               x={d.time.toISOString()} 
+                              yAxisId="left"
                               stroke="#94a3b8" 
                               strokeDasharray="4 4" 
                               strokeWidth={1}
@@ -315,13 +364,23 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             />
                           ))}
                           <Area 
+                            yAxisId="left"
                             type="monotone" 
                             dataKey="totalLoad" 
                             stroke="#3b82f6" 
                             fill={`url(#colorScheduled-${dc.id})`} 
                             isAnimationActive={false}
                           />
-                        </AreaChart>
+                          <Line
+                            yAxisId="right"
+                            type="stepAfter"
+                            dataKey="greenness"
+                            stroke="#10b981"
+                            strokeWidth={1.5}
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                        </ComposedChart>
                       </ResponsiveContainer>
                     </div>
                   )

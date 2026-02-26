@@ -16,13 +16,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
+import { Area, Line, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 import { JobScheduleResponse, ScheduleData, ScheduleBlock } from "../types/schedule"
 
 interface WorkloadInterval {
   time: string
   existing: number
   newJob: number
+  greenness?: number
 }
 
 interface ScheduleResultProps {
@@ -50,7 +51,7 @@ function locationToDcId(location: string): string | undefined {
 }
 
 // At the top of ScheduleResult.tsx, outside the component
-function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newScheduleId?: string) {
+function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newScheduleId?: string, greennessData?: any[]) {
   const intervalMs = 5 * 60 * 1000
   const intervals: WorkloadInterval[] = []
 
@@ -76,10 +77,21 @@ function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newSched
       .filter(b => b.schedule_id === newScheduleId)
       .reduce((sum, b) => sum + (typeof b.additional_load === 'number' ? b.additional_load : 0), 0)
 
+    let currentGreenness = undefined;
+    if (greennessData && greennessData.length > 0) {
+      const pastPoints = greennessData.filter(g => new Date(g.timestamp).getTime() <= t);
+      if (pastPoints.length > 0) {
+        currentGreenness = pastPoints[pastPoints.length - 1].value;
+      } else {
+        currentGreenness = greennessData[0].value;
+      }
+    }
+
     intervals.push({ 
       time: timestamp.toISOString(), 
       existing, 
-      newJob 
+      newJob,
+      greenness: currentGreenness
     })
   }
 
@@ -101,6 +113,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const [loading, setLoading] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [allBlocks, setAllBlocks] = useState<any[]>([])
+  const [greennessCache, setGreennessCache] = useState<Record<string, any[]>>({})
   const [showTrivial, setShowTrivial] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -188,10 +201,21 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         let unoptJobBlocks: any[] = [];
         
         // Fetch specific schedule details and its trivial baseline
-        const [scheduleRes, trivialRes] = await Promise.all([
+        const [scheduleRes, trivialRes, ...greennessRes] = await Promise.all([
           fetch(`/api/schedules/${result.schedule_id}`),
-          fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null)
+          fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null),
+          ...DATA_CENTERS.map(dc => fetch(`/api/locations/${dc.backendLocation}/greenness`).then(res => res.ok ? res.json() : null).catch(() => null))
         ])
+
+        const newGreenness: Record<string, any[]> = {}
+        DATA_CENTERS.forEach((dc, i) => {
+          if (greennessRes[i] && greennessRes[i].data) {
+             newGreenness[dc.id] = greennessRes[i].data
+          } else {
+             newGreenness[dc.id] = []
+          }
+        })
+        setGreennessCache(newGreenness)
 
         if (!scheduleRes.ok) {
           throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
@@ -295,7 +319,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     const realBlocks = dcBlocks.filter((b: any) => b.schedule_id !== otherVariantScheduleId)
 
     // Convert blocks → workload intervals for chart
-    const intervals = convertBlocksToWorkload(realBlocks, start, end, newJobScheduleId)
+    const intervals = convertBlocksToWorkload(realBlocks, start, end, newJobScheduleId, greennessCache[selectedDC])
     
     // Fill empty arrays with 0s so Recharts doesn't look completely blank when there's no data
     if (intervals.length > 0 && intervals.every(i => i.existing === 0 && i.newJob === 0)) {
@@ -303,7 +327,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     }
 
     setWorkloadData(intervals)
-  }, [selectedDC, allBlocks, result.schedule_id, showTrivial, unoptData])
+  }, [selectedDC, allBlocks, result.schedule_id, showTrivial, unoptData, greennessCache])
 
   const handleCancel = async () => {
     setCancelling(true)
@@ -516,6 +540,10 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               <div className={`h-3 w-3 rounded ${showTrivial ? "bg-orange-500" : "bg-emerald-500"}`} />
               <span className="text-muted-foreground">{showTrivial ? "Unoptimised Job" : "Optimised Job"}</span>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="h-0.5 w-4 bg-emerald-500" />
+              <span className="text-muted-foreground">Grid Carbon Intensity</span>
+            </div>
           </div>
 
           {/* Area Chart using Recharts */}
@@ -526,7 +554,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           ) : (
             <div className="h-[250px] w-full mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
+                <ComposedChart
                   data={workloadData}
                   margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                 >
@@ -550,12 +578,19 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                     tickLine={false}
                   />
                   <YAxis 
+                    yAxisId="left"
                     domain={[0, maxValue]} 
                     tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                     axisLine={false}
                     tickLine={false}
                     width={30}
                     tickFormatter={(val) => Math.floor(val).toString()}
+                  />
+                  <YAxis 
+                    yAxisId="right" 
+                    orientation="right" 
+                    domain={['auto', 'auto']} 
+                    hide={true} 
                   />
                   <Tooltip 
                     content={({ active, payload, label }) => {
@@ -565,6 +600,14 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                             <p className="font-medium mb-1 border-b pb-1">{formatTime(label)}</p>
                             <div className="space-y-1">
                               {payload.map((entry, index) => {
+                                if (entry.dataKey === "greenness") {
+                                  return (
+                                    <div key={`item-${index}`} className="flex justify-between gap-4 mt-1 pt-1 border-t">
+                                      <span className="text-emerald-600 font-medium">Carbon Intensity</span>
+                                      <span className="font-medium text-emerald-600">{Number(entry.value).toFixed(3)}</span>
+                                    </div>
+                                  )
+                                }
                                 const isNew = entry.dataKey === "newJob";
                                 if (entry.value === 0) return null;
                                 return (
@@ -592,6 +635,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                   {workloadData.filter(d => new Date(d.time).getHours() === 0 && new Date(d.time).getMinutes() === 0).map((d, i) => (
                     <ReferenceLine 
                       key={`midnight-${i}`} 
+                      yAxisId="left"
                       x={d.time} 
                       stroke="#94a3b8" 
                       strokeDasharray="4 4" 
@@ -600,6 +644,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                     />
                   ))}
                   <Area 
+                    yAxisId="left"
                     type="monotone" 
                     dataKey="existing" 
                     stackId="1" 
@@ -609,6 +654,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                     animationDuration={300}
                   />
                   <Area 
+                    yAxisId="left"
                     type="monotone" 
                     dataKey="newJob" 
                     stackId="1" 
@@ -617,7 +663,17 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                     isAnimationActive={true}
                     animationDuration={300}
                   />
-                </AreaChart>
+                  <Line
+                    yAxisId="right"
+                    type="stepAfter"
+                    dataKey="greenness"
+                    stroke="#10b981"
+                    strokeWidth={1.5}
+                    dot={false}
+                    isAnimationActive={true}
+                    animationDuration={300}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           )}
