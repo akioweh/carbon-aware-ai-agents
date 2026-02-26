@@ -179,68 +179,40 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     }
   }
 
-  // Fetch: (1) the new job's blocks and trivial blocks, (2) windowed existing blocks, then combine
+  // Fetch: (1) the specific job's blocks and trivial blocks, (2) windowed existing blocks, then combine
   useEffect(() => {
     const loadBlocks = async () => {
       setLoading(true)
       try {
         let newJobBlocks: any[] = [];
         let unoptJobBlocks: any[] = [];
-        let trivialData = null;
         
-        // If we already have the blocks passed in from props (and they're not empty arrays designed to save bandwidth)
-        // Then we can skip fetching them!
-        // But wait, the backend now returns empty arrays [] on POST to save bandwidth.
-        // So we ALWAYS need to fetch if the arrays are empty.
-        // Let's check if result.scheduled_blocks exists and is NOT empty.
-        if (result.scheduled_blocks && result.scheduled_blocks.length > 0) {
-            newJobBlocks = result.scheduled_blocks;
-            
-            // Check trivial blocks
-            if (unoptData?.scheduled_blocks && unoptData.scheduled_blocks.length > 0) {
-               unoptJobBlocks = unoptData.scheduled_blocks;
-            } else {
-               // We have main blocks but no trivial blocks, fetch only trivial
-               const trivialRes = await fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null);
-               if (trivialRes && trivialRes.ok) {
-                 trivialData = await trivialRes.json();
-                 if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
-                   unoptJobBlocks = trivialData.scheduled_blocks;
-                 }
-               }
-            }
-        } else {
-            // Fetch both!
-            const [scheduleRes, trivialRes] = await Promise.all([
-              fetch(`/api/schedules/${result.schedule_id}`),
-              fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null)
-            ])
+        // Fetch specific schedule details and its trivial baseline
+        const [scheduleRes, trivialRes] = await Promise.all([
+          fetch(`/api/schedules/${result.schedule_id}`),
+          fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null)
+        ])
 
-            if (!scheduleRes.ok) {
-              throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
-            }
-            const scheduleData = await scheduleRes.json()
-            setFetchedOptData(scheduleData)
-            newJobBlocks = Array.isArray(scheduleData.scheduled_blocks) 
-              ? scheduleData.scheduled_blocks 
-              : []
-
-            if (trivialRes && trivialRes.ok) {
-               trivialData = await trivialRes.json();
-               if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
-                 unoptJobBlocks = trivialData.scheduled_blocks;
-               }
-            }
-            
-            const unoptDataFromApi = scheduleData.unoptimizedResult;
-            if (unoptJobBlocks.length === 0 && unoptDataFromApi && Array.isArray(unoptDataFromApi.scheduled_blocks)) {
-               unoptJobBlocks = unoptDataFromApi.scheduled_blocks;
-               setFetchedUnoptData(unoptDataFromApi);
-            }
+        if (!scheduleRes.ok) {
+          throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
         }
+        
+        const scheduleData = await scheduleRes.json()
+        setFetchedOptData(scheduleData)
+        newJobBlocks = Array.isArray(scheduleData.scheduled_blocks) 
+          ? scheduleData.scheduled_blocks 
+          : []
 
-        if (trivialData && unoptJobBlocks.length > 0) {
-           setFetchedUnoptData(trivialData);
+        if (trivialRes && trivialRes.ok) {
+           const trivialData = await trivialRes.json();
+           if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
+             unoptJobBlocks = trivialData.scheduled_blocks;
+             setFetchedUnoptData(trivialData);
+           }
+        } else if (scheduleData.unoptimizedResult && Array.isArray(scheduleData.unoptimizedResult.scheduled_blocks)) {
+           // Fallback to embedded unoptimizedResult if the API happens to return it
+           unoptJobBlocks = scheduleData.unoptimizedResult.scheduled_blocks;
+           setFetchedUnoptData(scheduleData.unoptimizedResult);
         }
 
         // Get the time range to limit the background workload fetch
