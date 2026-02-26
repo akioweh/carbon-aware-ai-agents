@@ -8,6 +8,7 @@
 #include <drogon/orm/Criteria.h>
 #include <drogon/orm/Exception.h>
 #include <ranges>
+#include <string>
 #include <unordered_map>
 
 namespace scheduler::calendar {
@@ -68,7 +69,7 @@ auto specificTrivialDatacenterCriteria(const string &datacenter) {
                                  drogon::orm::CompareOperator::EQ, datacenter);
 }
 
-const std::string GET_SUMMARIES_SQL = R"(
+const auto GET_SUMMARIES_SQL = R"(
     SELECT
         i.id AS impact_id,
         i.carbon_intensity,
@@ -82,16 +83,16 @@ const std::string GET_SUMMARIES_SQL = R"(
     FROM impacts i
     LEFT JOIN jobs j ON i.id = j.impact_id
     GROUP BY i.id
-)";
+)"s;
 
-const std::string GET_TRIVIAL_IMPACTS_SQL = R"(
+const auto GET_TRIVIAL_IMPACTS_SQL = R"(
     SELECT
         impact_id,
         carbon_intensity,
         total_emissions,
         sci
     FROM trivial_impacts
-)";
+)"s;
 
 } // namespace
 
@@ -220,12 +221,14 @@ auto get(time_point start, time_point end, const string &datacenter)
 
 auto scheduleSummaries() -> drogon::Task<vector<ScheduleSummary>> {
     auto db = drogon::app().getDbClient();
+    // TODO: fix when_all and use when_all here
+    // right now we can't due to when_all structured binding bug and
+    // the fact that it only takes drogon::Task (these are SqlAwaiters)
     auto res = co_await db->execSqlCoro(GET_SUMMARIES_SQL);
-
     auto trivialRes = co_await db->execSqlCoro(GET_TRIVIAL_IMPACTS_SQL);
 
     auto trivialMap = unordered_map<int, ScheduleImpact>{};
-    for (auto row : trivialRes) {
+    for (const auto &row : trivialRes) {
         trivialMap[row["impact_id"].as<int>()] = {
             .carbon_intensity = row["carbon_intensity"].as<double>(),
             .total_emissions = row["total_emissions"].as<double>(),
@@ -234,53 +237,50 @@ auto scheduleSummaries() -> drogon::Task<vector<ScheduleSummary>> {
 
     auto scheduleSummaries = vector<ScheduleSummary>{};
     scheduleSummaries.reserve(res.size());
-    for (auto row : res) {
+    for (const auto &row : res) {
         const auto impactId = row["impact_id"].as<int>();
 
-        auto locStr = row["locations"].as<std::string>();
+        // TODO: there are some fishy string manipulations here (needs clean)
+        auto locStr = row["locations"].as<string>();
         // strip '{' and '}'
-        if (locStr.length() >= 2) {
+        if (locStr.length() >= 2)
             locStr = locStr.substr(1, locStr.length() - 2);
-        }
-        auto locations = std::vector<std::string>{};
+        auto locations = vector<string>{};
         if (!locStr.empty()) {
-            std::stringstream ss(locStr);
-            std::string item;
-            while (std::getline(ss, item, ',')) {
+            stringstream ss(locStr);
+            string item;
+            while (getline(ss, item, ',')) {
                 // If the strings are quoted, we might need to unquote them
-                if (item.front() == '"' && item.back() == '"') {
+                if (item.front() == '"' && item.back() == '"')
                     item = item.substr(1, item.length() - 2);
-                }
                 locations.push_back(item);
             }
         }
 
-        std::string startTime = "";
-        std::string endTime = "";
-        double totalLoad = 0;
-        int blockCount = 0;
+        auto startTime = string{};
+        auto endTime = string{};
+        auto totalLoad = 0.;
+        auto blockCount = 0;
 
         if (!row["start_time"].isNull()) {
             auto sd = trantor::Date::fromDbStringLocal(
-                row["start_time"].as<std::string>());
+                row["start_time"].as<string>());
             startTime = scheduler::utils::toIso8601(
                 scheduler::utils::trantorToChrono(sd));
         }
         if (!row["end_time"].isNull()) {
-            auto ed = trantor::Date::fromDbStringLocal(
-                row["end_time"].as<std::string>());
+            auto ed =
+                trantor::Date::fromDbStringLocal(row["end_time"].as<string>());
             // add 5 minutes to end time since it represents the start of the
             // last block
             ed = ed.after(5 * 60);
             endTime = scheduler::utils::toIso8601(
                 scheduler::utils::trantorToChrono(ed));
         }
-        if (!row["total_load"].isNull()) {
+        if (!row["total_load"].isNull())
             totalLoad = row["total_load"].as<double>();
-        }
-        if (!row["block_count"].isNull()) {
+        if (!row["block_count"].isNull())
             blockCount = row["block_count"].as<int>();
-        }
 
         auto summary = ScheduleSummary{
             .scheduleId = scheduler::utils::parseIntToStringID(impactId),
@@ -294,9 +294,8 @@ auto scheduleSummaries() -> drogon::Task<vector<ScheduleSummary>> {
             .totalLoad = totalLoad,
             .blockCount = blockCount};
 
-        if (trivialMap.contains(impactId)) {
+        if (trivialMap.contains(impactId))
             summary.trivialImpact = trivialMap[impactId];
-        }
 
         scheduleSummaries.push_back(std::move(summary));
     }

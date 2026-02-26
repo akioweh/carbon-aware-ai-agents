@@ -53,37 +53,6 @@ inline auto f_toJson(const ScheduleResult &obj) -> Json::Value {
 static_assert(Serializable<ScheduleResult>);
 
 /**
- * @class JobScheduleResponse
- * @brief API DTO for the complete result of a job placement.
- *        Includes the optimized schedule and optionally the unoptimized
- * baseline.
- */
-struct JobScheduleResponse {
-    std::string scheduleId;
-    std::vector<ScheduleBlock> schedule;
-    ScheduleImpact impact{};
-    std::optional<ScheduleResult> unoptimizedResult;
-};
-
-inline auto f_toJson(const JobScheduleResponse &obj) -> Json::Value {
-    auto res = Json::Value{};
-    res["schedule_id"] = obj.scheduleId;
-    res["message"] = "Success";
-    res["scheduled_blocks"] = Json::Value(Json::arrayValue);
-    res["impact"] = toJson(obj.impact);
-    for (const auto &block : obj.schedule)
-        res["scheduled_blocks"].append(toJson(block));
-
-    if (obj.unoptimizedResult.has_value()) {
-        res["unoptimizedResult"] = toJson(obj.unoptimizedResult.value());
-    }
-
-    return res;
-}
-
-static_assert(Serializable<JobScheduleResponse>);
-
-/**
  * @class ScheduleCreatedResponse
  * @brief API DTO for the response of a successful job placement.
  */

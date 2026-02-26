@@ -40,22 +40,7 @@ auto ScheduleController::
     auto res =
         co_await calendar::get(schedule_id.getScheduleId(), datacenter.name);
 
-    auto trivialRes = optional<ScheduleResult>{};
-    try {
-        trivialRes = co_await calendar::getTrivial(schedule_id.getScheduleId(),
-                                                   datacenter.name);
-    } catch (const exceptions::SchedulingException
-                 &) { // NOLINT(bugprone-empty-catch)
-        // No unoptimized baseline found
-    }
-
-    auto response =
-        JobScheduleResponse{.scheduleId = res.scheduleId,
-                            .schedule = std::move(res.schedule),
-                            .impact = res.impact,
-                            .unoptimizedResult = std::move(trivialRes)};
-
-    co_return HttpResponse::newHttpJsonResponse(toJson(response));
+    co_return HttpResponse::newHttpJsonResponse(toJson(res));
 }
 
 auto ScheduleController::

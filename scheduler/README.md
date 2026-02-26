@@ -342,7 +342,7 @@ ScheduleController (resumed)
   │     └── SchedulerOutput + job ID → ScheduleResult (now including trivial comparison data)
   │
   ▼
-Client receives ScheduleResult { schedule_id, schedule[], impact, unoptimizedResult }
+Client receives ScheduleResult { schedule_id, message } (for POST) or ScheduleData { schedule_id, scheduled_blocks[], impact } (for GET)
 ```
 
 #### 2. Schedule Query (`GET /api/schedule`)

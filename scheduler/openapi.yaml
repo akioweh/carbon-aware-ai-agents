@@ -367,8 +367,6 @@ components:
             $ref: "#/components/schemas/ScheduleBlock"
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
-        unoptimizedResult:
-          $ref: "#/components/schemas/ScheduleData"
 
     ScheduleCreatedResponse:
       type: object
