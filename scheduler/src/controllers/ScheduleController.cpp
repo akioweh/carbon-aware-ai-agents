@@ -4,7 +4,6 @@
 #include "TrivialScheduler.hpp"
 #include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
-#include "structs/ScheduleBlock.hpp"
 #include "structs/ScheduleIdentifierParam.hpp"
 #include "structs/TimeIntervalParams.hpp"
 #include "utils/TimeGridder.hpp"
