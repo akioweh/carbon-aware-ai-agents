@@ -94,22 +94,10 @@ auto ScheduleController::
         auto tOutput = co_await tSched.scheduleJob(job_request);
         co_await calendar::addTrivial(tOutput, schedule_id);
 
-        auto tBlocks = vector<ScheduleBlock>{};
-        tBlocks.reserve(tOutput.blocks.size());
-        for (auto &block : tOutput.blocks) {
-            tBlocks.push_back({
-                .timestamp = block.timestamp,
-                .scheduleId = schedule_id,
-                .location = std::move(block.location),
-                .additionalLoad = block.additionalLoad,
-            });
-        }
-
         trivialResult = ScheduleResult{
             .scheduleId = schedule_id,
-            .schedule = std::move(tBlocks),
-            .impact =
-                tOutput.impact // removed std::move here since it is trivial
+            .schedule = vector<ScheduleBlock>{}, // Do not send blocks to save bandwidth, UI will fetch if needed
+            .impact = tOutput.impact
         };
     } catch (const exception &e) {
         LOG_WARN << "Failed to generate trivial schedule for " << schedule_id
@@ -117,19 +105,9 @@ auto ScheduleController::
     }
 
     // construct the API DTO with the real job ID
-    auto schedule = vector<ScheduleBlock>{};
-    schedule.reserve(output.blocks.size());
-    for (auto &block : output.blocks)
-        schedule.push_back({
-            .timestamp = block.timestamp,
-            .scheduleId = schedule_id,
-            .location = std::move(block.location),
-            .additionalLoad = block.additionalLoad,
-        });
-
     auto result =
         JobScheduleResponse{.scheduleId = schedule_id,
-                            .schedule = std::move(schedule),
+                            .schedule = vector<ScheduleBlock>{}, // Do not send blocks to save bandwidth, UI will fetch if needed
                             .impact = output.impact,
                             .unoptimizedResult = std::move(trivialResult)};
 
