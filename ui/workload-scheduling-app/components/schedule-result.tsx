@@ -110,8 +110,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   // Use fetched data if we have it (since POST might only return an ID now), otherwise fallback to props
   const optData = fetchedOptData || result
   
-  // Use unoptimizedResult prop, or fallback to result.unoptimizedResult, or fetched data
-  let unoptData = fetchedUnoptData || unoptimizedResult || result.unoptimizedResult || null
+  // Use unoptimizedResult prop, or fetched data
+  let unoptData = fetchedUnoptData || unoptimizedResult || null
   
   // Clean up if it's an error object or if the array of blocks is totally empty
   if (unoptData && (('error' in unoptData) || (unoptData.scheduled_blocks && unoptData.scheduled_blocks.length === 0))) {
@@ -209,10 +209,6 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
              unoptJobBlocks = trivialData.scheduled_blocks;
              setFetchedUnoptData(trivialData);
            }
-        } else if (scheduleData.unoptimizedResult && Array.isArray(scheduleData.unoptimizedResult.scheduled_blocks)) {
-           // Fallback to embedded unoptimizedResult if the API happens to return it
-           unoptJobBlocks = scheduleData.unoptimizedResult.scheduled_blocks;
-           setFetchedUnoptData(scheduleData.unoptimizedResult);
         }
 
         // Get the time range to limit the background workload fetch

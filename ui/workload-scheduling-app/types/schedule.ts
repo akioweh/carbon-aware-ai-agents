@@ -19,7 +19,6 @@ export interface ScheduleData {
 
 export interface JobScheduleResponse extends ScheduleData {
   message?: string
-  unoptimizedResult?: ScheduleData
 }
 
 export interface ScheduleSummary {

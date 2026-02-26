@@ -106,7 +106,7 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
       const optimizedResult = await response.json()
 
       if (onScheduleComplete) {
-        onScheduleComplete(optimizedResult, optimizedResult.unoptimizedResult || null, startDate.toISOString(), endDate.toISOString())
+        onScheduleComplete(optimizedResult, null, startDate.toISOString(), endDate.toISOString())
       }
     } catch (error) {
       console.error("Error scheduling job:", error)

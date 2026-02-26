@@ -44,7 +44,7 @@ export default function Home() {
   }
 
   const handleSelectJob = (job: any) => {
-    // Check if the backend gave us unoptimizedResult via job.unoptimizedResult OR job.trivialResult (etc)
+    // Check if the backend gave us unoptimizedResult via job.unoptimizedResult (from summary)
     const unopt = job.unoptimizedResult || null;
     
     setScheduleResult(job)
