@@ -104,7 +104,11 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const [showTrivial, setShowTrivial] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
+  const [fetchedOptData, setFetchedOptData] = useState<any>(null)
   const [fetchedUnoptData, setFetchedUnoptData] = useState<ScheduleData | null>(null)
+  
+  // Use fetched data if we have it (since POST might only return an ID now), otherwise fallback to props
+  const optData = fetchedOptData || result
   
   // Use unoptimizedResult prop, or fallback to result.unoptimizedResult, or fetched data
   let unoptData = fetchedUnoptData || unoptimizedResult || result.unoptimizedResult || null
@@ -119,13 +123,13 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   }
 
   // Get impact values
-  const activeImpact = showTrivial && unoptData ? unoptData.impact : result.impact
+  const activeImpact = showTrivial && unoptData ? unoptData.impact : optData.impact
   const carbonIntensity = activeImpact?.carbon_intensity
   const totalEmissions = activeImpact?.total_emissions
   const sci = activeImpact?.sci
 
   // Get unoptimized comparison values for savings calculation
-  const optEmissions = result.impact?.total_emissions
+  const optEmissions = optData.impact?.total_emissions
   const unoptEmissions = unoptData?.impact?.total_emissions
   const emissionsSavings = optEmissions && unoptEmissions && unoptEmissions > optEmissions 
     ? ((unoptEmissions - optEmissions) / unoptEmissions) * 100 
@@ -216,6 +220,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
             }
             const scheduleData = await scheduleRes.json()
+            setFetchedOptData(scheduleData)
             newJobBlocks = Array.isArray(scheduleData.scheduled_blocks) 
               ? scheduleData.scheduled_blocks 
               : []
