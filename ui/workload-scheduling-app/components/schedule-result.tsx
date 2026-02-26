@@ -138,18 +138,15 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     sci: unoptData?.impact?.sci,
   }
 
-  const getTimeRange = () => {
-    // If the user's explicit requested time window is available, use that as the bounding box!
-    if (earliestStart && latestFinish) {
-      return {
-        start: new Date(new Date(earliestStart).getTime() - 15 * 60 * 1000),
-        end: new Date(new Date(latestFinish).getTime() + 15 * 60 * 1000)
-      }
-    }
+  const getTimeRange = (blocks?: any[]) => {
+    // We try to find the full bounds of the specific job's actual scheduled blocks.
+    // If the backend didn't supply them in `result.scheduled_blocks` (e.g. to save bandwidth on POST),
+    // they should be inside the `allBlocks` state, or passed in via the `blocks` parameter during the initial fetch.
+    const jobBlocksFromState = allBlocks.filter(b => b.schedule_id === result.schedule_id);
+    const trivialBlocksFromState = allBlocks.filter(b => b.schedule_id === `${result.schedule_id}_trivial`);
 
-    // Determine the total bounds using BOTH block sets so the axes stay identical when toggling
-    const optBlocks = result.scheduled_blocks || [];
-    const unoptBlocks = unoptData?.scheduled_blocks || [];
+    const optBlocks = blocks ? blocks.filter(b => b.schedule_id === result.schedule_id) : (jobBlocksFromState.length > 0 ? jobBlocksFromState : (result.scheduled_blocks || []));
+    const unoptBlocks = blocks ? blocks.filter(b => b.schedule_id === `${result.schedule_id}_trivial`) : (trivialBlocksFromState.length > 0 ? trivialBlocksFromState : (unoptData?.scheduled_blocks || []));
     const allRelevantBlocks = [...optBlocks, ...unoptBlocks];
 
     if (allRelevantBlocks.length > 0) {
@@ -161,6 +158,14 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
       }
     }
     
+    // If the user's explicit requested time window is available, use that as the fallback bounding box!
+    if (earliestStart && latestFinish) {
+      return {
+        start: new Date(new Date(earliestStart).getTime() - 15 * 60 * 1000),
+        end: new Date(new Date(latestFinish).getTime() + 15 * 60 * 1000)
+      }
+    }
+
     // Default to 4 hour window
     const now = new Date()
     now.setHours(8, 0, 0, 0)
@@ -175,44 +180,66 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     const loadBlocks = async () => {
       setLoading(true)
       try {
-        // Fetch the specific schedule's blocks (the new job and its trivial baseline)
-        const [scheduleRes, trivialRes] = await Promise.all([
-          fetch(`/api/schedules/${result.schedule_id}`),
-          fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null)
-        ])
-
-        if (!scheduleRes.ok) {
-          throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
-        }
-        const scheduleData = await scheduleRes.json()
-        const newJobBlocks = Array.isArray(scheduleData.scheduled_blocks) 
-          ? scheduleData.scheduled_blocks 
-          : []
-
-        // If the API returns the unoptimized blocks, we use them
-        const unoptDataFromApi = scheduleData.unoptimizedResult;
+        let newJobBlocks: any[] = [];
         let unoptJobBlocks: any[] = [];
-        
         let trivialData = null;
-        if (trivialRes && trivialRes.ok) {
-           trivialData = await trivialRes.json();
-           if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
-             unoptJobBlocks = trivialData.scheduled_blocks;
-           }
-        }
         
-        // fallback to embedded unoptimizedResult if trivial fetch failed
-        if (unoptJobBlocks.length === 0 && unoptDataFromApi && Array.isArray(unoptDataFromApi.scheduled_blocks)) {
-           unoptJobBlocks = unoptDataFromApi.scheduled_blocks;
-           setFetchedUnoptData(unoptDataFromApi);
-        } else if (unoptJobBlocks.length === 0 && unoptData?.scheduled_blocks) {
-           unoptJobBlocks = unoptData.scheduled_blocks;
-        } else if (trivialData) {
+        // If we already have the blocks passed in from props (and they're not empty arrays designed to save bandwidth)
+        // Then we can skip fetching them!
+        // But wait, the backend now returns empty arrays [] on POST to save bandwidth.
+        // So we ALWAYS need to fetch if the arrays are empty.
+        // Let's check if result.scheduled_blocks exists and is NOT empty.
+        if (result.scheduled_blocks && result.scheduled_blocks.length > 0) {
+            newJobBlocks = result.scheduled_blocks;
+            
+            // Check trivial blocks
+            if (unoptData?.scheduled_blocks && unoptData.scheduled_blocks.length > 0) {
+               unoptJobBlocks = unoptData.scheduled_blocks;
+            } else {
+               // We have main blocks but no trivial blocks, fetch only trivial
+               const trivialRes = await fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null);
+               if (trivialRes && trivialRes.ok) {
+                 trivialData = await trivialRes.json();
+                 if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
+                   unoptJobBlocks = trivialData.scheduled_blocks;
+                 }
+               }
+            }
+        } else {
+            // Fetch both!
+            const [scheduleRes, trivialRes] = await Promise.all([
+              fetch(`/api/schedules/${result.schedule_id}`),
+              fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null)
+            ])
+
+            if (!scheduleRes.ok) {
+              throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
+            }
+            const scheduleData = await scheduleRes.json()
+            newJobBlocks = Array.isArray(scheduleData.scheduled_blocks) 
+              ? scheduleData.scheduled_blocks 
+              : []
+
+            if (trivialRes && trivialRes.ok) {
+               trivialData = await trivialRes.json();
+               if (trivialData && Array.isArray(trivialData.scheduled_blocks)) {
+                 unoptJobBlocks = trivialData.scheduled_blocks;
+               }
+            }
+            
+            const unoptDataFromApi = scheduleData.unoptimizedResult;
+            if (unoptJobBlocks.length === 0 && unoptDataFromApi && Array.isArray(unoptDataFromApi.scheduled_blocks)) {
+               unoptJobBlocks = unoptDataFromApi.scheduled_blocks;
+               setFetchedUnoptData(unoptDataFromApi);
+            }
+        }
+
+        if (trivialData && unoptJobBlocks.length > 0) {
            setFetchedUnoptData(trivialData);
         }
 
         // Get the time range to limit the background workload fetch
-        const { start, end } = getTimeRange()
+        const { start, end } = getTimeRange([...newJobBlocks, ...unoptJobBlocks])
         
         // Fetch blocks in the time window to get existing workload
         const startQuery = `start_time=${encodeURIComponent(start.toISOString())}`
@@ -255,6 +282,17 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         }
 
         setAllBlocks(combinedWithNewJob)
+        
+        // Auto-select a data center that actually has workload if current selected DC has none
+        if (newJobBlocks.length > 0) {
+            const hasLoadOnCurrentDc = newJobBlocks.some((b: any) => locationToDcId(b.location) === selectedDC);
+            if (!hasLoadOnCurrentDc) {
+                const firstActiveDc = locationToDcId(newJobBlocks[0].location);
+                if (firstActiveDc) {
+                    setSelectedDC(firstActiveDc);
+                }
+            }
+        }
       } catch (err) {
         console.error("Failed to load blocks", err)
         setAllBlocks([])
@@ -268,6 +306,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
   // Update workload data when data center changes (uses cached allBlocks)
   useEffect(() => {
+    // Get the dynamic bounds of whatever is loaded so far!
     const { start, end } = getTimeRange()
 
     // Filter blocks by selected DC using backend location name
