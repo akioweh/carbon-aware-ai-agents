@@ -50,8 +50,30 @@ function locationToDcId(location: string): string | undefined {
   return dc?.id
 }
 
+// Smooth multi-layer organic volatility (same as WorkloadCalendar)
+function getSmoothVolatility(timestampMs: number, dcIndex: number) {
+  const hash = (n: number) => {
+    const x = Math.sin(n) * 43758.5453123;
+    return x - Math.floor(x);
+  };
+
+  const noise1D = (t: number) => {
+    const i = Math.floor(t);
+    const f = t - i;
+    const curve = f * f * (3 - 2 * f); // Hermite interpolation
+    return hash(i) * (1 - curve) + hash(i + 1) * curve;
+  };
+
+  // 3 stacked layers for organic shape
+  const layer1 = noise1D(timestampMs / (1000 * 60 * 60 * 24) + dcIndex * 0.7) * 0.6;  // long trend
+  const layer2 = noise1D(timestampMs / (1000 * 60 * 60 * 6) + dcIndex * 1.3) * 0.3;   // medium
+  const layer3 = noise1D(timestampMs / (1000 * 60 * 45) + dcIndex * 2.5) * 0.1;      // jitter
+
+  return (layer1 + layer2 + layer3 - 0.5) * 2;
+}
+
 // At the top of ScheduleResult.tsx, outside the component
-function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newScheduleId?: string, greennessData?: any[]) {
+function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newScheduleId?: string, greennessData?: any[], dcIndex: number = 0) {
   const intervalMs = 5 * 60 * 1000
   const intervals: WorkloadInterval[] = []
 
@@ -78,12 +100,24 @@ function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newSched
       .reduce((sum, b) => sum + (typeof b.additional_load === 'number' ? b.additional_load : 0), 0)
 
     let currentGreenness = undefined;
+
     if (greennessData && greennessData.length > 0) {
-      const pastPoints = greennessData.filter(g => new Date(g.timestamp).getTime() <= t);
+      const pastPoints = greennessData.filter(
+        g => new Date(g.timestamp).getTime() <= t
+      );
+
       if (pastPoints.length > 0) {
         currentGreenness = pastPoints[pastPoints.length - 1].value;
       } else {
         currentGreenness = greennessData[0].value;
+      }
+
+      // Apply smooth organic volatility (same behaviour as WorkloadCalendar)
+      if (typeof currentGreenness === "number") {
+        const noise = getSmoothVolatility(t, dcIndex);
+        const fluctuationMagnitude = 0.35; // ±35% max deviation
+        currentGreenness =
+          currentGreenness * (1 + noise * fluctuationMagnitude);
       }
     }
 
@@ -319,7 +353,16 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     const realBlocks = dcBlocks.filter((b: any) => b.schedule_id !== otherVariantScheduleId)
 
     // Convert blocks → workload intervals for chart
-    const intervals = convertBlocksToWorkload(realBlocks, start, end, newJobScheduleId, greennessCache[selectedDC])
+    const dcIndex = DATA_CENTERS.findIndex(dc => dc.id === selectedDC);
+
+    const intervals = convertBlocksToWorkload(
+      realBlocks,
+      start,
+      end,
+      newJobScheduleId,
+      greennessCache[selectedDC],
+      dcIndex
+    )
 
     // Fill empty arrays with 0s so Recharts doesn't look completely blank when there's no data
     if (intervals.length > 0 && intervals.every(i => i.existing === 0 && i.newJob === 0)) {

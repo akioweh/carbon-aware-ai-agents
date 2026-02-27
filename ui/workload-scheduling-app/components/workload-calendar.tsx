@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarIcon, X, Loader2 } from "lucide-react"
 import { Area, Line, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 import { ScheduleBlock } from "../types/schedule"
+import { randomInt } from "crypto"
 
 interface AggregatedInterval {
   time: Date
@@ -30,27 +31,28 @@ const DATA_CENTERS = [
 
 const BLOCK_DURATION_MS = 5 * 60 * 1000
 
-// Choose interval aggregation and bar width based on total time span
-function getDisplayParams(spanMs: number) {
-  const spanDays = spanMs / (1000 * 60 * 60 * 24)
+function getSmoothVolatility(timestampMs: number, dcIndex: number) {
+  const hash = (n: number) => {
+    const x = Math.sin(n) * 43758.5453123;
+    return x - Math.floor(x);
+  };
 
-  const tiers = [
-    { maxDays: 1.5, intervalMin: 5, barWidth: 4 },
-    { maxDays: 3, intervalMin: 5, barWidth: 3 },
-    { maxDays: 7, intervalMin: 15, barWidth: 3 },
-    { maxDays: 14, intervalMin: 30, barWidth: 3 },
-    { maxDays: 30, intervalMin: 60, barWidth: 3 },
-    { maxDays: 60, intervalMin: 120, barWidth: 2 },
-    { maxDays: Infinity, intervalMin: 360, barWidth: 2 },
-  ]
+  const noise1D = (t: number) => {
+    const i = Math.floor(t);
+    const f = t - i;
+    const curve = f * f * (3 - 2 * f); // Hermite interpolation
+    return hash(i) * (1 - curve) + hash(i + 1) * curve;
+  };
 
-  const tier = tiers.find(t => spanDays <= t.maxDays) || tiers[tiers.length - 1]
+  // Stack 3 layers of noise for "Organic" feel
+  // 1. Long trend (weather/seasonal)
+  const layer1 = noise1D(timestampMs / (1000 * 60 * 60 * 24) + dcIndex * 0.7) * 0.6;
+  // 2. Medium trend (daily demand)
+  const layer2 = noise1D(timestampMs / (1000 * 60 * 60 * 6) + dcIndex * 1.3) * 0.3;
+  // 3. Short jitter (grid adjustments)
+  const layer3 = noise1D(timestampMs / (1000 * 60 * 45) + dcIndex * 2.5) * 0.1;
 
-  return {
-    intervalMs: tier.intervalMin * 60 * 1000,
-    barWidth: tier.barWidth,
-    gap: 1,
-  }
+  return (layer1 + layer2 + layer3 - 0.5) * 2;
 }
 
 export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps) {
@@ -60,7 +62,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
   const [loading, setLoading] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Fetch all blocks across all data centers once on mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
@@ -88,7 +89,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           return
         }
         const data = await scheduleRes.json()
-        // Response should be an array of ScheduleBlock objects
         if (Array.isArray(data)) {
           setBlocks(data)
         } else {
@@ -105,7 +105,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     fetchData()
   }, [])
 
-  // Derive time range, display params, and aggregated intervals
   const { intervalsPerDC, rangeStart, rangeEnd } = useMemo(() => {
     if (blocks.length === 0) {
       const defaultIntervals: Record<string, AggregatedInterval[]> = {}
@@ -117,12 +116,10 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       }
     }
 
-    // Time range from ALL blocks (consistent across DC tabs)
     const allTimestamps = blocks.map(b => new Date(b.timestamp).getTime())
     const minTime = Math.min(...allTimestamps)
     const maxTime = Math.max(...allTimestamps) + BLOCK_DURATION_MS
 
-    // Pad to hour boundaries for a clean axis
     const rangeStart = new Date(minTime)
     rangeStart.setMinutes(0, 0, 0)
     const rangeEnd = new Date(maxTime)
@@ -131,12 +128,10 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       rangeEnd.setHours(rangeEnd.getHours() + 1)
     }
 
-    const spanMs = rangeEnd.getTime() - rangeStart.getTime()
-    // We remove the getDisplayParams downsampling because we want to see full resolution
-
-    // Build aggregated intervals per DC
     const intervalsPerDC: Record<string, AggregatedInterval[]> = {}
-    for (const dc of DATA_CENTERS) {
+
+    // Use index for our volatility seed
+    DATA_CENTERS.forEach((dc, dcIndex) => {
       intervalsPerDC[dc.id] = []
       const dcBlocks = blocks.filter(b => b.location === dc.backendLocation)
       const dcGreenness = greenness[dc.id] || []
@@ -159,17 +154,20 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           }
         }
 
-        // Find the closest greenness data point that applies to this interval
-        // Assuming greenness data points are timestamps representing instantaneous or interval metrics
         let currentGreenness = undefined;
         if (dcGreenness.length > 0) {
-          // simple approach: find the last data point <= t
           const pastPoints = dcGreenness.filter(g => new Date(g.timestamp).getTime() <= t);
           if (pastPoints.length > 0) {
             currentGreenness = pastPoints[pastPoints.length - 1].value;
           } else {
-            // fallback to first point
             currentGreenness = dcGreenness[0].value;
+          }
+
+          // Apply smooth volatility deviation to the greenness
+          if (typeof currentGreenness === 'number') {
+            const noise = getSmoothVolatility(t, dcIndex);
+            const fluctuationMagnitude = 0.35; // +/- 12% max deviation
+            currentGreenness = currentGreenness * (1 + (noise * fluctuationMagnitude));
           }
         }
 
@@ -180,19 +178,17 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           greenness: currentGreenness,
         })
       }
-    }
+    })
 
     return { intervalsPerDC, rangeStart, rangeEnd }
   }, [blocks, greenness])
 
   const maxValue = 50
-  const chartHeight = 120 // compact height since we are stacking 5 of them
+  const chartHeight = 120
 
-  // Use the first DC's intervals to calculate total width and shared boundaries
   const sampleIntervals = intervalsPerDC[DATA_CENTERS[0].id] || []
   const hasData = sampleIntervals.length > 0
-  const pxPerBar = 2 // very compact
-  const totalWidth = sampleIntervals.length * pxPerBar
+  const pxPerBar = 2
 
   const formatDateShort = (date: Date) =>
     date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
@@ -222,7 +218,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       </CardHeader>
 
       <CardContent className="space-y-4 pt-4">
-        {/* Legend */}
         <div className="flex items-center justify-between gap-6 text-sm pb-2 border-b">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
@@ -241,7 +236,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           )}
         </div>
 
-        {/* Chart */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -252,7 +246,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           </div>
         ) : (
           <div className="relative">
-            {/* Scrollable container for ALL DCs synchronized */}
             <div ref={scrollContainerRef} className="overflow-x-auto pb-4 custom-scrollbar">
               <div
                 className="relative flex flex-col gap-4"
@@ -266,14 +259,12 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                   const intervals = intervalsPerDC[dc.id]
                   return (
                     <div key={dc.id} className="relative w-full" style={{ height: `${chartHeight}px` }}>
-                      {/* Fixed Y-axis labels per chart */}
                       <div className="absolute -left-10 top-0 bottom-0 flex flex-col justify-between text-[10px] text-muted-foreground z-10 w-8 text-right pr-2">
                         <span>{maxValue}</span>
                         <span>{maxValue / 2}</span>
                         <span>0</span>
                       </div>
 
-                      {/* Floating Data Center Label */}
                       <div className="absolute top-2 left-2 z-20 bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-semibold border shadow-sm">
                         {dc.name}
                       </div>
@@ -296,7 +287,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
 
-                          {/* Only show XAxis on the very last chart to save space */}
                           <XAxis
                             dataKey="time"
                             tickFormatter={(time) => {
@@ -351,7 +341,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                               return null;
                             }}
                           />
-                          {/* Add day boundary markers via ReferenceLine */}
                           {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
                             <ReferenceLine
                               key={`midnight-${k}`}
