@@ -185,12 +185,12 @@ inline auto calc_single(const std::vector<double> &load_f,
                         const std::vector<double> &capacity_f,
                         const CostFunction<double> auto &cost_f,
                         const double penalty_f, const double tot_work_f,
-                        const int resolution = 1000) -> SingleResult {
+                        const int resolution = 10000) -> SingleResult {
     using namespace std;
     const auto n = static_cast<int>(load_f.size());
     // discretization
-    const auto e_work = tot_work_f / resolution;
-    const auto tot_work = resolution;
+    const auto e_work = max(tot_work_f / resolution, 0.5);
+    const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
     auto load = vector<int>(n);
     transform(execution::unseq, load_f.begin(), load_f.end(), load.begin(),
               [e_work](double x) -> int {
@@ -302,7 +302,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
                    const std::vector<std::vector<double>> &capacities_f,
                    const std::vector<CostFunc> &costs_f,
                    const std::vector<double> &penalties_f,
-                   const double tot_work_f, const int resolution = 1000)
+                   const double tot_work_f, const int resolution = 10000)
     -> std::pair<double, std::vector<std::vector<double>>> {
     using namespace std;
     const auto m = loads_f.size();
@@ -337,7 +337,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     for (auto i : views::iota(0ULL, m))
         tie(locations_cost_vector[i], locations_memo[i]) = futures[i].get();
 
-    const auto e_work = tot_work_f / resolution;
+    const auto e_work = max(tot_work_f / resolution, 0.5);
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
 
     // result validation
