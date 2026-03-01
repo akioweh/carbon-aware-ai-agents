@@ -215,7 +215,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/GreenessForecastDataPoint'
+                  $ref: '#/components/schemas/LoadGreenessForecastDataPoint'
         "400":
           description: Python API is unresponsive
           content:
@@ -423,7 +423,7 @@ components:
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
 
-    GreenessForecastDataPoint:
+    LoadGreenessForecastDataPoint:
       properties:
         max_load:
           type: number
@@ -436,13 +436,14 @@ components:
         timeseries:
           type: array
           items:
-            $ref: '#/components/schemas/GreenessPoint'
+            $ref: '#/components/schemas/LoadGreenessPoint'
       type: object
       required:
-      - timestamp
-      - value
+      - location
+      - timeseries
+      - max_load
     
-    GreenessPoint:
+    LoadGreenessPoint:
       type: object
       properties:
         timestamp:
@@ -454,6 +455,10 @@ components:
           type: number
           description: greeness at the location at the time
           example: 5.4
+        load:
+          type: number
+          description: load at the locatioin at the time
+          example: 6.9
 
 
     ScheduleImpact:
