@@ -113,7 +113,7 @@ auto ScheduleController::
     if (datacenter.name == scheduler::calendar::ANY_DATACENTER) {
         ret = toJson(co_await stats.getAllDatacenters());
     } else {
-        ret = toJson(co_await stats.getDatacenter(datacenter.name));
+        ret = toJson(vector{co_await stats.getDatacenter(datacenter.name)});
     }
     const auto resp = HttpResponse::newHttpJsonResponse(ret);
     co_return resp;
