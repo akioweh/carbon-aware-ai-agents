@@ -39,6 +39,7 @@ inline auto f_toJson(const TimeSlot &obj) -> Json::Value {
     auto res = Json::Value{};
     res["timestamp"] = utils::toIso8601(obj.timestamp);
     res["greeness"] = obj.predictedGreenness;
+    res["load"] = obj.predictedLoad;
     return res;
 }
 
