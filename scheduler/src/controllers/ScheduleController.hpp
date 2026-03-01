@@ -1,5 +1,7 @@
 #ifndef SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #define SCHEDULER_SCHEDULE_CONTROLLER_HPP
+#include <drogon/HttpRequest.h>
+#include <drogon/HttpTypes.h>
 #pragma once
 
 #include "structs/DatacenterIdentifierParam.hpp"
@@ -27,6 +29,8 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                   "/api/schedules/{schedule_id}/trivial", drogon::Get);
     ADD_METHOD_TO(ScheduleController::getScheduleSummaries,
                   "/api/schedules/summary", drogon::Get);
+    ADD_METHOD_TO(ScheduleController::getForecast, "/api/forecast",
+                  drogon::Get);
     METHOD_LIST_END
 
     [[nodiscard]] auto calculateSchedule(drogon::HttpRequestPtr,
@@ -51,6 +55,10 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                                    DatacenterIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
     [[nodiscard]] auto getScheduleSummaries(drogon::HttpRequestPtr) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
+
+    [[nodiscard]] auto getForecast(drogon::HttpRequestPtr,
+                                   DatacenterIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
 
