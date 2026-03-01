@@ -4,7 +4,8 @@
 
 #include <json/value.h>
 
-template <typename T> auto f_toJson(const std::vector<T> &V) -> Json::Value;
+template <typename T>
+inline auto f_toJson(const std::vector<T> &V) -> Json::Value;
 
 /**
  * @brief Types that can be serialized to JSON via a f_toJson
@@ -14,6 +15,16 @@ template <typename T>
 concept BaseSerializable = requires(const T &obj) {
     { f_toJson(obj) } -> std::convertible_to<Json::Value>;
 };
+
+template <typename T>
+    requires BaseSerializable<T>
+inline auto f_toJson(const std::vector<T> &V) -> Json::Value {
+    auto res = Json::Value(Json::arrayValue);
+    for (const auto &val : V) {
+        res.append(f_toJson(val));
+    }
+    return res;
+}
 
 template <typename T>
 concept VectorSerializable = requires(const T &obj) {
@@ -39,15 +50,5 @@ struct toJsonFn {
  * it must be \ref Serializable (i.e. have a f_toJson overload).
  */
 inline constexpr scheduler::serialization::impl::toJsonFn toJson{};
-
-template <typename T>
-    requires Serializable<T>
-inline auto f_toJson(const std::vector<T> &V) -> Json::Value {
-    auto res = Json::Value(Json::arrayValue);
-    for (const auto &val : V) {
-        res.append(toJson(val));
-    }
-    return res;
-}
 
 #endif // SCHEDULER_SERIALIZABLE_HPP
