@@ -1,8 +1,8 @@
 #ifndef SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #define SCHEDULER_SCHEDULE_CONTROLLER_HPP
-#include "structs/DatacenterIdentifierParam.hpp"
 #pragma once
 
+#include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleIdentifierParam.hpp"
 #include "structs/TimeIntervalParams.hpp"
@@ -23,6 +23,8 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
                   "/api/schedules/{schedule_id}", drogon::Delete);
     ADD_METHOD_TO(ScheduleController::getSpecificSchedule,
                   "/api/schedules/{schedule_id}", drogon::Get);
+    ADD_METHOD_TO(ScheduleController::getSpecificTrivialSchedule,
+                  "/api/schedules/{schedule_id}/trivial", drogon::Get);
     ADD_METHOD_TO(ScheduleController::getScheduleSummaries,
                   "/api/schedules/summary", drogon::Get);
     METHOD_LIST_END
@@ -42,6 +44,11 @@ class ScheduleController : public drogon::HttpController<ScheduleController> {
     [[nodiscard]] auto getSpecificSchedule(drogon::HttpRequestPtr,
                                            ScheduleIdentifierParam,
                                            DatacenterIdentifierParam) const
+        -> drogon::Task<drogon::HttpResponsePtr>;
+    [[nodiscard]] auto
+        getSpecificTrivialSchedule(drogon::HttpRequestPtr,
+                                   ScheduleIdentifierParam,
+                                   DatacenterIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
     [[nodiscard]] auto getScheduleSummaries(drogon::HttpRequestPtr) const
         -> drogon::Task<drogon::HttpResponsePtr>;

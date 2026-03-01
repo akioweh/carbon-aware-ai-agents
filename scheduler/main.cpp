@@ -8,7 +8,6 @@
 constexpr auto PORT = 6969;
 
 auto main() -> int {
-    drogon::app().setLogPath(".");
     drogon::app().loadConfigFile("config.json");
     drogon::app().addListener("0.0.0.0", PORT);
     scheduler::exceptions::registerExceptionHandler();

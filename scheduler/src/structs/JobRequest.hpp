@@ -6,6 +6,7 @@
 #include "utils/Utils.hpp"
 #include <chrono>
 #include <drogon/HttpRequest.h>
+#include <optional>
 #include <string>
 
 namespace scheduler {
@@ -20,6 +21,7 @@ struct JobRequest {
     double workload_amount;
     time_t earliest_start;
     time_t latest_finish;
+    std::optional<std::string> preferred_datacenter;
 };
 } // namespace scheduler
 
@@ -72,11 +74,22 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
         if (workload_amount < 0.)
             throw scheduler::exceptions::ValidationException(
                 "workload_amount must be non-negative");
+
+        std::optional<std::string> pref_dc = std::nullopt;
+        if (!json["preferred_datacenter"].isNull()) {
+            if (!json["preferred_datacenter"].isString()) {
+                throw scheduler::exceptions::ValidationException(
+                    "Field 'preferred_datacenter' must be a string");
+            }
+            pref_dc = json["preferred_datacenter"].asString();
+        }
+
         return scheduler::JobRequest{
             .job_type = json["job_type"].asString(),
             .workload_amount = workload_amount,
             .earliest_start = earliest_start_opt.value(),
-            .latest_finish = latest_finish_opt.value()};
+            .latest_finish = latest_finish_opt.value(),
+            .preferred_datacenter = std::move(pref_dc)};
     } catch (const std::exception &e) {
         throw scheduler::exceptions::ValidationException("Invalid body");
     }

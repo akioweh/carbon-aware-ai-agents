@@ -365,9 +365,14 @@ CMakeUserPresets.json
 # Ignore all local history of files
 .history
 .ionide
+
 *.db*
 cache.db
+cache.db-shm
+cache.db-wal
 history.json
 prediction.json
 predictions.json
 
+# Frontend development Mock API data
+ui/mock-api/
