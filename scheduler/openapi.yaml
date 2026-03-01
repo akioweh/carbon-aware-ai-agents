@@ -200,6 +200,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/forecast:
+    get:
+      operationId: GetForcast
+      summary: Gets forcast from python API.
+      description: Gets full forecast for a specific datacenter.
+      parameters:
+        - $ref: '#/components/parameters/DatacenterLocationParam'
+      responses:
+        "200":
+          description: Successfull response with requested datacenter
+          content:
+            application/json: 
+              schema:
+                type: array
+                items:
+                    $ref: '#/components/schemas/LoadForecastDataPoint'
+        "400":
+          description: Python API is unresponsive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 
 components:
   parameters:
@@ -399,6 +422,25 @@ components:
             $ref: "#/components/schemas/ScheduleBlock"
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
+
+    LoadForecastDataPoint:
+      properties:
+        timestamp:
+          type: string
+          title: Timestamp
+          description: ISO format timestamp
+        value:
+          type: number
+          title: Value
+          description: Forecasted value
+        location:
+          type: string
+          title: location
+          description: location at which this value represents the greeness
+      type: object
+      required:
+      - timestamp
+      - value
 
     ScheduleImpact:
       type: object
