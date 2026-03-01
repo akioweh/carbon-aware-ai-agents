@@ -204,7 +204,7 @@ paths:
     get:
       operationId: GetForcast
       summary: Gets forcast from python API.
-      description: Gets full forecast for a specific datacenter.
+      description: Gets full forecast for a specific datacenter, or for all depending on whether datacenter location is provied.
       parameters:
         - $ref: '#/components/parameters/DatacenterLocationParam'
       responses:
@@ -215,7 +215,7 @@ paths:
               schema:
                 type: array
                 items:
-                    $ref: '#/components/schemas/LoadForecastDataPoint'
+                  $ref: '#/components/schemas/GreenessForecastDataPoint'
         "400":
           description: Python API is unresponsive
           content:
@@ -423,24 +423,38 @@ components:
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
 
-    LoadForecastDataPoint:
+    GreenessForecastDataPoint:
       properties:
-        timestamp:
-          type: string
-          title: Timestamp
-          description: ISO format timestamp
-        value:
+        max_load:
           type: number
-          title: Value
-          description: Forecasted value
+          title: max_load
+          description: maximum load of the datacenter
         location:
           type: string
           title: location
-          description: location at which this value represents the greeness
+          description: location of the greeness data
+        timeseries:
+          type: array
+          items:
+            $ref: '#/components/schemas/GreenessPoint'
       type: object
       required:
       - timestamp
       - value
+    
+    GreenessPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Start time of the scheduled block
+          example: "2025-12-08T02:00:00Z"
+        greeness:
+          type: number
+          description: greeness at the location at the time
+          example: 5.4
+
 
     ScheduleImpact:
       type: object
