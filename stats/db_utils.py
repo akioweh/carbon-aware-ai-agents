@@ -16,7 +16,7 @@ CARBON_DB_FILE = Path(os.environ.get(
 # Map UK regions to Data Center locations
 UK_REGION_TO_DC = {
     13: "Data-Center-1",  # London
-    1: "Data-Center-2",   # North Scotland
+    14: "Data-Center-2",  # South East England
     2: "Data-Center-3",   # South Scotland
     3: "Data-Center-4",   # North West England
     4: "Data-Center-5",   # North East England
