@@ -5,7 +5,11 @@ import pandas as pd
 
 import db_utils
 from predictor_linreg import get_next_week_load
-from predictor_sarimax import get_next_week_greenness, get_next_week_carbon_intensity
+# TEMPORARY: Using API forecast instead of SARIMAX predictions.
+# To revert, change this import back to:
+#     from predictor_sarimax import get_next_week_greenness, get_next_week_carbon_intensity
+# and remove the `location` arg from the calls below.
+from predictor_api_forecast import get_next_week_greenness, get_next_week_carbon_intensity
 
 
 def generate_next_week_load_prediction(location):
@@ -70,7 +74,7 @@ def generate_next_week_greenness_prediction(location):
         ]
     )
 
-    next_week_greenness_df = get_next_week_greenness(historical_greenness)
+    next_week_greenness_df = get_next_week_greenness(historical_greenness, location)  # TEMPORARY: location arg
 
     # Format as unified metric time-series
     # Note: greenness is inverse of carbon intensity for this prototype
@@ -114,7 +118,7 @@ def generate_next_week_carbon_intensity_prediction(location):
         ]
     )
 
-    next_week_ci_df = get_next_week_carbon_intensity(historical_ci)
+    next_week_ci_df = get_next_week_carbon_intensity(historical_ci, location)  # TEMPORARY: location arg
 
     return {
         'location_id': location,
