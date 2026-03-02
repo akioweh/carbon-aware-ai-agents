@@ -93,15 +93,15 @@ def _build_forecast(
     # Start with last-week data as the base (covers all 7 days)
     base = last_week.reindex(full_index).interpolate(method='time')
 
-    # If we still have NaNs (sparse history), forward/back-fill
-    base = base.ffill().bfill()
-
     # Overlay API forecast for the first ~48h (API data is 30-min, upsample to 5-min)
     if not api_series.empty:
         api_5min = api_series.resample('5min').interpolate(method='linear')
         overlap = api_5min.index.intersection(full_index)
         if len(overlap):
             base.loc[overlap] = api_5min.loc[overlap]
+
+    # Fill any remaining gaps (sparse history, or no history at all)
+    base = base.ffill().bfill()
 
     yhat = np.clip(base.values, clip_min, clip_max)
     return pd.DataFrame({'ds': full_index, 'yhat': yhat})
@@ -164,23 +164,23 @@ def get_next_week_greenness(historical_df, location: str) -> pd.DataFrame:
     Returns:
         DataFrame with columns 'ds' (datetime) and 'yhat' (greenness 0-100).
     """
-    has_ci = (
-        'carbon_intensity' in historical_df.columns
-        and historical_df['carbon_intensity'].notna().any()
-    )
-
     region_id = DC_TO_UK_REGION.get(location)
 
-    if has_ci and region_id is not None:
+    if region_id is not None:
         # Build carbon intensity forecast, then convert to greenness
         api_series = _fetch_48h_regional_forecast(region_id)
-        last_week = _last_week_series(historical_df, 'carbon_intensity')
+        has_ci = (
+            'carbon_intensity' in historical_df.columns
+            and historical_df['carbon_intensity'].notna().any()
+        )
+        last_week = (_last_week_series(historical_df, 'carbon_intensity')
+                     if has_ci else pd.Series(dtype=float))
         ci_df = _build_forecast(api_series, last_week, clip_min=1, clip_max=500)
         # Convert: 1/CI normalised to 0-100 (matches db_utils.carbon_intensity_to_greenness)
-        greenness = 100.0 / np.maximum(ci_df['yhat'].values, 0.01)
+        greenness = 100.0 / np.maximum(ci_df['yhat'].values, 1)
         ci_df['yhat'] = np.clip(greenness, 0, 100)
         return ci_df
 
-    # Fallback: no carbon data or unknown region — use raw greenness history
+    # Fallback: unknown region — use raw greenness history
     last_week = _last_week_series(historical_df, 'greenness')
     return _build_forecast(pd.Series(dtype=float), last_week, clip_min=0, clip_max=100)
