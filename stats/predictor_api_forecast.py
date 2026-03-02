@@ -86,7 +86,7 @@ def _build_forecast(
 
     Returns DataFrame with columns 'ds' and 'yhat' (2016 rows).
     """
-    now = pd.Timestamp.utcnow()
+    now = pd.Timestamp(datetime.utcnow())
     start = now.ceil('5min')
     full_index = pd.date_range(start, periods=2016, freq='5min')
 
