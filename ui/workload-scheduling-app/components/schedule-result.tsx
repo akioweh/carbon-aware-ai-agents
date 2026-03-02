@@ -329,7 +329,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                 )}
                 <p className="text-xs text-muted-foreground">Carbon Intensity</p>
                 <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{carbonIntensity?.toFixed(3)}</p>
-                <p className="text-xs text-muted-foreground">kg CO2/kWh</p>
+                <p className="text-xs text-muted-foreground">g CO2/kWh</p>
               </div>
 
               {/* Total Emissions Card */}
@@ -341,7 +341,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                 )}
                 <p className="text-xs text-muted-foreground">Total Emissions</p>
                 <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{totalEmissions?.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">kg CO2</p>
+                <p className="text-xs text-muted-foreground">g CO2</p>
               </div>
 
               {/* SCI Card */}
@@ -353,7 +353,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                 )}
                 <p className="text-xs text-muted-foreground">SCI per Unit</p>
                 <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{sci?.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">kg CO2e/unit</p>
+                <p className="text-xs text-muted-foreground">g CO2e/unit</p>
               </div>
             </div>
           </CardContent>
