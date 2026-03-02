@@ -184,7 +184,7 @@ components:
         value:
           type: number
           title: Value
-          description: Forecasted carbon intensity in gCO2/kWh
+          description: Forecasted value
         is_forecast:
           type: boolean
           title: Is Forecast
@@ -204,11 +204,11 @@ components:
         metric:
           type: string
           title: Metric
-          description: Metric name (forecast_carbon_intensity)
+          description: Metric name (e.g. forecast_load, forecast_greenness)
         unit:
           type: string
           title: Unit
-          description: Unit of measurement (gCO2_per_kWh)
+          description: Unit of measurement
         data:
           items:
             $ref: '#/components/schemas/CarbonIntensityForecastDataPoint'
@@ -373,6 +373,11 @@ components:
         type:
           type: string
           title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
       type: object
       required:
       - loc

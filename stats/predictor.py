@@ -4,7 +4,11 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 import db_utils
-from predictor_linreg import get_next_week_load
+# TEMPORARY: Using random generation instead of Ridge regression for load.
+# To revert, change this import back to:
+#     from predictor_linreg import get_next_week_load
+# and remove the `location` arg from the get_next_week_load() call below.
+from predictor_api_forecast import get_next_week_load
 # TEMPORARY: Using API forecast instead of SARIMAX predictions.
 # To revert, change this import back to:
 #     from predictor_sarimax import get_next_week_greenness, get_next_week_carbon_intensity
@@ -31,7 +35,7 @@ def generate_next_week_load_prediction(location):
             for entry in location_history
         ]
     )
-    next_week_load_df = get_next_week_load(historical_load)
+    next_week_load_df = get_next_week_load(historical_load, location)  # TEMPORARY: location arg
 
     # Format as unified metric time-series
     return {

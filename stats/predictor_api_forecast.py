@@ -107,6 +107,29 @@ def _build_forecast(
     return pd.DataFrame({'ds': full_index, 'yhat': yhat})
 
 
+def get_next_week_load(historical_df, location: str) -> pd.DataFrame:
+    """TEMPORARY: Generate noisy-but-realistic random load data for the next week.
+
+    Calls generate_load() directly — no training, no regression.
+    Returns DataFrame with 'ds' and 'yhat' columns (2016 rows, 7 days × 288/day).
+
+    To revert, delete this function and restore the import in predictor.py to:
+        from predictor_linreg import get_next_week_load
+    """
+    from generate_history import generate_load, DATA_CENTRES
+
+    dc_index = 0
+    if location in DATA_CENTRES:
+        dc_index = DATA_CENTRES.index(location)
+
+    now = pd.Timestamp.now()
+    start = now.ceil('5min')
+    timestamps = pd.date_range(start, periods=2016, freq='5min')
+
+    values = [generate_load(ts.to_pydatetime(), dc_index) for ts in timestamps]
+    return pd.DataFrame({'ds': timestamps, 'yhat': values})
+
+
 def get_next_week_carbon_intensity(historical_df, location: str) -> pd.DataFrame:
     """Predict next-week carbon intensity using API forecast + last week's actuals.
 
