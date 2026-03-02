@@ -448,7 +448,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                   />
                   <Area yAxisId="left" type="monotone" dataKey="existing" stackId="1" stroke="#9ca3af" fill="url(#colorExisting)" isAnimationActive={false} />
                   <Area yAxisId="left" type="monotone" dataKey="newJob" stackId="1" stroke={showTrivial ? "#ea580c" : "#059669"} fill="url(#colorNew)" isAnimationActive={false} />
-                  <Line yAxisId="right" type="monotone" dataKey="greeness" stroke="#10b981" strokeWidth={1} dot={false} isAnimationActive={false} />
+                  <Line yAxisId="right" type="monotone" dataKey="greeness" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
                   <Line yAxisId="left" type="monotone" dataKey="load" stroke="#3b82f6" strokeWidth={0.5} dot={false} isAnimationActive={false} />
                 </ComposedChart>
               </ResponsiveContainer>

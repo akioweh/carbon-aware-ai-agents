@@ -148,7 +148,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
 
       <CardContent className="space-y-4 pt-4">
         <div className="flex flex-wrap items-center gap-4 text-sm pb-2 border-b">
-          <div className="flex items-center gap-2"><div className="h-3 w-3 rounded bg-blue-500" /><span className="text-muted-foreground">Scheduled</span></div>
+          <div className="flex items-center gap-2"><div className="h-3 w-3 rounded bg-green-500" /><span className="text-muted-foreground">Scheduled</span></div>
           <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-emerald-500" /><span className="text-muted-foreground">Greenness</span></div>
           <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-blue-400" /><span className="text-muted-foreground">Outside-Load</span></div>
         </div>
@@ -189,7 +189,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                         <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id={`colorScheduled-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
+                              <stop offset="5%" stopColor="#059669" stopOpacity={0.8} /><stop offset="95%" stopColor="#059669" stopOpacity={0.1} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
@@ -220,9 +220,9 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                               return null;
                             }}
                           />
-                          <Area yAxisId="left" type="monotone" dataKey="totalLoad" stroke="#3b82f6" fill={`url(#colorScheduled-${dc.id})`} isAnimationActive={false} />
+                          <Area yAxisId="left" type="monotone" dataKey="totalLoad" stroke="#059669" fill={`url(#colorScheduled-${dc.id})`} isAnimationActive={false} />
                           <Line yAxisId="right" type="monotone" dataKey="greeness" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
-                          <Line yAxisId="left" type="monotone" dataKey="load" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                          <Line yAxisId="left" type="monotone" dataKey="load" stroke="#3b82f6" strokeWidth={1} dot={false} isAnimationActive={false} />
                           {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
                             <ReferenceLine key={k} yAxisId="left" x={d.time.toISOString()} stroke="#94a3b8" strokeDasharray="4 4" label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fontSize: 10 } : undefined} />
                           ))}
