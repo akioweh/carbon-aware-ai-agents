@@ -316,17 +316,14 @@ def get_carbon_db_connection():
 def carbon_intensity_to_greenness(intensity: int) -> float:
     """Convert carbon intensity (gCO2/kWh) to greenness score (0-100).
 
-    Uses a 1/CI curve: greenness = 100 * (1/CI) / (1/CI_min), normalized so that
-    CI=1 → 100 and higher CI values decay hyperbolically toward 0.
+    Linear mapping: CI=0 → 100, CI=350 → 0.
     """
     if intensity is None:
         return 50.0  # Default to middle if no data
 
-    # Clamp to positive range (avoid division by zero)
-    intensity = max(1, min(500, intensity))
+    intensity = max(0, min(500, intensity))
 
-    # 1/CI normalised to 0-100:  greenness = 100 / CI
-    greenness = 100.0 / intensity
+    greenness = 100.0 * (1.0 - intensity / 350.0)
     return max(0.0, min(100.0, greenness))
 
 
