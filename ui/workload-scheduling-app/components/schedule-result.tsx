@@ -320,17 +320,37 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           </CardHeader>
           <CardContent className="pt-0">
             <div className="grid gap-4 sm:grid-cols-3">
+              {/* Carbon Intensity Card */}
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
+                {!showTrivial && unoptimizedComparison.carbon_intensity && (
+                  <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
+                    {-Math.max(0, ((unoptimizedComparison.carbon_intensity - (carbonIntensity || 0)) / unoptimizedComparison.carbon_intensity) * 100).toFixed(0)}%
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">Carbon Intensity</p>
                 <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{carbonIntensity?.toFixed(3)}</p>
                 <p className="text-xs text-muted-foreground">kg CO2/kWh</p>
               </div>
+
+              {/* Total Emissions Card */}
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
+                {!showTrivial && unoptimizedComparison.total_emissions && (
+                  <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
+                    {-Math.max(0, ((unoptimizedComparison.total_emissions - (totalEmissions || 0)) / unoptimizedComparison.total_emissions) * 100).toFixed(0)}%
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">Total Emissions</p>
                 <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{totalEmissions?.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground">kg CO2</p>
               </div>
+
+              {/* SCI Card */}
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
+                {!showTrivial && unoptimizedComparison.sci && (
+                  <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
+                    {-Math.max(0, ((unoptimizedComparison.sci - (sci || 0)) / unoptimizedComparison.sci) * 100).toFixed(0)}%
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">SCI per Unit</p>
                 <p className={`text-3xl font-bold ${showTrivial ? "text-orange-600" : "text-primary"}`}>{sci?.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground">kg CO2e/unit</p>
