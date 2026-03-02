@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 import db_utils
-from predictor_linreg import get_next_week_load, get_next_week_greenness
+from predictor_linreg import get_next_week_load
+from predictor_sarimax import get_next_week_greenness, get_next_week_carbon_intensity
 
 
 def generate_next_week_load_prediction(location):
@@ -63,6 +64,7 @@ def generate_next_week_greenness_prediction(location):
             {
                 'timestamp': entry['timestamp'],
                 'greenness': entry['greenness'],
+                'carbon_intensity': entry.get('carbon_intensity'),
             }
             for entry in location_history
         ]
@@ -85,6 +87,46 @@ def generate_next_week_greenness_prediction(location):
                 'is_forecast': True,
             }
             for i in range(len(next_week_greenness_df))
+        ],
+    }
+
+
+def generate_next_week_carbon_intensity_prediction(location):
+    """Generate carbon intensity predictions (gCO2/kWh) for the next week at a specific location."""
+    start_time = datetime.now() - timedelta(days=60)
+    location_history = db_utils.get_historical_data(location, start_time=start_time)
+
+    if not location_history:
+        raise ValueError(f'No history found for location: {location}')
+
+    # Need carbon_intensity data for this endpoint
+    has_ci = any(entry.get('carbon_intensity') is not None for entry in location_history)
+    if not has_ci:
+        raise ValueError(f'No carbon intensity data available for location: {location}')
+
+    historical_ci = pd.DataFrame(
+        [
+            {
+                'timestamp': entry['timestamp'],
+                'carbon_intensity': entry.get('carbon_intensity'),
+            }
+            for entry in location_history
+        ]
+    )
+
+    next_week_ci_df = get_next_week_carbon_intensity(historical_ci)
+
+    return {
+        'location_id': location,
+        'metric': 'forecast_carbon_intensity',
+        'unit': 'gCO2_per_kWh',
+        'data': [
+            {
+                'timestamp': next_week_ci_df.iloc[i]['ds'].isoformat(),
+                'value': max(0.0, min(500.0, float(next_week_ci_df.iloc[i]['yhat']))),
+                'is_forecast': True,
+            }
+            for i in range(len(next_week_ci_df))
         ],
     }
 

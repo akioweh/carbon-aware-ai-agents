@@ -120,9 +120,3 @@ Simpler methods like SARIMAX and Seasonal Naive outperform precisely because the
 **The lesson:** benchmarking on synthetic data can give misleading results. The properties of generated data (smooth seasonality, predictable trends) may not match the real signal at all. Always validate against real data before choosing a forecasting method.
 
 ---
-
-### Overall recommendation
-
-**Replace Prophet with Linear Regression** as the default. It's near-best, quicker, and has zero dependencies. SariIf greenness accuracy needs to be maximised, add SARIMAX as an option.
-
----

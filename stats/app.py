@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 import db_utils
 from generate_history import DATA_CENTRES, generate_history
 from predictor import (
+    generate_next_week_carbon_intensity_prediction,
     generate_next_week_greenness_prediction,
     generate_next_week_load_prediction,
 )
@@ -97,6 +98,14 @@ class GreennessForecastResponse(BaseForecastResponse):
     data: list[GreennessForecastDataPoint] = Field(..., description='Time series data')
 
 
+class CarbonIntensityForecastDataPoint(BaseForecastDataPoint):
+    pass
+
+
+class CarbonIntensityForecastResponse(BaseForecastResponse):
+    data: list[CarbonIntensityForecastDataPoint] = Field(..., description='Time series data')
+
+
 class ErrorResponse(BaseModel):
     error: str
 
@@ -113,6 +122,12 @@ def prediction_loop():
 
                 greenness_data = generate_next_week_greenness_prediction(dc)
                 db_utils.save_prediction(f'greenness_forecast_{dc}', greenness_data)
+
+                try:
+                    ci_data = generate_next_week_carbon_intensity_prediction(dc)
+                    db_utils.save_prediction(f'carbon_intensity_forecast_{dc}', ci_data)
+                except ValueError:
+                    pass  # No carbon intensity data yet for this location
 
                 if consecutive_failures[dc]:
                     logger.info('Prediction loop recovered for %s after %d failure(s)', dc, consecutive_failures[dc])
@@ -313,6 +328,37 @@ def get_carbon_forecast(location: str):
 
 
 @app.get(
+    '/locations/{location}/metrics/forecast_carbon_intensity',
+    response_model=CarbonIntensityForecastResponse,
+    tags=['Forecasts'],
+    summary='Get carbon intensity forecast for next week',
+    responses={
+        500: {'model': ErrorResponse},
+        404: {'model': ErrorResponse, 'description': 'Location not found or no carbon intensity data'},
+    },
+)
+def get_carbon_intensity_forecast(location: str):
+    """
+    Returns SARIMAX-generated carbon intensity predictions (gCO2/kWh) for the next week.
+    Results are cached for 5 minutes.
+    """
+    try:
+        cache_key = f'carbon_intensity_forecast_{location}'
+        cached_result = db_utils.get_cached_prediction(cache_key)
+        if cached_result:
+            return cached_result
+        else:
+            data = generate_next_week_carbon_intensity_prediction(location)
+            db_utils.save_prediction(cache_key, data)
+            return data
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={'error': str(e)})
+    except Exception as e:
+        print(f'Error processing request: {e}')
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@app.get(
     '/locations',
     response_model=list[Location],
     tags=['Locations'],
@@ -330,6 +376,11 @@ def get_carbon_forecast(location: str):
                     'operationId': 'get_carbon_forecast_locations__location__metrics_forecast_greenness_get',
                     'parameters': {'location': '$response.body#/0/id'},
                     'description': 'Get greenness forecast for a location from the list',
+                },
+                'GetCarbonIntensityForecast': {
+                    'operationId': 'get_carbon_intensity_forecast_locations__location__metrics_forecast_carbon_intensity_get',
+                    'parameters': {'location': '$response.body#/0/id'},
+                    'description': 'Get carbon intensity forecast for a location from the list',
                 },
             },
         }
