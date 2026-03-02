@@ -79,17 +79,17 @@ def generate_load(timestamp, dc_index):
         if 0 <= hour < 5:
             base_curve *= 0.5
 
-    # Add randomness/noise
-    noise = random.uniform(-8, 8)
+    # Add randomness/noise (kept mild so the curve shape stays clean)
+    noise = random.uniform(-3, 3)
 
     # Small random baseline shift per day so consecutive days don't look identical
     day_seed = timestamp.toordinal() + dc_index
     rng_day = random.Random(day_seed)
-    noise += rng_day.uniform(-5, 5)
+    noise += rng_day.uniform(-2, 2)
 
-    # Occasional spikes (server updates, batch jobs) — 5% chance, varied magnitude
-    if random.random() < 0.05:
-        noise += random.uniform(5, 25)
+    # Occasional spikes (server updates, batch jobs) — 3% chance, mild magnitude
+    if random.random() < 0.03:
+        noise += random.uniform(3, 10)
 
     value = base_curve + noise
 

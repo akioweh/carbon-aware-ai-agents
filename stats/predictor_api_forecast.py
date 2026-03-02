@@ -175,22 +175,12 @@ def get_next_week_greenness(historical_df, location: str) -> pd.DataFrame:
         # Build carbon intensity forecast, then convert to greenness
         api_series = _fetch_48h_regional_forecast(region_id)
         last_week = _last_week_series(historical_df, 'carbon_intensity')
-        ci_df = _build_forecast(api_series, last_week, clip_min=0, clip_max=500)
-        # DEBUG: log intermediate values to diagnose all-100s issue
-        ci_vals = ci_df['yhat']
-        print(f"[DEBUG greenness {location}] has_ci=True, region_id={region_id}")
-        print(f"[DEBUG greenness {location}] api_series: len={len(api_series)}, empty={api_series.empty}")
-        print(f"[DEBUG greenness {location}] last_week CI: len={len(last_week)}, empty={last_week.empty}")
-        if not last_week.empty:
-            print(f"[DEBUG greenness {location}] last_week CI range: {last_week.min():.1f} - {last_week.max():.1f}")
-        print(f"[DEBUG greenness {location}] ci_df yhat: min={ci_vals.min():.1f}, max={ci_vals.max():.1f}, mean={ci_vals.mean():.1f}, nan_count={ci_vals.isna().sum()}")
-        # Convert: same formula as db_utils.carbon_intensity_to_greenness, vectorised
-        greenness = 100.0 - ((ci_df['yhat'].values - 50) / 3.5)
+        ci_df = _build_forecast(api_series, last_week, clip_min=1, clip_max=500)
+        # Convert: 1/CI normalised to 0-100 (matches db_utils.carbon_intensity_to_greenness)
+        greenness = 100.0 / np.maximum(ci_df['yhat'].values, 1)
         ci_df['yhat'] = np.clip(greenness, 0, 100)
-        print(f"[DEBUG greenness {location}] final greenness: min={ci_df['yhat'].min():.1f}, max={ci_df['yhat'].max():.1f}, mean={ci_df['yhat'].mean():.1f}")
         return ci_df
 
     # Fallback: no carbon data or unknown region — use raw greenness history
-    print(f"[DEBUG greenness {location}] FALLBACK: has_ci={has_ci}, region_id={region_id}")
     last_week = _last_week_series(historical_df, 'greenness')
     return _build_forecast(pd.Series(dtype=float), last_week, clip_min=0, clip_max=100)

@@ -316,20 +316,17 @@ def get_carbon_db_connection():
 def carbon_intensity_to_greenness(intensity: int) -> float:
     """Convert carbon intensity (gCO2/kWh) to greenness score (0-100).
 
-    UK carbon intensity typically ranges from ~50 (very green) to ~400+ (high carbon).
-    We map this to a 0-100 greenness score where:
-    - 100 = very green (low carbon, ~50 gCO2/kWh or less)
-    - 0 = high carbon (~400+ gCO2/kWh)
+    Uses a 1/CI curve: greenness = 100 * (1/CI) / (1/CI_min), normalized so that
+    CI=1 → 100 and higher CI values decay hyperbolically toward 0.
     """
     if intensity is None:
         return 50.0  # Default to middle if no data
 
-    # Clamp intensity to expected range
-    intensity = max(0, min(500, intensity))
+    # Clamp to positive range (avoid division by zero)
+    intensity = max(1, min(500, intensity))
 
-    # Linear mapping: 50 -> 100, 400 -> 0
-    # greenness = 100 - ((intensity - 50) / 350) * 100
-    greenness = 100 - ((intensity - 50) / 3.5)
+    # 1/CI normalised to 0-100:  greenness = 100 / CI
+    greenness = 100.0 / intensity
     return max(0.0, min(100.0, greenness))
 
 
