@@ -177,7 +177,7 @@ def get_next_week_greenness(historical_df, location: str) -> pd.DataFrame:
         last_week = _last_week_series(historical_df, 'carbon_intensity')
         ci_df = _build_forecast(api_series, last_week, clip_min=1, clip_max=500)
         # Convert: 1/CI normalised to 0-100 (matches db_utils.carbon_intensity_to_greenness)
-        greenness = 100.0 / np.maximum(ci_df['yhat'].values, 1)
+        greenness = 100.0 / np.maximum(ci_df['yhat'].values, 0.01)
         ci_df['yhat'] = np.clip(greenness, 0, 100)
         return ci_df
 
