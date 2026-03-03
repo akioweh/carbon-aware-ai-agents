@@ -180,7 +180,7 @@ def carbon_collector_loop():
     logger.info('Database: %s', CARBON_DB_PATH)
 
     conn = init_carbon_db(CARBON_DB_PATH)
-    backfill(conn)
+    # Backfill already ran during startup (lifespan), just collect going forward.
 
     consecutive_failures = 0
     while True:
@@ -211,16 +211,29 @@ def carbon_collector_loop():
 async def lifespan(app: FastAPI):
     db_utils.initialize_db()
 
-    # Try to use real carbon data if available
+    # Step 1: Backfill carbon data from API BEFORE anything else.
+    # This ensures historical_data has real CI values so predictions
+    # cover the full 7 days (not just the 48h API forecast window).
+    if CARBON_COLLECTION_ENABLED:
+        logger.info('Running carbon collector backfill from API...')
+        try:
+            conn = init_carbon_db(CARBON_DB_PATH)
+            backfill(conn)
+            conn.close()
+            logger.info('Carbon backfill complete')
+        except Exception:
+            logger.error('Carbon backfill failed on startup', exc_info=True)
+
+    # Step 2: Sync carbon data into historical_data table
     if db_utils.has_carbon_data():
-        logger.info('Carbon intensity database found, syncing real data...')
+        logger.info('Syncing carbon data to historical_data...')
         try:
             count = db_utils.sync_carbon_to_historical(days_back=30)
             logger.info('Synced %d carbon readings to historical data', count)
         except Exception:
             logger.error('Failed to sync carbon data on startup', exc_info=True)
 
-    # Fall back to other data sources if no historical data
+    # Step 3: Fall back to synthetic data only if no historical data at all
     if db_utils.count_historical_data() == 0:
         if os.path.exists(HISTORY_FILE):
             print('Migrating history.json to database...')
@@ -229,11 +242,10 @@ async def lifespan(app: FastAPI):
             print('No historical data found, generating initial data...')
             generate_history()
 
-    # Start background threads
+    # Step 4: Start background threads (predictions now have CI data)
     prediction_thread = threading.Thread(target=prediction_loop, daemon=True)
     prediction_thread.start()
 
-    # Start carbon collector and sync threads if enabled
     if CARBON_COLLECTION_ENABLED:
         collector_thread = threading.Thread(target=carbon_collector_loop, daemon=True)
         collector_thread.start()
@@ -243,7 +255,6 @@ async def lifespan(app: FastAPI):
         sync_thread.start()
         print('Carbon sync background thread started')
     elif db_utils.has_carbon_data():
-        # If not collecting but have existing data, still sync it
         sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
         sync_thread.start()
         print('Carbon sync background thread started')

@@ -24,11 +24,11 @@ from pathlib import Path
 # Configuration
 API_BASE_URL = "https://api.carbonintensity.org.uk"
 REGIONS = {
-    1: "North Scotland",
-    2: "South Scotland",
     3: "North West England",
     4: "North East England",
+    5: "South Yorkshire",
     13: "London",
+    14: "South East England",
 }
 DB_PATH = Path(os.environ.get("CARBON_DB_PATH", Path(__file__).parent / "carbon_intensity.db"))
 INTERVAL_MINUTES = int(os.environ.get("CARBON_INTERVAL_MINUTES", 30))
