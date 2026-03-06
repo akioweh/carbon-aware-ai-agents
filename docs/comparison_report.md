@@ -177,11 +177,11 @@ When MAE is a tie, shape-capture metrics break the deadlock:
 
 **Spectral Entropy** splits the field into two tiers: Random Forest and LightGBM (0.893) versus XGBoost and CatBoost (0.87–0.88). Higher entropy means the residuals contain less leftover periodic structure — the model has captured more of the signal.
 
-**Speed** is a non-factor. Predictions are pre-computed and cached server-side as a batch job (not in the request path). Random Forest's 6.72s versus CatBoost's 0.66s makes no practical difference when the computation runs in a background thread.
+**Resource efficiency** matters because the Stats service runs on a constrained Oracle cloud server. Random Forest takes 6.72s to train (200 full independent trees, all held in memory) versus LightGBM's 0.85s (~8x faster). LightGBM's histogram binning (~255 bins per feature) also produces a significantly smaller memory footprint than RF's full tree storage. Even though predictions are pre-computed in a background batch job, 8x less CPU time and lower RAM usage is meaningful on a resource-limited machine.
 
 ### Recommendation
 
-**LightGBM or Random Forest.** Both top the accuracy and shape metrics. LightGBM has the best KL divergence (0.084), meaning its prediction distribution most faithfully reproduces reality — it doesn't flatten valleys or clip peaks. Random Forest ties on spectral entropy and edges on MAE (6.53 vs 6.62). Either is a strong choice for the production scheduler.
+**LightGBM.** It ties Random Forest on spectral entropy (0.893) and wins on KL divergence (0.084 vs 0.129), meaning its prediction distribution most faithfully reproduces reality. The MAE gap is just 0.09 gCO2/kWh (6.62 vs 6.53) — negligible. What breaks the tie is resource efficiency: LightGBM trains ~8x faster and uses significantly less memory, which matters on the constrained Oracle server hosting the Stats service.
 
 ### Caveat
 

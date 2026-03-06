@@ -160,22 +160,7 @@ paths:
               description: Get carbon intensity forecast for a location from the list
 components:
   schemas:
-    Capacity:
-      properties:
-        max_load:
-          type: number
-          title: Max Load
-          description: Maximum load capacity
-        total_gpus:
-          type: integer
-          title: Total Gpus
-          description: Total number of GPUs
-      type: object
-      required:
-      - max_load
-      - total_gpus
-      title: Capacity
-    CarbonIntensityForecastDataPoint:
+    BaseForecastDataPoint:
       properties:
         timestamp:
           type: string
@@ -194,7 +179,22 @@ components:
       - timestamp
       - value
       - is_forecast
-      title: CarbonIntensityForecastDataPoint
+      title: BaseForecastDataPoint
+    Capacity:
+      properties:
+        max_load:
+          type: number
+          title: Max Load
+          description: Maximum load capacity
+        total_gpus:
+          type: integer
+          title: Total Gpus
+          description: Total number of GPUs
+      type: object
+      required:
+      - max_load
+      - total_gpus
+      title: Capacity
     CarbonIntensityForecastResponse:
       properties:
         location_id:
@@ -211,7 +211,7 @@ components:
           description: Unit of measurement
         data:
           items:
-            $ref: '#/components/schemas/CarbonIntensityForecastDataPoint'
+            $ref: '#/components/schemas/BaseForecastDataPoint'
           type: array
           title: Data
           description: Time series data
@@ -245,6 +245,12 @@ components:
           type: boolean
           title: Is Forecast
           description: Indicates if this is a forecast
+        carbon_intensity:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Carbon Intensity
+          description: Estimated carbon intensity (gCO2/kWh)
       type: object
       required:
       - timestamp
