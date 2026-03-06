@@ -50,7 +50,7 @@ def initialize_db():
                 location TEXT NOT NULL,
                 timestamp REAL NOT NULL,
                 load REAL NOT NULL,
-                greenness REAL NOT NULL,
+                greenness REAL,
                 carbon_intensity REAL,
                 PRIMARY KEY (location, timestamp)
             )
