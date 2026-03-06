@@ -1,122 +1,196 @@
-# Prophet Alternatives: Benchmark Report
+# Carbon Intensity Prediction Benchmark
 
 ## Overview
 
-This report compares Meta Prophet against 5 lightweight alternatives for forecasting datacenter **load** (0-50 scale) and **greenness** (0-100 scale). The goal is to find a method that matches or beats Prophet's accuracy while being lighter in dependencies and runtime.
+This report compares 9 forecasting models (5 statistical + 4 ML tree-based) on real UK carbon intensity data (gCO2/kWh). Models are evaluated on 7 metrics that measure both point accuracy and shape capture. The benchmark tests different training window sizes to assess the effect of data volume on prediction quality.
 
 ## Test Setup
 
-| Parameter | Load | Greenness |
-|-----------|------|-----------|
-| **Data source** | `cache.db` (synthetic) | `carbon_intensity.db` (real UK Carbon Intensity API) |
-| **Location** | Data-Center-1 | Region 13 (London) |
-| **Training set** | 23 days (6,624 pts, 5-min intervals) | Jan 31 - Feb 6 (336 pts, 30-min intervals) |
-| **Test set** | 7 days (2,475 pts) | Feb 7 - Feb 13 (336 pts) |
+| Parameter | Value |
+|-----------|-------|
+| **Data source** | `carbon_intensity.db` (UK Carbon Intensity API) |
+| **Regions** | London, North East England, North West England, South East England, South Yorkshire |
+| **Date range** | 2025-12-06 11:30:00+00:00 to 2026-03-06 11:00:00+00:00 |
+| **Total readings** | 21480 |
+| **Frequency** | 30-minute intervals |
+| **Test set** | Last 7 days |
+| **Training (7-day)** | 336 points (6 days) |
+| **Training (Full backfill)** | 3960 points (82 days) |
 
-Load data is synthetic. Greenness data is **real carbon intensity** from the UK grid, collected via the Carbon Intensity API, deduplicated to unique 30-minute readings. All methods were given identical training data and evaluated against the same held-out test period.
+## Raw Data
 
----
+![Raw Data](benchmark_raw_data.png)
 
-## Results
+## Metrics Explained
 
-### Accuracy
+| Metric | Purpose |
+|--------|---------|
+| **MAE** | Mean Absolute Error — primary accuracy in gCO2/kWh |
+| **MSE** | Mean Squared Error — penalizes large errors quadratically |
+| **RMSE** | Root MSE — same scale as MAE, sensitive to outliers |
+| **R-squared** | Fraction of variance explained; negative = worse than predicting the mean |
+| **Adjusted R-squared** | R-squared penalized by number of model features |
+| **Spectral Entropy** | Entropy of residual periodogram, scaled to [0,1]. High = residuals are white noise (good). Low = model missed periodic structure |
+| **KL Divergence** | KL divergence between actual and predicted distributions. Low = predictions distribution matches actual. High = model distorts the shape |
 
-| Method | MAE Load | RMSE Load | MAE Greenness | RMSE Greenness |
-|--------|----------|-----------|---------------|----------------|
-| Prophet | 4.26 | 5.71 | 21.44 | 23.95 |
-| Holt-Winters | 6.57 | 7.50 | 32.34 | 37.12 |
-| SARIMAX | 7.50 | 8.39 | **9.62** | **11.94** |
-| Linear Regression | 5.76 | 7.10 | 12.27 | 15.38 |
-| Fourier Regression | 5.14 | 6.36 | 15.65 | 18.79 |
-| **Seasonal Naive** | **1.58** | **2.55** | **10.62** | **13.69** |
+## Results: 7-day
 
-*Bold = best or near-best in category. Lower is better.*
+### Accuracy Table
 
-### Speed
+| Model | MAE | RMSE | R2 | Spectral_Entropy | KL_Divergence | Time (s) |
+|-------|-------|-------|-------|-------|-------|----------|
+| Ridge | 46.01 | 60.25 | -0.400 | 0.376 | 0.905 | 0.00 |
+| SARIMAX | 70.87 | 86.88 | -1.821 | 0.373 | 1.155 | 0.75 |
+| Seasonal Naive | 43.52 | 57.17 | -0.328 | 0.447 | 0.449 | 0.00 |
+| Fourier | 57.39 | 65.26 | -0.803 | 0.399 | 1.015 | 0.00 |
+| Holt-Winters | 101.95 | 116.29 | -6.474 | 0.410 | 1.650 | 0.14 |
+| Random Forest | 11.09 | 16.95 | 0.887 | 0.731 | 0.446 | 5.04 |
+| XGBoost | 12.83 | 18.89 | 0.847 | 0.700 | 0.449 | 0.69 |
+| CatBoost | 21.55 | 31.03 | 0.510 | 0.539 | 0.465 | 0.53 |
+| LightGBM | 12.13 | 18.46 | 0.857 | 0.729 | 0.379 | 0.57 |
 
-| Method | Total Time (s) | Speedup vs Prophet |
-|--------|----------------|--------------------|
-| Prophet | 0.95 | 1x |
-| Holt-Winters | 0.14 | 7x |
-| SARIMAX | 3.05 | 0.3x (slower) |
-| Linear Regression | 0.01 | **95x** |
-| Fourier Regression | 0.01 | **95x** |
-| Seasonal Naive | 0.00 | **instant** |
+*Averaged across 5 regions. Lower MAE/RMSE/KL is better. Higher R2/Spectral Entropy is better.*
 
-### Dependencies
+### Predictions vs Actual
 
-| Method | Extra Dependencies | Approx. Install Size |
-|--------|-------------------|---------------------|
-| Prophet | `prophet`, `cmdstanpy`, `pystan`, Stan compiler | ~200+ MB |
-| Holt-Winters | `statsmodels` | ~30 MB |
-| SARIMAX | `statsmodels` | ~30 MB |
-| Linear Regression | `scikit-learn` | ~40 MB |
-| Fourier Regression | None (`numpy` only, already required by pandas) | **0 MB** |
-| Seasonal Naive | None (`pandas` only) | **0 MB** |
+![Predictions 7-day](benchmark_predictions_7-day.png)
 
----
+### Zoomed 48-Hour Detail
 
-## Method Details
+![48h Detail 7-day](benchmark_zoom_48h_7-day.png)
 
-### 1. Prophet (baseline)
-- **Config:** `daily_seasonality=True`, `weekly_seasonality=True`
-- **How it works:** Decomposes time series into trend + seasonality using Fourier terms, fit via Stan's MAP optimizer. Automatic changepoint detection.
-- **Result:** Second-worst on real greenness (MAE 21.44). Prophet's complex model overfits on limited training data and misses the non-periodic variability in real carbon intensity. Decent on synthetic load (4.26) where patterns are clean and predictable. **Not recommended — heavy dependencies, mediocre accuracy on real data.**
+## Results: Full backfill
 
-### 2. Holt-Winters (Triple Exponential Smoothing)
-- **Config:** Additive trend + additive seasonality, `seasonal_periods=24` (hourly resampling)
-- **How it works:** Exponential smoothing with level, trend, and seasonal components. Resampled to hourly, then interpolated back.
-- **Result:** Worst greenness accuracy (MAE 32.34). The single-seasonality limitation and trend extrapolation produce poor forecasts. **Not recommended.**
+### Accuracy Table
 
-### 3. SARIMAX
-- **Config:** `order=(1,1,1)`, `seasonal_order=(1,1,1,24)` on hourly data
-- **How it works:** Seasonal ARIMA with autoregressive and moving average components. Captures momentum and recent patterns rather than just seasonality.
-- **Result:** Best greenness accuracy (MAE 9.62) — ARIMA's autoregressive nature handles the real-world variability in carbon intensity well. But it's the slowest method (3.05s) and worst on load (7.50). **Best for greenness accuracy if speed is not a concern.**
+| Model | MAE | RMSE | R2 | Spectral_Entropy | KL_Divergence | Time (s) |
+|-------|-------|-------|-------|-------|-------|----------|
+| Ridge | 43.33 | 52.38 | -0.054 | 0.376 | 1.059 | 0.00 |
+| SARIMAX | 61.44 | 77.45 | -1.334 | 0.384 | 0.900 | 1.86 |
+| Seasonal Naive | 43.52 | 57.17 | -0.328 | 0.447 | 0.449 | 0.00 |
+| Fourier | 42.84 | 51.59 | -0.041 | 0.369 | 0.977 | 0.00 |
+| Holt-Winters | 87.04 | 102.41 | -4.192 | 0.346 | 1.646 | 0.89 |
+| Random Forest | 6.531 | 9.595 | 0.961 | 0.893 | 0.129 | 6.72 |
+| XGBoost | 6.783 | 9.852 | 0.959 | 0.884 | 0.119 | 0.78 |
+| CatBoost | 6.869 | 9.923 | 0.959 | 0.871 | 0.121 | 0.66 |
+| LightGBM | 6.617 | 9.635 | 0.961 | 0.893 | 0.084 | 0.85 |
 
-### 4. Linear Regression with Seasonal Features
-- **Config:** Ridge regression (alpha=1.0) with cyclical sin/cos features for hour, day-of-week, minute-of-day, plus linear trend
-- **How it works:** Encodes time features as cyclical variables, fits a regularised linear model. Interval-agnostic — works on any frequency.
-- **Result:** Solid greenness accuracy (MAE 12.27), fast (0.01s). A good balanced option. **Solid choice if you want a modelling approach with scikit-learn.**
+*Averaged across 5 regions. Lower MAE/RMSE/KL is better. Higher R2/Spectral Entropy is better.*
 
-### 5. Fourier Regression (OLS)
-- **Config:** 3 daily harmonics, 2 weekly harmonics, linear trend. Auto-detects data interval. Solved with `numpy.linalg.lstsq`.
-- **How it works:** Explicit sine/cosine terms at daily and weekly frequencies — Prophet's core math without the overhead.
-- **Result:** Middle-of-pack greenness (MAE 15.65), second-best load (5.14), fast (0.01s), zero dependencies. **Good all-rounder, fully transparent.**
+### Predictions vs Actual
 
-### 6. Seasonal Naive
-- **Config:** Repeat the last 7 days of training data as the forecast. Auto-detects data interval.
-- **How it works:** Assumes next week looks like last week. No model fitting.
-- **Result:** Dominates load (MAE 1.58) and near-best on greenness (MAE 10.62). Instant. Zero dependencies. **Surprisingly strong on real data.**
+![Predictions Full backfill](benchmark_predictions_full_backfill.png)
 
----
+### Zoomed 48-Hour Detail
 
-## Key Insight: Prophet Dominated on Synthetic Data, Failed on Real Data
+![48h Detail Full backfill](benchmark_zoom_48h_full_backfill.png)
 
-Our initial benchmarks used synthetic greenness data generated by `generate_history.py`. On that data, Prophet was the clear winner — it achieved the best greenness MAE (12.13) and appeared to justify its heavy dependency footprint. Every alternative looked like a compromise.
+## Training Data Volume Comparison
 
-But when we replaced the synthetic greenness with real carbon intensity data from the UK grid, the rankings inverted completely. Prophet dropped from 1st to 5th place, with a greenness MAE of 21.44 — more than double the best alternative (SARIMAX at 9.62).
+![Training Comparison](benchmark_training_comparison.png)
 
-| Method | Greenness MAE (synthetic) | Rank | Greenness MAE (real) | Rank |
-|--------|--------------------------|------|---------------------|------|
-| Prophet | **12.13** | 1st | 21.44 | 5th |
-| SARIMAX | 12.27 | 2nd | **9.62** | **1st** |
-| Linear Regression | 12.41 | 3rd | 12.27 | 3rd |
-| Fourier Regression | 12.72 | 4th | 15.65 | 4th |
-| Seasonal Naive | 16.09 | 5th | 10.62 | 2nd |
-| Holt-Winters | 26.99 | 6th | 32.34 | 6th |
+This chart compares MAE across training windows. Models that improve significantly with more data have learned meaningful temporal patterns. Models that stay flat or get worse may be overfitting or are insensitive to training volume.
 
-**Why this happened:** The synthetic data in `generate_history.py` produces clean, smooth seasonal patterns — exactly the kind of signal Prophet is designed for. It uses sine waves for daily cycles and gentle random walks for trends. Prophet's Fourier decomposition and changepoint detection are perfectly suited to this.
+## Residual Analysis — 7-day
 
-Real carbon intensity is fundamentally different. It's driven by:
-- **Weather** — wind speed directly determines how much generation comes from wind farms, causing sharp, unpredictable swings
-- **Demand spikes** — cold snaps, industrial demand, and events cause sudden load increases that fire up gas plants
-- **Grid dispatch decisions** — which power stations are brought online depends on market prices, maintenance schedules, and interconnector availability
-- **Time of day** — there is a daily pattern, but it's noisy and varies significantly day-to-day
+![Residuals 7-day](benchmark_residuals_7-day.png)
 
-Prophet's model assumes the signal is primarily composed of smooth seasonal components plus a piecewise-linear trend with changepoints. When the signal has significant non-periodic variability (as real carbon data does), Prophet fits the noise in the training data and extrapolates it poorly. With only 7 days of training data, the changepoint detection is especially prone to overfitting.
+**Spectral Entropy** near 1.0 means the model's residuals look like white noise — it captured all the periodic structure in the data. Values below 0.8 suggest the model missed recurring patterns. The **ACF plot** shows autocorrelation in residuals; significant spikes at lag 48 (1 day) or lag 336 (1 week) indicate unmodelled seasonality.
 
-Simpler methods like SARIMAX and Seasonal Naive outperform precisely because they don't try to model structure that isn't there. SARIMAX captures short-term momentum (today's intensity is correlated with yesterday's). Seasonal Naive assumes next week looks like last week — a surprisingly good heuristic for carbon intensity, which does have stable weekly patterns despite the daily noise.
+## Residual Analysis — Full backfill
 
-**The lesson:** benchmarking on synthetic data can give misleading results. The properties of generated data (smooth seasonality, predictable trends) may not match the real signal at all. Always validate against real data before choosing a forecasting method.
+![Residuals Full backfill](benchmark_residuals_full_backfill.png)
 
----
+**Spectral Entropy** near 1.0 means the model's residuals look like white noise — it captured all the periodic structure in the data. Values below 0.8 suggest the model missed recurring patterns. The **ACF plot** shows autocorrelation in residuals; significant spikes at lag 48 (1 day) or lag 336 (1 week) indicate unmodelled seasonality.
+
+## Metrics Heatmap — 7-day
+
+![Heatmap 7-day](benchmark_heatmap_7-day.png)
+
+## Metrics Heatmap — Full backfill
+
+![Heatmap Full backfill](benchmark_heatmap_full_backfill.png)
+
+## Model Details
+
+### Statistical Models
+
+- **Ridge Regression**: Ridge(alpha=1.0) with cyclical sin/cos features for hour, day-of-week, minute-of-day. Fast, interpretable, but limited to capturing smooth seasonality.
+- **SARIMAX**: SARIMAX(1,0,1)(1,0,1,48) with training capped at 14 days. Captures autoregressive momentum and seasonal patterns. Slower to fit.
+- **Seasonal Naive**: Repeats the last 7 days of training data. Zero parameters, instant. Strong baseline when weekly patterns dominate.
+- **Fourier Regression**: 3 daily + 2 weekly harmonics solved via OLS (numpy.linalg.lstsq). Prophet's core math without the overhead.
+- **Holt-Winters**: Triple exponential smoothing with additive trend and seasonality (seasonal_periods=48). Struggles with noisy, multi-seasonal data.
+
+### ML Tree-Based Models
+
+- **Random Forest**: RF(n_estimators=200, max_depth=15) with lag + cyclical features. Walk-forward evaluation using actual history for lag computation.
+- **XGBoost**: XGB(n_estimators=200, max_depth=6, lr=0.1). Gradient-boosted trees with the same feature set and walk-forward evaluation.
+- **CatBoost**: CB(iterations=200, depth=6, lr=0.1). Ordered boosting with symmetric trees. Walk-forward evaluation.
+- **LightGBM**: LGBM(n_estimators=200, max_depth=6, lr=0.1). Histogram-based gradient boosting. Walk-forward evaluation.
+
+## Key Findings
+
+**7-day** — Top 3 by MAE:
+1. Random Forest: MAE = 11.09 gCO2/kWh
+2. LightGBM: MAE = 12.13 gCO2/kWh
+3. XGBoost: MAE = 12.83 gCO2/kWh
+
+**Full backfill** — Top 3 by MAE:
+1. Random Forest: MAE = 6.53 gCO2/kWh
+2. LightGBM: MAE = 6.62 gCO2/kWh
+3. XGBoost: MAE = 6.78 gCO2/kWh
+
+**Shape capture**: Models with high spectral entropy and low KL divergence capture the shape of carbon intensity better, not just minimizing mean error. Tree-based models with lag features tend to score well here because they can replicate recent patterns.
+
+**Training volume effect**: More training data generally helps autoregressive models (SARIMAX, tree models) but has diminishing returns for models that only use time-of-day features (Ridge, Fourier).
+
+**Speed/accuracy tradeoffs**: Ridge and Fourier are near-instant. SARIMAX and tree models take seconds. For production use, the best model depends on whether you need sub-second predictions or can afford batch computation.
+
+## Conclusion
+
+### Statistical vs ML: Settled
+
+ML tree-based models dominate statistical models by every metric. On full backfill data, ML models achieve MAE 6.5–6.9 gCO2/kWh versus 42–87 for statistical methods. R-squared is ~0.96 for all four ML models; every statistical model scores negative (worse than predicting the mean). Spectral entropy tells the same story: ML residuals are near-white-noise (0.87–0.89) while statistical residuals retain massive unmodelled structure (0.35–0.45). This gap is not a tuning issue — it reflects a fundamental advantage of lag-based features over time-of-day features for carbon intensity forecasting.
+
+### Is MAE Foolproof?
+
+No. MAE is a useful starting point, but it has three blind spots that matter for scheduling:
+
+1. **MAE treats all errors equally.** A 10 gCO2/kWh error during a low-carbon window — exactly when the scheduler should be dispatching work — is operationally costlier than the same error during a high-carbon peak. MAE doesn't distinguish between the two.
+2. **MAE is an average.** Two models with identical MAE can have very different error distributions. One might nail most points but badly miss peaks; another might have consistent moderate errors everywhere. The average hides this.
+3. **MAE doesn't measure shape.** A model that outputs a flat line near the test set mean can score a reasonable MAE on noisy data, but it's useless for scheduling because it never identifies good windows versus bad ones.
+
+Among the four ML models, the full backfill MAE spread is just 0.34 gCO2/kWh (6.53 to 6.87). That's within noise margin. MAE alone cannot pick a winner here.
+
+### What Distinguishes the ML Models
+
+When MAE is a tie, shape-capture metrics break the deadlock:
+
+| Model | MAE | R2 | Spectral Entropy | KL Divergence |
+|-------|------|----|------------------|---------------|
+| Random Forest | 6.53 | 0.961 | **0.893** | 0.129 |
+| LightGBM | 6.62 | 0.961 | **0.893** | **0.084** |
+| XGBoost | 6.78 | 0.959 | 0.884 | 0.119 |
+| CatBoost | 6.87 | 0.959 | 0.871 | 0.121 |
+
+**KL Divergence** is the clearest separator. LightGBM scores 0.084 — its prediction distribution most closely matches the actual carbon intensity distribution. The other three cluster at 0.12–0.13. This means LightGBM is less likely to flatten peaks or compress the range of predicted values, which directly matters for a scheduler that needs to distinguish clean windows from dirty ones.
+
+**Spectral Entropy** splits the field into two tiers: Random Forest and LightGBM (0.893) versus XGBoost and CatBoost (0.87–0.88). Higher entropy means the residuals contain less leftover periodic structure — the model has captured more of the signal.
+
+**Speed** is a non-factor. Predictions are pre-computed and cached server-side as a batch job (not in the request path). Random Forest's 6.72s versus CatBoost's 0.66s makes no practical difference when the computation runs in a background thread.
+
+### Recommendation
+
+**LightGBM or Random Forest.** Both top the accuracy and shape metrics. LightGBM has the best KL divergence (0.084), meaning its prediction distribution most faithfully reproduces reality — it doesn't flatten valleys or clip peaks. Random Forest ties on spectral entropy and edges on MAE (6.53 vs 6.62). Either is a strong choice for the production scheduler.
+
+### Caveat
+
+Walk-forward evaluation builds lag features from actual historical values at each test step. This is realistic for this scheduler, which has continuous access to the UK Carbon Intensity API and maintains a local database of recent readings. However, these results would not generalize to a setting without a live data feed — without recent actuals, lag features degrade and ML model performance would drop significantly.
+
+## Methodology Notes
+
+- **Walk-forward evaluation** for tree models: trained once, then at each test step lag features are built from actual historical values (not predictions). This simulates production usage where recent actuals are available.
+- **SARIMAX training cap**: Limited to 14 days to avoid excessive fit time. This is consistent with the production predictor.
+- **No hyperparameter tuning**: All models use reasonable defaults. Results could improve with tuning, but the comparison is fair since no model was optimized.
+- **Spectral entropy**: Computed from the periodogram of residuals, normalized to [0,1]. Shannon entropy of the normalized power spectral density.
+- **KL divergence**: Histogram-based (50 bins) with Laplace smoothing. Measures distributional similarity between actual and predicted values.

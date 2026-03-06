@@ -367,6 +367,7 @@ CMakeUserPresets.json
 .ionide
 *.db*
 cache.db
+catboost_info/
 history.json
 prediction.json
 predictions.json
