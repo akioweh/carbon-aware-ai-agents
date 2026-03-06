@@ -93,10 +93,14 @@ def get_next_week_greenness(historical_greenness_df):
         yhat = 100.0 - ((ci - 50) / 3.5)
     else:
         yhat = fc_5min.values
+        ci = None
 
     yhat = np.clip(yhat, 0, 100)
 
-    return pd.DataFrame({'ds': fc_5min.index, 'yhat': yhat})
+    result = pd.DataFrame({'ds': fc_5min.index, 'yhat': yhat})
+    if ci is not None:
+        result['ci'] = ci
+    return result
 
 
 def get_next_week_carbon_intensity(historical_df):

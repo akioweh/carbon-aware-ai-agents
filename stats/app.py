@@ -13,7 +13,7 @@ import db_utils
 from generate_history import DATA_CENTRES, generate_history
 from predictor import (
     generate_next_week_carbon_intensity_prediction,
-    generate_next_week_greenness_prediction,
+    generate_next_week_greenness_and_ci_prediction,
     generate_next_week_load_prediction,
 )
 from carbon_collector import (
@@ -78,7 +78,7 @@ class LoadForecastDataPoint(BaseForecastDataPoint):
 
 
 class GreennessForecastDataPoint(BaseForecastDataPoint):
-    pass
+    carbon_intensity: float | None = Field(None, description='Estimated carbon intensity (gCO2/kWh)')
 
 
 class BaseForecastResponse(BaseModel):
@@ -98,12 +98,9 @@ class GreennessForecastResponse(BaseForecastResponse):
     data: list[GreennessForecastDataPoint] = Field(..., description='Time series data')
 
 
-class CarbonIntensityForecastDataPoint(BaseForecastDataPoint):
-    pass
-
 
 class CarbonIntensityForecastResponse(BaseForecastResponse):
-    data: list[CarbonIntensityForecastDataPoint] = Field(..., description='Time series data')
+    data: list[BaseForecastDataPoint] = Field(..., description='Time series data')
 
 
 class ErrorResponse(BaseModel):
@@ -120,14 +117,14 @@ def prediction_loop():
                 load_data = generate_next_week_load_prediction(dc)
                 db_utils.save_prediction(f'load_forecast_{dc}', load_data)
 
-                greenness_data = generate_next_week_greenness_prediction(dc)
+                greenness_data = generate_next_week_greenness_and_ci_prediction(dc)
                 db_utils.save_prediction(f'greenness_forecast_{dc}', greenness_data)
 
                 try:
                     ci_data = generate_next_week_carbon_intensity_prediction(dc)
                     db_utils.save_prediction(f'carbon_intensity_forecast_{dc}', ci_data)
                 except ValueError:
-                    pass  # No carbon intensity data yet for this location
+                    logger.warning('No carbon intensity data for %s, skipping CI forecast', dc)
 
                 if consecutive_failures[dc]:
                     logger.info('Prediction loop recovered for %s after %d failure(s)', dc, consecutive_failures[dc])
@@ -328,7 +325,7 @@ def get_carbon_forecast(location: str):
         if cached_result:
             return cached_result
         else:
-            data = generate_next_week_greenness_prediction(location)
+            data = generate_next_week_greenness_and_ci_prediction(location)
             db_utils.save_prediction(cache_key, data)
             return data
     except ValueError as e:
