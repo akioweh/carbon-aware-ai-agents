@@ -9,7 +9,7 @@ if RUN_DIRECTLY:
 
     schema = schemathesis.openapi.from_asgi('/openapi.json', app)
 else:
-    schema = schemathesis.openapi.from_url('http://localhost:5000/openapi.json')
+    schema = schemathesis.openapi.from_url('http://127.0.0.1:5000/openapi.json')
 
 
 # calling as_state_machine is necessary to enable link-following testing

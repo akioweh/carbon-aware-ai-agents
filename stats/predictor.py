@@ -70,7 +70,7 @@ def generate_next_week_greenness_prediction(location):
         ]
     )
 
-    next_week_greenness_df = get_next_week_greenness(historical_greenness, location)  # TEMPORARY: location arg
+    next_week_greenness_df = get_next_week_greenness(historical_greenness)
 
     # Format as unified metric time-series
     # Note: greenness is inverse of carbon intensity for this prototype
@@ -114,7 +114,7 @@ def generate_next_week_carbon_intensity_prediction(location):
         ]
     )
 
-    next_week_ci_df = get_next_week_carbon_intensity(historical_ci, location)  # TEMPORARY: location arg
+    next_week_ci_df = get_next_week_carbon_intensity(historical_ci)
 
     return {
         'location_id': location,
