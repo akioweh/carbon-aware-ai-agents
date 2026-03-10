@@ -368,7 +368,10 @@ CMakeUserPresets.json
 *.db*
 cache.db
 catboost_info/
+lightning_logs/
 history.json
 prediction.json
 predictions.json
+weather_cache.json
+*results*.json
 CLAUDE.md
