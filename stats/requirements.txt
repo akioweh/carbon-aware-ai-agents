@@ -9,3 +9,7 @@ schemathesis
 requests
 schedule
 uvicorn
+torch
+threadpoolctl
+chronos-forecasting
+neuralforecast

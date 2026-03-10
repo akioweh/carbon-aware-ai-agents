@@ -347,7 +347,7 @@ def get_carbon_forecast(location: str):
 )
 def get_carbon_intensity_forecast(location: str):
     """
-    Returns SARIMAX-generated carbon intensity predictions (gCO2/kWh) for the next week.
+    Returns Direct Ridge carbon intensity predictions (gCO2/kWh) for the next week.
     Results are cached for 5 minutes.
     """
     try:

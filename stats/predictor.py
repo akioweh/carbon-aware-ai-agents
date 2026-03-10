@@ -5,7 +5,7 @@ import pandas as pd
 
 import db_utils
 from predictor_load import get_next_week_load
-from predictor_sarimax import get_next_week_greenness, get_next_week_carbon_intensity
+from predictor_direct_ridge import get_next_week_greenness, get_next_week_carbon_intensity
 
 
 def generate_next_week_load_prediction(location):
@@ -65,6 +65,7 @@ def generate_next_week_greenness_and_ci_prediction(location):
                 'timestamp': entry['timestamp'],
                 'greenness': entry['greenness'],
                 'carbon_intensity': entry.get('carbon_intensity'),
+                'location': location,
             }
             for entry in location_history
         ]
@@ -110,6 +111,7 @@ def generate_next_week_carbon_intensity_prediction(location):
             {
                 'timestamp': entry['timestamp'],
                 'carbon_intensity': entry.get('carbon_intensity'),
+                'location': location,
             }
             for entry in location_history
         ]
