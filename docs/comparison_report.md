@@ -244,3 +244,27 @@ To measure the impact of weather features, all models were run both with and wit
 | N-HiTS | 76.36 | 76.36 | 0.00 |
 
 Negative delta means weather features helped (lower MAE). Models that don't accept exogenous features show no change.
+
+
+## Preprocessing Experiment
+
+Can smarter feature engineering or target preprocessing beat Direct-Ridge MAE 32.99?
+
+All variants use Ridge regression with full-backfill training, same train/test split.
+
+| Variant | MAE | RMSE | R² | #Features |
+|---------|-----|------|----|-----------|
+| Hour×Weather | 33.00 | 40.57 | 0.3388 | 20 |
+| Baseline | 33.02 | 40.36 | 0.3572 | 14 |
+| MA-3h Target | 33.08 | 40.21 | 0.3626 | 14 |
+| One-Hot+Fourier | 33.96 | 41.32 | 0.3180 | 81 |
+| One-Hot Time | 33.97 | 41.33 | 0.3177 | 63 |
+| Fourier-3 | 34.17 | 41.56 | 0.3103 | 26 |
+| STL Residual | 52.11 | 64.11 | -0.8472 | 14 |
+| diff(48) | 54.16 | 68.22 | -1.0476 | 14 |
+
+Baseline Direct-Ridge MAE: 33.02
+Best variant: **Hour×Weather** with MAE 33.00 (Δ = -0.03)
+
+![Preprocessing Comparison](benchmark_preprocessing_comparison.png)
+![Preprocessing Predictions](benchmark_preprocessing_predictions.png)
