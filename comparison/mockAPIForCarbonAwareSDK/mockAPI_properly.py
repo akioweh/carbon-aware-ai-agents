@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import TypedDict
 
 import requests
 from flask import Flask, jsonify, request
@@ -6,16 +7,18 @@ from flask import Flask, jsonify, request
 app = Flask(__name__)
 
 
+class ForecastPoint(TypedDict):
+    point_time: str
+    value: float
+
+
 def transformLatitudeToLocation(latitude: str) -> str:
-    return "Data-Center-" + latitude
+    return f"Data-Center-{latitude}"
 
 
-def transformFromGramToPounds(obj):
-    conversionRateGramsToPounds = 2.20462262
-    return {
-        k: (v * conversionRateGramsToPounds if k == "value" else v)
-        for k, v in obj.items()
-    }
+def transformFromGramToPounds(obj: ForecastPoint) -> ForecastPoint:
+    conversion_rate: float = 2.20462262
+    return {"point_time": obj["point_time"], "value": obj["value"] * conversion_rate}
 
 
 def getForecastDataForLocation(location: str):
@@ -25,8 +28,8 @@ def getForecastDataForLocation(location: str):
         response = requests.get(statsAPICIEndpoint, timeout=10)
         response.raise_for_status()
         external_data = response.json()
-        data = [
-            {"point_time": point["timestamp"], "value": point["value"]}
+        data: list[ForecastPoint] = [
+            {"point_time": point["timestamp"], "value": float(point["value"])}
             for point in external_data.get("data", [])
         ]
     except Exception:
@@ -56,10 +59,10 @@ def region_from_loc():
 
 @app.route("/forecast", methods=["GET"])
 def forecast():
-    location = request.args.get("region")
-
-    if not location:
+    if not request.args.get("region"):
         Exception("not correct region provided")
+
+    location: str = request.args.get("region", "error")
 
     curr_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
