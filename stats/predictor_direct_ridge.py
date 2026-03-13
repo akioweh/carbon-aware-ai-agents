@@ -332,29 +332,14 @@ def get_next_week_greenness(historical_greenness_df):
         and 'ci' (carbon intensity).
     """
     df = historical_greenness_df.copy()
-
-    has_ci = (
-        'carbon_intensity' in df.columns
-        and df['carbon_intensity'].notna().any()
-    )
-
-    if not has_ci:
-        # Fall back: derive CI from greenness using inverse formula
-        # greenness = 100.0 - ((ci - 50) / 3.5) → ci = (100 - greenness) * 3.5 + 50
-        df['carbon_intensity'] = (100.0 - df['greenness']) * 3.5 + 50.0
-
-    # Try to infer DC name from the data for weather fetching
     dc_name = _infer_dc_name(df)
-
     ci_df = _predict_carbon_intensity(df, dc_name=dc_name)
 
-    # Convert CI → greenness
     ci = ci_df['yhat'].values
-    greenness = 100.0 - ((ci - 50) / 3.5)
+    greenness = 100.0 * (1.0 - ci / 350.0)
     greenness = np.clip(greenness, 0, 100)
 
-    result = pd.DataFrame({'ds': ci_df['ds'], 'yhat': greenness, 'ci': ci})
-    return result
+    return pd.DataFrame({'ds': ci_df['ds'], 'yhat': greenness, 'ci': ci})
 
 
 def get_next_week_carbon_intensity(historical_df):
