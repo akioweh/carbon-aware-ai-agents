@@ -1,0 +1,26 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+
+# --- Carbon Aware SDK / Node dependencies ---
+# Prevents thousands of files in the docs from blocking git
+node_modules/
+.docusaurus/
+build/
+.yarn/
+yarn-error.log
+
+# --- IDEs & OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Test Results ---
+# If your tests generate local logs or data exports
+*.log
+results/
