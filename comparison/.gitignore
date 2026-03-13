@@ -24,3 +24,31 @@ Thumbs.db
 # If your tests generate local logs or data exports
 *.log
 results/
+
+# --- .NET / C# (The src/ folder) ---
+bin/
+obj/
+*.user
+*.suo
+*.sln.dotSettings
+.vs/
+.vscode/
+
+# --- Node / Docusaurus (The casdk-docs/ folder) ---
+node_modules/
+.docusaurus/
+.cache/
+build/
+.env
+yarn-error.log
+package-lock.json
+
+# --- Python (Your managers and tools) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- OS / Misc ---
+.DS_Store
+Thumbs.db
