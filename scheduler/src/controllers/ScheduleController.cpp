@@ -1,12 +1,14 @@
 #include "controllers/ScheduleController.hpp"
 #include "Calendar.hpp"
 #include "SchedulingQueue.hpp"
+#include "StatsAPIClient.hpp"
 #include "TrivialScheduler.hpp"
 #include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleIdentifierParam.hpp"
 #include "structs/TimeIntervalParams.hpp"
 #include "utils/TimeGridder.hpp"
+#include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
 #include <drogon/HttpTypes.h>
 
@@ -96,6 +98,23 @@ auto ScheduleController::
     Json::Value ret(Json::arrayValue);
     for (const auto &scheduleSummary : scheduleSummaries)
         ret.append(toJson(scheduleSummary));
+    const auto resp = HttpResponse::newHttpJsonResponse(ret);
+    co_return resp;
+}
+
+auto ScheduleController::
+    getForecast( // NOLINT(readability-convert-member-functions-to-static)
+        HttpRequestPtr /*req*/,
+        const DatacenterIdentifierParam datacenter) const
+    -> Task<HttpResponsePtr> {
+
+    StatsAPIClient stats;
+    Json::Value ret;
+    if (datacenter.name == scheduler::calendar::ANY_DATACENTER) {
+        ret = toJson(co_await stats.getAllDatacenters());
+    } else {
+        ret = toJson(vector{co_await stats.getDatacenter(datacenter.name)});
+    }
     const auto resp = HttpResponse::newHttpJsonResponse(ret);
     co_return resp;
 }

@@ -1,7 +1,10 @@
 #ifndef SCHEDULER_DATACENTER_HPP
 #define SCHEDULER_DATACENTER_HPP
+#include "utils/Utils.hpp"
+#include <json/value.h>
 #pragma once
 
+#include "Serializable.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -32,6 +35,14 @@ inline auto operator==(const TimeSlot &lhs, const TimeSlot &rhs) {
            lhs.availableGpus == rhs.availableGpus;
 }
 
+inline auto f_toJson(const TimeSlot &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["timestamp"] = utils::toIso8601(obj.timestamp);
+    res["greeness"] = obj.predictedGreenness;
+    res["load"] = obj.predictedLoad;
+    return res;
+}
+
 /**
  * @class Datacenter
  * @brief DTO for per-location information as per stats API definition.
@@ -43,6 +54,17 @@ struct Datacenter {
     int totalGpus;
     std::vector<TimeSlot> timeSeries;
 };
+
+inline auto f_toJson(const Datacenter &obj) -> Json::Value {
+    auto res = Json::Value{};
+    res["location"] = obj.id;
+    res["max_load"] = obj.maxLoad;
+    res["timeseries"] = Json::Value(Json::arrayValue);
+    for (const auto &block : obj.timeSeries) {
+        res["timeseries"].append(toJson(block));
+    }
+    return res;
+}
 
 } // namespace scheduler
 

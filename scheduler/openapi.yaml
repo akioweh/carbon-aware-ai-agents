@@ -200,6 +200,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/forecast:
+    get:
+      operationId: GetForcast
+      summary: Gets forcast from python API.
+      description: Gets full forecast for a specific datacenter, or for all depending on whether datacenter location is provied.
+      parameters:
+        - $ref: '#/components/parameters/DatacenterLocationParam'
+      responses:
+        "200":
+          description: Successfull response with requested datacenter
+          content:
+            application/json: 
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoadGreenessForecastDataPoint'
+        "400":
+          description: Python API is unresponsive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 
 components:
   parameters:
@@ -399,6 +422,44 @@ components:
             $ref: "#/components/schemas/ScheduleBlock"
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
+
+    LoadGreenessForecastDataPoint:
+      properties:
+        max_load:
+          type: number
+          title: max_load
+          description: maximum load of the datacenter
+        location:
+          type: string
+          title: location
+          description: location of the greeness data
+        timeseries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadGreenessPoint'
+      type: object
+      required:
+      - location
+      - timeseries
+      - max_load
+    
+    LoadGreenessPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Start time of the scheduled block
+          example: "2025-12-08T02:00:00Z"
+        greeness:
+          type: number
+          description: greeness at the location at the time
+          example: 5.4
+        load:
+          type: number
+          description: load at the locatioin at the time
+          example: 6.9
+
 
     ScheduleImpact:
       type: object
