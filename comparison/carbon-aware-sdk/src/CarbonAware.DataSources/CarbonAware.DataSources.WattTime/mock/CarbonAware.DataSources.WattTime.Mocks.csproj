@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WireMock.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\CarbonAware.DataSources.WattTime.csproj" />
+    <ProjectReference Include="..\test\CarbonAware.DataSources.WattTime.Tests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CarbonAware.WebApi.IntegrationTests" />
+    <InternalsVisibleTo Include="CarbonAware.CLI.IntegrationTests" />
+  </ItemGroup>
+
+</Project>
