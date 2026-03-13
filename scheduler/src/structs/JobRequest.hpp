@@ -9,7 +9,6 @@
 #include <drogon/HttpRequest.h>
 #include <optional>
 #include <string>
-#include <utils/HardwareConversion.hpp>
 
 namespace scheduler {
 
