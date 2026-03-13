@@ -8,4 +8,6 @@ pytest
 schemathesis
 requests
 schedule
-uvicorn
+numpy
+torch
+lightgbm>=4.0
