@@ -29,7 +29,7 @@ def get_real_length_of_computation(
     return int(ceil(effective_length_of_computation + (overhead / power) * 60))
 
 
-def run_single_test(
+def run_single_test_sdk_vs_ours(
     test_config: TestConfig,
 ):
     start_time = "2026-03-14T20:30:00Z"
@@ -69,8 +69,7 @@ def run_tests():
     test_configs = get_test_configs()
     results: list[dict[int, tuple[float, float]]]
     with ThreadPoolExecutor(max_workers=18) as executor:
-        results = list(executor.map(run_single_test, test_configs))
-    print(len(test_configs), len(results))
+        results = list(executor.map(run_single_test_sdk_vs_ours, test_configs))
     return results
 
 
