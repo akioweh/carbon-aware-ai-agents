@@ -14,7 +14,7 @@ class HardwareSpecs(TypedDict):
 
 class ModelConfig(TypedDict):
     name: str
-    gb: float
+    gb: int
 
 
 class SystemConfig(TypedDict):
@@ -79,7 +79,7 @@ def get_load_energy_kwh(model_gb: float, gpu_type: str, p_full_kw: float) -> flo
     """Calculates E_load: Energy to move weights into VRAM"""
     h: HardwareSpecs = HW_LIB[gpu_type]
     p_load: float = p_full_kw * TRANSFER_EFFICIENCY
-    transfer_time_hr: float = (model_gb / h["bus_gbps"]) / 3600
+    transfer_time_hr: float = (model_gb / h["bus_gbps"]) / 3600.0
     return round(p_load * transfer_time_hr, ROUNDING_PRECISION)
 
 
@@ -88,15 +88,15 @@ def get_load_energy_kwh(model_gb: float, gpu_type: str, p_full_kw: float) -> flo
 # =============================================================================
 
 models: list[ModelConfig] = [
-    {"name": "BERT-L", "gb": 3.0},
-    {"name": "Llama7B", "gb": 14.0},
-    {"name": "Llama13B", "gb": 26.0},
+    {"name": "BERT-L", "gb": 3},
+    {"name": "Llama7B", "gb": 14},
+    {"name": "Llama13B", "gb": 26},
 ]
 
 configs: list[SystemConfig] = [
-    {"id": "V100-1x", "type": "V100_PCIE", "n": 1},
-    {"id": "A100-1x", "type": "A100_SXM4", "n": 1},
-    {"id": "A100-2x", "type": "A100_SXM4", "n": 2},
+    {"id": "V100-5x", "type": "V100_PCIE", "n": 5},
+    {"id": "A100-5x", "type": "A100_SXM4", "n": 5},
+    {"id": "A100-10x", "type": "A100_SXM4", "n": 10},
 ]
 
 
@@ -121,7 +121,7 @@ def get_test_configs() -> list[TestConfig]:
                 "startup_overhead": round(e_base + e_load, ROUNDING_PRECISION),
             }
         )
-    return [results[0], results[1]]
+    return results
 
 
 if __name__ == "__main__":
