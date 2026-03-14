@@ -96,9 +96,11 @@ auto convertRawJobRequest(const Json::Value &json)
     const auto workload_amount =
         get_workload_amount(hardwareMetrics.length, full_power);
 
+    const auto max_workload_completed_in_block = full_power / 12.;
+
     return hardwareConstants::JobHardwareSpecifics{
         .startup_overhead = e_base + e_load,
-        .max_load = full_power,
+        .max_load = max_workload_completed_in_block,
         .workload_amount = workload_amount};
 }
 
