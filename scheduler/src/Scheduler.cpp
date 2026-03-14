@@ -35,7 +35,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
     for (size_t i = 0; i < optimal_schedule.size(); ++i) {
         const auto &loc_id = data.location_ids[i];
         const auto &schedule_vec = optimal_schedule[i];
-        const auto &greenness_vec = data.greennesses[i];
+        const auto &sci_vec = data.sci_scores[i];
 
         for (const auto j : views::iota(int64_t{0}, n_intervals)) {
             const auto load = schedule_vec[j];
@@ -48,10 +48,9 @@ auto Scheduler::scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
             });
             ++blocks_count;
 
-            const auto g = max(greenness_vec[j], 0.01);
-            const auto ci = 1.0 / g;
-            total_emissions += load * ci;
-            total_carbon_intensity_sum += ci;
+            const auto sci = sci_vec[j];
+            total_emissions += load * sci;
+            total_carbon_intensity_sum += sci;
         }
     }
 

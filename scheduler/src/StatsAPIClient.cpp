@@ -72,13 +72,13 @@ auto StatsAPIClient::getLoadForecast(const string &location)
                            .data = std::move(data)};
 }
 
-auto StatsAPIClient::getGreennessForecast(const string &location)
-    -> Task<std::optional<GreennessForecast>> {
+auto StatsAPIClient::getCarbonIntensityForecast(const string &location)
+    -> Task<std::optional<CarbonIntensityForecast>> {
     auto jsonPtr =
-        co_await utils::makeGetRequest(host, getGreennessPath(location));
+        co_await utils::makeGetRequest(host, getCarbonIntensityPath(location));
 
     const auto &json = *jsonPtr;
-    auto data = decltype(GreennessForecast::data){};
+    auto data = decltype(CarbonIntensityForecast::data){};
     if (json.isMember("data") && json["data"].isArray()) {
         data.reserve(json["data"].size());
         for (const auto &item : json["data"]) {
@@ -93,7 +93,7 @@ auto StatsAPIClient::getGreennessForecast(const string &location)
             }
         }
     }
-    co_return GreennessForecast{
+    co_return CarbonIntensityForecast{
         .locationId = json.get("location_id", location).asString(),
         .metric = json.get("metric", "").asString(),
         .unit = json.get("unit", "").asString(),
@@ -102,27 +102,28 @@ auto StatsAPIClient::getGreennessForecast(const string &location)
 
 auto StatsAPIClient::getDatacenter(const string &datacenterName)
     -> Task<Datacenter> {
-    auto [loadOpt, greennessOpt] = co_await coro::when_all(
-        getLoadForecast(datacenterName), getGreennessForecast(datacenterName));
-    if (!loadOpt || !greennessOpt) {
+    auto [loadOpt, sciOpt] =
+        co_await coro::when_all(getLoadForecast(datacenterName),
+                                getCarbonIntensityForecast(datacenterName));
+    if (!loadOpt || !sciOpt) {
         LOG_ERROR << "Failed to get complete data for " << datacenterName;
         co_return Datacenter{};
     }
 
     const auto &load = *loadOpt;
-    const auto &greenness = *greennessOpt;
+    const auto &sci = *sciOpt;
     // TODO: do we really want a map here?
-    map<chrono::system_clock::time_point, double> greennessMap;
-    for (const auto &point : greenness.data)
-        greennessMap.emplace(point.timestamp, point.value);
+    map<chrono::system_clock::time_point, double> sciMap;
+    for (const auto &point : sci.data)
+        sciMap.emplace(point.timestamp, point.value);
 
     auto timeSeries = decltype(Datacenter::timeSeries){};
     timeSeries.reserve(load.data.size());
 
     for (const auto &point : load.data) {
-        if (greennessMap.contains(point.timestamp)) {
+        if (sciMap.contains(point.timestamp)) {
             timeSeries.emplace_back(point.timestamp, point.value,
-                                    greennessMap.at(point.timestamp),
+                                    sciMap.at(point.timestamp),
                                     point.availableGpus);
         }
     }
