@@ -79,7 +79,7 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
         }
     }
 
-    data.penalties_f = vector(data.location_ids.size(), 1.);
+    data.penalties_f = vector(data.location_ids.size(), job.startup_overhead);
 
     if (data.location_ids.empty())
         throw exceptions::SchedulingException(
