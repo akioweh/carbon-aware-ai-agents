@@ -49,7 +49,7 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
 
     for (const auto &loc : locations) {
         data.location_ids.push_back(loc.id);
-        data.capacities_f.emplace_back(n_intervals, loc.maxLoad);
+        data.capacities_f.emplace_back(n_intervals, job.max_load);
 
         auto load = vector(n_intervals, 0.);
         auto greenness = vector(n_intervals, 1.);
@@ -59,7 +59,8 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
                 continue;
             const auto index = time_to_index(tp.timestamp);
             if (index >= 0 && index < n_intervals) {
-                load[index] = tp.predictedLoad;
+                load[index] = job.max_load -
+                              min(loc.maxLoad - tp.predictedLoad, job.max_load);
                 greenness[index] = tp.predictedGreenness;
             }
         }
