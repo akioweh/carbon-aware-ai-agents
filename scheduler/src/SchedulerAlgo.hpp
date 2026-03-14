@@ -88,7 +88,9 @@ struct LocationCost {
         return [g, c](double load) -> double {
             // cost increases with load and decreases with greenness.
             // 0.01 to avoid div by zero
-            return load / c / std::max(g, 0.01);
+            const auto ci =
+                350.0 * (1.0 - (g / 100.0)); // Ali's conversion formula XD
+            return load * ci;
         };
     }
 };

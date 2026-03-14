@@ -49,7 +49,8 @@ auto Scheduler::scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
             ++blocks_count;
 
             const auto g = max(greenness_vec[j], 0.01);
-            const auto ci = 1.0 / g;
+            const auto ci =
+                350.0 * (1.0 - (g / 100.0)); // Ali's conversion formula XD
             total_emissions += load * ci;
             total_carbon_intensity_sum += ci;
         }
