@@ -2,6 +2,7 @@
 #include "Calendar.hpp"
 #include "exceptions/SchedulingException.hpp"
 #include "utils/Coro.hpp"
+#include <ranges>
 
 namespace scheduler {
 
@@ -42,14 +43,14 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
     auto data = SchedulerData{};
     data.n_intervals = n_intervals;
     data.time_index_offset = time_index_offset;
-    data.location_ids.reserve(n_locations);
     data.loads_f.reserve(n_locations);
+    data.location_ids.reserve(n_locations);
     data.capacities_f.reserve(n_locations);
     data.greennesses.reserve(n_locations);
 
     for (const auto &loc : locations) {
         data.location_ids.push_back(loc.id);
-        data.capacities_f.emplace_back(n_intervals, loc.maxLoad);
+        data.capacities_f.emplace_back(n_intervals, job.max_load);
 
         auto load = vector(n_intervals, 0.);
         auto greenness = vector(n_intervals, 1.);
@@ -78,7 +79,15 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
         }
     }
 
-    data.penalties_f = vector(data.location_ids.size(), 1.);
+    for (const auto i : std::views::iota(0ULL, n_locations)) {
+        const double physical_limit = locations[i].maxLoad;
+        for (auto &current_load : data.loads_f[i]) {
+            double remaining = physical_limit - current_load;
+            current_load = job.max_load - min(remaining, job.max_load);
+        }
+    }
+
+    data.penalties_f = vector(data.location_ids.size(), job.startup_overhead);
 
     if (data.location_ids.empty())
         throw exceptions::SchedulingException(

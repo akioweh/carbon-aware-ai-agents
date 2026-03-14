@@ -1,5 +1,6 @@
 #ifndef SCHEDULER_SERIALIZABLE_HPP
 #define SCHEDULER_SERIALIZABLE_HPP
+#include <concepts>
 #pragma once
 
 #include <json/value.h>
@@ -16,8 +17,12 @@ concept BaseSerializable = requires(const T &obj) {
     { f_toJson(obj) } -> std::convertible_to<Json::Value>;
 };
 
+inline auto f_toJson(const std::string str) -> Json::Value { return {str}; }
+
 template <typename T>
-    requires BaseSerializable<T>
+    requires requires(const T &obj) {
+        { f_toJson(obj) } -> std::convertible_to<Json::Value>;
+    }
 inline auto f_toJson(const std::vector<T> &V) -> Json::Value {
     auto res = Json::Value(Json::arrayValue);
     for (const auto &val : V) {

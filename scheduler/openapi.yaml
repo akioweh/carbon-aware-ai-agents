@@ -223,6 +223,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/hardwareSpecs/gpus:
+    get:
+      operationId: getGpuSpecs
+      summary: Gets available GPU specs
+      description: Lists GPUs convertible to functional units of computation.
+      responses:
+        "200":
+          description: Successful response with requested GPU list.
+          content:
+            application/json:
+              schema:
+                  type: array
+                  items:
+                    type: string
+                  example: ["V100_PCIE", "A100_SXM4"]
+
 
 components:
   parameters:
