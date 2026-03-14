@@ -316,10 +316,11 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     assert(capacities_f.size() == m);
     assert(costs_f.size() == m);
     assert(penalties_f.size() == m);
-    for (const auto i : views::iota(0ULL, m)) {
-        assert(loads_f[i].size() == n);
-        assert(capacities_f[i].size() == n);
-    }
+    assert(ranges::all_of(
+        loads_f, [](const auto &load_f) { return load_f.size() == n; }));
+    assert(ranges::all_of(capacities_f, [](const auto &capacity_f) {
+        return capacity_f.size() == n;
+    }));
 
     // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
@@ -344,10 +345,11 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
 
     // result validation
-    for (const auto i : views::iota(0ULL, m)) {
-        assert(locations_memo[i].size() == n + 1ULL);
-        assert(locations_cost_vector[i].size() == tot_work + 1ULL);
-    }
+    assert(ranges::all_of(
+        locations_memo, [](const auto &vec) { return vec.size() == n + 1UZ; }));
+    assert(ranges::all_of(locations_cost_vector, [](const auto &vec) {
+        return vec.size() == tot_work + 1UZ;
+    }));
 
     // multiple choice knapsack
     constexpr auto inf = numeric_limits<double>::max() / 2;
