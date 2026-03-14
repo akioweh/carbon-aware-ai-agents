@@ -1,11 +1,11 @@
 #ifndef SCHEDULER_DATACENTER_HPP
 #define SCHEDULER_DATACENTER_HPP
-#include "utils/Utils.hpp"
-#include <json/value.h>
 #pragma once
 
 #include "Serializable.hpp"
+#include "utils/Utils.hpp"
 #include <chrono>
+#include <json/value.h>
 #include <string>
 #include <vector>
 
