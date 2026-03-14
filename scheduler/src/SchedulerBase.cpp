@@ -2,6 +2,7 @@
 #include "Calendar.hpp"
 #include "exceptions/SchedulingException.hpp"
 #include "utils/Coro.hpp"
+#include <ranges>
 
 namespace scheduler {
 
@@ -42,8 +43,8 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
     auto data = SchedulerData{};
     data.n_intervals = n_intervals;
     data.time_index_offset = time_index_offset;
-    data.location_ids.reserve(n_locations);
     data.loads_f.reserve(n_locations);
+    data.location_ids.reserve(n_locations);
     data.capacities_f.reserve(n_locations);
     data.greennesses.reserve(n_locations);
 
@@ -59,8 +60,7 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
                 continue;
             const auto index = time_to_index(tp.timestamp);
             if (index >= 0 && index < n_intervals) {
-                load[index] = job.max_load -
-                              min(loc.maxLoad - tp.predictedLoad, job.max_load);
+                load[index] = tp.predictedLoad;
                 greenness[index] = tp.predictedGreenness;
             }
         }
@@ -76,6 +76,14 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
         const auto time_index = time_to_index(block.timestamp);
         if (time_index >= 0 && time_index < n_intervals) {
             data.loads_f[loc_index][time_index] += block.additionalLoad;
+        }
+    }
+
+    for (const auto i : std::views::iota(0ULL, n_locations)) {
+        const double physical_limit = locations[i].maxLoad;
+        for (auto &current_load : data.loads_f[i]) {
+            double remaining = physical_limit - current_load;
+            current_load = job.max_load - min(remaining, job.max_load);
         }
     }
 
