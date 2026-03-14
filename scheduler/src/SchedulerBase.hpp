@@ -22,8 +22,8 @@ struct SchedulerData {
     std::vector<std::vector<double>> capacities_f;
     std::vector<std::vector<double>> greennesses;
     std::vector<double> penalties_f;
-    long long n_intervals;
-    long long time_index_offset;
+    int64_t n_intervals;
+    int64_t time_index_offset;
 
     auto generateCostsF() -> std::vector<LocationCost> {
         std::vector<LocationCost> costs_f;

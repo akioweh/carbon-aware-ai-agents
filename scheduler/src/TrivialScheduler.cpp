@@ -63,7 +63,7 @@ auto TrivialScheduler::scheduleJob(
             suffix_50_avail[j] = suffix_50_avail[j + 1] + rule_avail;
         }
 
-        for (auto j = 0LL; j < n_intervals && rem_work > EPSILON; ++j) {
+        for (auto j = int64_t{}; j < n_intervals && rem_work > EPSILON; ++j) {
             const auto capacity = data.capacities_f[i][j];
             const auto existing = data.loads_f[i][j];
             const auto available = max(0.0, capacity - existing);
@@ -102,7 +102,9 @@ auto TrivialScheduler::scheduleJob(
     }
 
     if (rem_work > EPSILON) {
-        LOG_WARN << "Trivial schedule could not place all work. It will be empty. rem_work: " << rem_work;
+        LOG_WARN << "Trivial schedule could not place all work. It will be "
+                    "empty. rem_work: "
+                 << rem_work;
         /*
          * Note: Mathematically, if the DP optimizer succeeded, the greedy
          * trivial algorithm should also succeed. The greedy algorithm packs
@@ -126,7 +128,7 @@ auto TrivialScheduler::scheduleJob(
     auto blocks = vector<InternalBlock>{};
     auto blocks_count = 0;
 
-    const auto index_to_time = [&](const long long i)
+    const auto index_to_time = [&](const uint64_t i)
         -> decltype(scheduler::time_gridder)::time_point_t {
         return scheduler::time_gridder.toTimePoint(i + data.time_index_offset);
     };
@@ -136,7 +138,7 @@ auto TrivialScheduler::scheduleJob(
         const auto &schedule_vec = res[i];
         const auto &greenness_vec = data.greennesses[i];
 
-        for (const auto j : views::iota(0LL, n_intervals)) {
+        for (const auto j : views::iota(int64_t{}, n_intervals)) {
             const auto load = schedule_vec[j];
             if (load < EPSILON)
                 continue;

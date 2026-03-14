@@ -17,11 +17,11 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
     const auto time_index_offset = time_gridder.toIndex(job.earliest_start);
 
     const auto time_to_index =
-        [&](const decltype(time_gridder)::time_point_t &tp) -> long long {
+        [&](const decltype(time_gridder)::time_point_t &tp) -> int64_t {
         return time_gridder.toIndex(tp) - time_index_offset;
     };
     const auto index_to_time =
-        [&](const long long i) -> decltype(time_gridder)::time_point_t {
+        [&](const int64_t i) -> decltype(time_gridder)::time_point_t {
         return time_gridder.toTimePoint(i + time_index_offset);
     };
 

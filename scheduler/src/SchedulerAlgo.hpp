@@ -306,7 +306,10 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     -> std::pair<double, std::vector<std::vector<double>>> {
     using namespace std;
     const auto m = loads_f.size();
-    const auto n = m ? loads_f.front().size() : 0ULL;
+    if (m == 0)
+        throw exceptions::SchedulingException(
+            "No locations provided for scheduling");
+    const auto n = loads_f.front().size();
     // input validation
     assert(tot_work_f >= 0.);
     assert(resolution > 0);
@@ -321,7 +324,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
     futures.reserve(m);
-    for (const auto i : views::iota(0ULL, m))
+    for (const auto i : views::iota(0UZ, m))
         futures.push_back(async(
             launch::async,
             // wrapped in lambda due to template
@@ -334,7 +337,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
 
     auto locations_cost_vector = vector<SingleResult::first_type>(m);
     auto locations_memo = vector<SingleResult::second_type>(m);
-    for (auto i : views::iota(0ULL, m))
+    for (auto i : views::iota(0UZ, m))
         tie(locations_cost_vector[i], locations_memo[i]) = futures[i].get();
 
     const auto e_work = max(tot_work_f / resolution, 0.5);
@@ -361,7 +364,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
             memo[0][w] = w;
         }
     }
-    for (const auto i : views::iota(1ULL, m)) {
+    for (const auto i : views::iota(1UZ, m)) {
         const auto &costs = locations_cost_vector[i];
         auto next_dp = vector(tot_work + 1, inf);
         auto &memo_i = memo[i];
@@ -407,7 +410,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     }
 
     // reconstruct the {w_j} work allocation vector for each location
-    for (const auto i : views::iota(0ULL, m)) {
+    for (const auto i : views::iota(0UZ, m)) {
         const auto &loc_memo = locations_memo[i];
         auto &loc_res = res[i];
         loc_res.resize(n);

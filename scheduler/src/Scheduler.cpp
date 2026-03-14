@@ -27,7 +27,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
     auto blocks = vector<InternalBlock>{};
     auto blocks_count = 0;
 
-    const auto index_to_time = [&](const long long i)
+    const auto index_to_time = [&](const int64_t i)
         -> decltype(scheduler::time_gridder)::time_point_t {
         return scheduler::time_gridder.toTimePoint(i + data.time_index_offset);
     };
@@ -37,7 +37,7 @@ auto Scheduler::scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
         const auto &schedule_vec = optimal_schedule[i];
         const auto &greenness_vec = data.greennesses[i];
 
-        for (const auto j : views::iota(0LL, n_intervals)) {
+        for (const auto j : views::iota(int64_t{0}, n_intervals)) {
             const auto load = schedule_vec[j];
             if (load < EPSILON) // filter out negligible loads
                 continue;
