@@ -136,28 +136,3 @@ def generate_next_week_carbon_intensity_prediction(location):
         ],
     }
 
-
-from generate_history import DATA_CENTRES
-
-if __name__ == '__main__':
-    all_predictions = {}
-
-    for dc in DATA_CENTRES:
-        # Test the prediction functions
-        load_pred = generate_next_week_load_prediction(dc)
-        print(f'Generated {len(load_pred["data"])} load predictions for {dc}')
-
-        greenness_pred = generate_next_week_greenness_prediction(dc)
-        print(f'Generated {len(greenness_pred["data"])} greenness predictions for {dc}')
-
-        # Store predictions for this data centre
-        all_predictions[dc] = {
-            'load_prediction': load_pred,
-            'greenness_prediction': greenness_pred,
-        }
-
-    # Save all predictions to JSON file
-    with open('predictions.json', 'w') as f:
-        json.dump(all_predictions, f, indent=2)
-
-    print('Predictions saved to predictions.json')
