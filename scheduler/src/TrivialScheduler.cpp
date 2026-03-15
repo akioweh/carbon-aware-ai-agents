@@ -1,6 +1,7 @@
 #include "TrivialScheduler.hpp"
 #include "exceptions/SchedulingException.hpp"
 #include "structs/SchedulerOutput.hpp"
+#include "utils/TimeGridder.hpp"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -144,11 +145,7 @@ auto TrivialScheduler::scheduleJob(JobRequest job)
             if (load < EPSILON)
                 continue;
 
-            blocks.push_back({
-                .timestamp = index_to_time(j),
-                .location = loc_id,
-                .additionalLoad = load,
-            });
+            blocks.emplace_back(index_to_time(j), loc_id, load);
             ++blocks_count;
 
             const auto current_sci = sci_vec[j];

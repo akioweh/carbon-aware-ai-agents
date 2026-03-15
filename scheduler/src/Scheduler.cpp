@@ -1,6 +1,7 @@
 #include "Scheduler.hpp"
 #include "SchedulerAlgo.hpp"
 #include "structs/JobRequest.hpp"
+#include "utils/TimeGridder.hpp"
 #include <vector>
 
 namespace scheduler {
