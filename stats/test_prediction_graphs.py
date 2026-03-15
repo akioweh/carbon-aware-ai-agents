@@ -23,14 +23,28 @@ for idx, dc in enumerate(DATA_CENTRES):
     if dc in history_data:
         history_load = [item['load'] for item in history_data[dc]]
         history_indices = range(len(history_load))
-        plt.plot(history_indices, history_load, label=f'{dc} History', 
-                linestyle='-', alpha=0.6, color=colors[idx])
-    
+        plt.plot(
+            history_indices,
+            history_load,
+            label=f'{dc} History',
+            linestyle='-',
+            alpha=0.6,
+            color=colors[idx],
+        )
+
     if dc in prediction_data:
-        prediction_load = [item['value'] for item in prediction_data[dc]['load_prediction']['data']]
+        prediction_load = [
+            item['value'] for item in prediction_data[dc]['load_prediction']['data']
+        ]
         prediction_indices = range(len(prediction_load))
-        plt.plot(prediction_indices, prediction_load, label=f'{dc} Prediction', 
-                linestyle='--', alpha=0.8, color=colors[idx])
+        plt.plot(
+            prediction_indices,
+            prediction_load,
+            label=f'{dc} Prediction',
+            linestyle='--',
+            alpha=0.8,
+            color=colors[idx],
+        )
 
 plt.xlabel('Index (5-minute intervals)')
 plt.ylabel('Load')
@@ -42,16 +56,33 @@ plt.grid(True, alpha=0.3)
 plt.subplot(2, 1, 2)
 for idx, dc in enumerate(DATA_CENTRES):
     if dc in history_data:
-        history_greenness = [item['greenness'] for item in history_data[dc]]
-        history_indices = range(len(history_greenness))
-        plt.plot(history_indices, history_greenness, label=f'{dc} History', 
-                linestyle='-', alpha=0.6, color=colors[idx])
-    
+        history_carbon_intensity = [
+            item['carbon_intensity'] for item in history_data[dc]
+        ]
+        history_indices = range(len(history_carbon_intensity))
+        plt.plot(
+            history_indices,
+            history_carbon_intensity,
+            label=f'{dc} History',
+            linestyle='-',
+            alpha=0.6,
+            color=colors[idx],
+        )
+
     if dc in prediction_data:
-        prediction_greenness = [item['value'] for item in prediction_data[dc]['greenness_prediction']['data']]
-        prediction_indices = range(len(prediction_greenness))
-        plt.plot(prediction_indices, prediction_greenness, label=f'{dc} Prediction', 
-                linestyle='--', alpha=0.8, color=colors[idx])
+        prediction_carbon_intensity = [
+            item['value']
+            for item in prediction_data[dc]['carbon_intensity_prediction']['data']
+        ]
+        prediction_indices = range(len(prediction_carbon_intensity))
+        plt.plot(
+            prediction_indices,
+            prediction_carbon_intensity,
+            label=f'{dc} Prediction',
+            linestyle='--',
+            alpha=0.8,
+            color=colors[idx],
+        )
 
 plt.xlabel('Index (5-minute intervals)')
 plt.ylabel('Greenness')

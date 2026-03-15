@@ -94,17 +94,20 @@ def generate_load(timestamp, dc_index):
     return max(0, min(MAX_CAPACITY, value))
 
 
-def generate_greenness(timestamp, weather):
+def generate_carbon_intensity(timestamp, weather):
     solar = get_solar_intensity(timestamp, weather.cloud_cover)
     wind = weather.wind_speed * 0.7  # Wind contribution
 
-    # Base grid mix (nuclear/hydro/coal/gas) - varies slowly
-    grid_base = 30 + 10 * math.sin(timestamp.hour / 24 * 2 * math.pi)
+    # Base grid mix contribution (inverse relationship with renewables)
+    # Higher renewables -> lower carbon intensity
+    # Base intensity around 200, varies between 50 and 400
+    renewable_factor = (solar + wind) / 200.0  # normalized roughly 0-1
+    base_intensity = 250 + 50 * math.sin(timestamp.hour / 24 * 2 * math.pi)
 
-    total_greenness = 0.4 * solar + 0.4 * wind + 0.2 * grid_base
+    total_intensity = base_intensity * (1.0 - 0.7 * renewable_factor)
 
-    noise = random.uniform(-2, 2)
-    return max(0, min(100, total_greenness + noise))
+    noise = random.uniform(-10, 10)
+    return max(30.0, min(500.0, total_intensity + noise))
 
 
 def generate_history():
@@ -122,17 +125,21 @@ def generate_history():
         weather.update()
 
         for i, dc in enumerate(DATA_CENTRES):
-            bulk_data.append({
-                'location': dc,
-                'timestamp': current,
-                'load': generate_load(current, i),
-                'greenness': generate_greenness(current, weather),
-            })
+            bulk_data.append(
+                {
+                    'location': dc,
+                    'timestamp': current,
+                    'load': generate_load(current, i),
+                    'carbon_intensity': generate_carbon_intensity(current, weather),
+                }
+            )
         current += timedelta(minutes=5)
 
     # Insert all data into database
     db_utils.insert_historical_data_bulk(bulk_data)
-    print(f'Generated and inserted {len(bulk_data)} historical data points into database.')
+    print(
+        f'Generated and inserted {len(bulk_data)} historical data points into database.'
+    )
 
 
 if __name__ == '__main__':
