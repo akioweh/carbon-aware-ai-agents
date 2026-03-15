@@ -117,7 +117,7 @@ class PowerLeverageVisulizer(Visualizer):
             data.append(
                 {
                     "Peak Power of the system (kW)": c["full_power"],
-                    "Abs. Saved (kg)": saved,
+                    "Abs. Saved (g)": saved,
                     "Hardware": short_label,
                 }
             )
@@ -128,7 +128,7 @@ class PowerLeverageVisulizer(Visualizer):
         sns.regplot(
             data=df,
             x="Peak Power of the system (kW)",
-            y="Abs. Saved (kg)",
+            y="Abs. Saved (g)",
             scatter=False,
             color="gray",
             line_kws={"linestyle": "--"},
@@ -137,7 +137,7 @@ class PowerLeverageVisulizer(Visualizer):
         sns.scatterplot(
             data=df,
             x="Peak Power of the system (kW)",
-            y="Abs. Saved (kg)",
+            y="Abs. Saved (g)",
             hue="Hardware",
             s=250,
             palette="magma",
@@ -148,7 +148,7 @@ class PowerLeverageVisulizer(Visualizer):
         plt.title(
             "Absolute power impact on savings (window = 36h, length of workload: 9h)"
         )
-        plt.ylabel(r"Absolute Saved (kg $CO_2e$)")
+        plt.ylabel(r"Absolute Saved (g $CO_2e$)")
         plt.grid(True, linestyle=":", alpha=0.5)
         plt.tight_layout()
         plt.savefig(self.save_path + "plot_leverage_absolute.png", bbox_inches="tight")
@@ -161,4 +161,4 @@ class PowerLeverageVisulizer(Visualizer):
 
 if __name__ == "__main__":
     vis = PowerLeverageVisulizer()
-    vis.plot_compression_leverage_relative()
+    vis.plot_compression_leverage_absolute()
