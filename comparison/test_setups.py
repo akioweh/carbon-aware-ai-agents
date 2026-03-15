@@ -97,6 +97,7 @@ configs: list[SystemConfig] = [
     {"id": "V100-5x", "type": "V100_PCIE", "n": 5},
     {"id": "A100-5x", "type": "A100_SXM4", "n": 5},
     {"id": "A100-10x", "type": "A100_SXM4", "n": 10},
+    {"id": "V100-50x", "type": "V100_PCIE", "n": 50},
 ]
 
 
