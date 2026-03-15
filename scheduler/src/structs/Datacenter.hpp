@@ -1,11 +1,11 @@
 #ifndef SCHEDULER_DATACENTER_HPP
 #define SCHEDULER_DATACENTER_HPP
-#include "utils/Utils.hpp"
-#include <json/value.h>
 #pragma once
 
 #include "Serializable.hpp"
+#include "utils/Utils.hpp"
 #include <chrono>
+#include <json/value.h>
 #include <string>
 #include <vector>
 
@@ -19,7 +19,7 @@ namespace scheduler {
 struct TimeSlot {
     std::chrono::system_clock::time_point timestamp;
     double predictedLoad;
-    double predictedGreenness;
+    double predictedSci;
     int availableGpus;
 };
 
@@ -31,14 +31,14 @@ inline auto operator<=>(const TimeSlot &lhs, const TimeSlot &rhs) {
 inline auto operator==(const TimeSlot &lhs, const TimeSlot &rhs) {
     return lhs.timestamp == rhs.timestamp &&
            lhs.predictedLoad == rhs.predictedLoad &&
-           lhs.predictedGreenness == rhs.predictedGreenness &&
+           lhs.predictedSci == rhs.predictedSci &&
            lhs.availableGpus == rhs.availableGpus;
 }
 
 inline auto f_toJson(const TimeSlot &obj) -> Json::Value {
     auto res = Json::Value{};
     res["timestamp"] = utils::toIso8601(obj.timestamp);
-    res["greeness"] = obj.predictedGreenness;
+    res["sci"] = obj.predictedSci;
     res["load"] = obj.predictedLoad;
     return res;
 }

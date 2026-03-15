@@ -39,17 +39,17 @@ struct LoadForecast {
     std::vector<LoadForecastDataPoint> data;
 };
 
-struct GreennessForecastDataPoint {
+struct CarbonIntensityForecastDataPoint {
     std::chrono::system_clock::time_point timestamp;
     double value;
     bool isForecast;
 };
 
-struct GreennessForecast {
+struct CarbonIntensityForecast {
     std::string locationId;
     std::string metric;
     std::string unit;
-    std::vector<GreennessForecastDataPoint> data;
+    std::vector<CarbonIntensityForecastDataPoint> data;
 };
 
 class StatsAPIClient {
@@ -59,8 +59,10 @@ class StatsAPIClient {
     static auto getLoadPath(const std::string &locationId) -> std::string {
         return "/locations/" + locationId + "/metrics/forecast_load";
     }
-    static auto getGreennessPath(const std::string &locationId) -> std::string {
-        return "/locations/" + locationId + "/metrics/forecast_greenness";
+    static auto getCarbonIntensityPath(const std::string &locationId)
+        -> std::string {
+        return "/locations/" + locationId +
+               "/metrics/forecast_carbon_intensity";
     }
     static auto getLocationsPath() -> std::string { return "/locations"; }
 
@@ -70,8 +72,8 @@ class StatsAPIClient {
     auto getLocations() -> drogon::Task<std::vector<Location>>;
     auto getLoadForecast(const std::string &location)
         -> drogon::Task<std::optional<LoadForecast>>;
-    auto getGreennessForecast(const std::string &location)
-        -> drogon::Task<std::optional<GreennessForecast>>;
+    auto getCarbonIntensityForecast(const std::string &location)
+        -> drogon::Task<std::optional<CarbonIntensityForecast>>;
 
     auto getDatacenter(const std::string &datacenterName)
         -> drogon::Task<Datacenter>;

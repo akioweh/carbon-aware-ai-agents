@@ -35,12 +35,17 @@ maintainability across the codebase.
   - **Aggregate Types:** always define aggregates with default-initialized
     members; initialize aggregates with brace initialization.
   - **Primitive Types:** Do not explicitly write the type when it's obvious or
-    can be inferred. Use literal suffixes where necessary:
+    can be specified literally:
     - `auto x = 1;` (`int`)
     - `auto y = 1.;` (`double`) no digits after `.` if value is whole
-    - `auto z = 1ULL;` (`unsigned long long`)
     - `auto s = 1UZ;` (`size_t`)
     - `auto sv = "asdf"sv;` (`std::string_view`)
+  - Special cases for non-`int` integer types:
+    - use `uint64_t` or `int64_t` for 64-bit integers
+    - do NOT use `long` or `long long` types
+    - do NOT use `ULL` or `LL` suffixes
+    - assign-initialize like `auto x = uint64_t{1};` or `auto x = int64_t{1};`
+    - use `size_t` or `uz` suffixes only for memory-related indices
 
 ### Control Flow
 
