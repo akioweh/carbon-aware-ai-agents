@@ -124,7 +124,7 @@ auto TrivialScheduler::scheduleJob(
 
     auto total_emissions = 0.0;
     auto total_carbon_intensity_sum = 0.0;
-    auto sci = 0.0;
+    auto total_sci = 0.0;
     auto blocks = vector<InternalBlock>{};
     auto blocks_count = 0;
 
@@ -136,7 +136,7 @@ auto TrivialScheduler::scheduleJob(
     for (size_t i = 0; i < n_locations; ++i) {
         const auto &loc_id = data.location_ids[i];
         const auto &schedule_vec = res[i];
-        const auto &greenness_vec = data.greennesses[i];
+        const auto &sci_vec = data.sci_scores[i];
 
         for (const auto j : views::iota(int64_t{}, n_intervals)) {
             const auto load = schedule_vec[j];
@@ -150,12 +150,11 @@ auto TrivialScheduler::scheduleJob(
             });
             ++blocks_count;
 
-            const auto g = max(greenness_vec[j], 0.01);
-            const auto ci = 1.0 / g;
-            total_emissions += load * ci;
-            total_carbon_intensity_sum += ci;
-            sci += costs_f[i][j](data.loads_f[i][j] + load) -
-                   costs_f[i][j](data.loads_f[i][j]);
+            const auto current_sci = sci_vec[j];
+            total_emissions += load * current_sci;
+            total_carbon_intensity_sum += current_sci;
+            total_sci += costs_f[i][j](data.loads_f[i][j] + load) -
+                         costs_f[i][j](data.loads_f[i][j]);
         }
     }
 
@@ -166,7 +165,7 @@ auto TrivialScheduler::scheduleJob(
                                               static_cast<double>(blocks_count)
                                         : 0.0,
                    .total_emissions = total_emissions,
-                   .sci = sci,
+                   .sci = total_sci,
                }};
 }
 

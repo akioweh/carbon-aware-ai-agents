@@ -20,7 +20,7 @@ struct SchedulerData {
     std::vector<std::string> location_ids;
     std::vector<std::vector<double>> loads_f;
     std::vector<std::vector<double>> capacities_f;
-    std::vector<std::vector<double>> greennesses;
+    std::vector<std::vector<double>> sci_scores;
     std::vector<double> penalties_f;
     int64_t n_intervals;
     int64_t time_index_offset;
@@ -29,9 +29,8 @@ struct SchedulerData {
         std::vector<LocationCost> costs_f;
         costs_f.reserve(capacities_f.size());
         for (size_t i = 0; i < capacities_f.size(); ++i) {
-            costs_f.emplace_back(
-                LocationCost{.capacities = capacities_f[i],
-                             .greenness_scores = greennesses[i]});
+            costs_f.emplace_back(LocationCost{.capacities = capacities_f[i],
+                                              .sci_scores = sci_scores[i]});
         }
         return costs_f;
     }

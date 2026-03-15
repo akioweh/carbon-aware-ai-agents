@@ -80,15 +80,16 @@ using SingleResult = std::pair<CostVector, ChoiceVector>;
 
 struct LocationCost {
     std::vector<double> &capacities;
-    std::vector<double> &greenness_scores;
+    std::vector<double> &sci_scores;
 
     auto operator[](size_t i) const {
-        const auto g = greenness_scores.at(i);
+        const auto sci = sci_scores.at(i);
         const auto c = capacities.at(i);
-        return [g, c](double load) -> double {
-            // cost increases with load and decreases with greenness.
-            // 0.01 to avoid div by zero
-            return load / c / std::max(g, 0.01);
+        return [sci, c](double load) -> double {
+            // cost increases with load and sci.
+            // TODO: not sure if a zero sci might break dp??
+            // TODO: make this sensible (percentage of capacity is NOT sensible)
+            return (load / c) * sci;
         };
     }
 };
@@ -317,8 +318,8 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     assert(costs_f.size() == m);
     assert(penalties_f.size() == m);
     assert(ranges::all_of(
-        loads_f, [](const auto &load_f) { return load_f.size() == n; }));
-    assert(ranges::all_of(capacities_f, [](const auto &capacity_f) {
+        loads_f, [n](const auto &load_f) { return load_f.size() == n; }));
+    assert(ranges::all_of(capacities_f, [n](const auto &capacity_f) {
         return capacity_f.size() == n;
     }));
 
@@ -345,9 +346,10 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
 
     // result validation
-    assert(ranges::all_of(
-        locations_memo, [](const auto &vec) { return vec.size() == n + 1UZ; }));
-    assert(ranges::all_of(locations_cost_vector, [](const auto &vec) {
+    assert(ranges::all_of(locations_memo, [n](const auto &vec) {
+        return vec.size() == n + 1UZ;
+    }));
+    assert(ranges::all_of(locations_cost_vector, [tot_work](const auto &vec) {
         return vec.size() == tot_work + 1UZ;
     }));
 
