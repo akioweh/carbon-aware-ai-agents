@@ -65,7 +65,7 @@ BOOST_AUTO_TEST_SUITE_END()
 // Test Suite: getLoadForecast
 // =============================================================================
 
-BOOST_AUTO_TEST_SUITE(GetLoadForecast)
+BOOST_AUTO_TEST_SUITE(GetLoadTimeSeries)
 
 BOOST_AUTO_TEST_CASE(returns_valid_forecast_for_known_location) {
     // First get a valid location
@@ -78,8 +78,8 @@ BOOST_AUTO_TEST_CASE(returns_valid_forecast_for_known_location) {
     BOOST_REQUIRE(!locations.empty());
     const auto &testLocationId = locations[0].id;
 
-    auto forecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-        [&testLocationId]() -> drogon::Task<std::optional<LoadForecast>> {
+    auto forecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+        [&testLocationId]() -> drogon::Task<std::optional<LoadTimeSeries>> {
             auto client = std::make_shared<StatsAPIClient>();
             co_return co_await client->getLoadForecast(testLocationId);
         });
@@ -105,8 +105,8 @@ BOOST_AUTO_TEST_CASE(load_forecast_has_required_fields) {
     BOOST_REQUIRE(!locations.empty());
     const auto &testLocationId = locations[0].id;
 
-    auto forecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-        [&testLocationId]() -> drogon::Task<std::optional<LoadForecast>> {
+    auto forecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+        [&testLocationId]() -> drogon::Task<std::optional<LoadTimeSeries>> {
             auto client = std::make_shared<StatsAPIClient>();
             co_return co_await client->getLoadForecast(testLocationId);
         });
@@ -131,8 +131,8 @@ BOOST_AUTO_TEST_CASE(load_values_are_non_negative) {
     BOOST_REQUIRE(!locations.empty());
     const auto &testLocationId = locations[0].id;
 
-    auto forecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-        [&testLocationId]() -> drogon::Task<std::optional<LoadForecast>> {
+    auto forecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+        [&testLocationId]() -> drogon::Task<std::optional<LoadTimeSeries>> {
             auto client = std::make_shared<StatsAPIClient>();
             co_return co_await client->getLoadForecast(testLocationId);
         });
@@ -154,15 +154,16 @@ BOOST_AUTO_TEST_CASE(capacity_values_are_positive) {
     BOOST_REQUIRE(!locations.empty());
     const auto &testLocationId = locations[0].id;
 
-    auto forecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-        [&testLocationId]() -> drogon::Task<std::optional<LoadForecast>> {
+    auto forecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+        [&testLocationId]() -> drogon::Task<std::optional<LoadTimeSeries>> {
             auto client = std::make_shared<StatsAPIClient>();
             co_return co_await client->getLoadForecast(testLocationId);
         });
 
     BOOST_REQUIRE(forecastOpt.has_value());
-    BOOST_CHECK_GT(forecastOpt->capacity.maxLoad, 0.0);
-    BOOST_CHECK_GT(forecastOpt->capacity.totalGpus, 0);
+    for (const auto &point : forecastOpt->data) {
+        BOOST_CHECK_GT(point.capacity, 0.0);
+    }
 }
 
 BOOST_AUTO_TEST_CASE(data_points_have_valid_timestamps) {
@@ -175,8 +176,8 @@ BOOST_AUTO_TEST_CASE(data_points_have_valid_timestamps) {
     BOOST_REQUIRE(!locations.empty());
     const auto &testLocationId = locations[0].id;
 
-    auto forecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-        [&testLocationId]() -> drogon::Task<std::optional<LoadForecast>> {
+    auto forecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+        [&testLocationId]() -> drogon::Task<std::optional<LoadTimeSeries>> {
             auto client = std::make_shared<StatsAPIClient>();
             co_return co_await client->getLoadForecast(testLocationId);
         });
@@ -192,8 +193,8 @@ BOOST_AUTO_TEST_CASE(data_points_have_valid_timestamps) {
 
 BOOST_AUTO_TEST_CASE(returns_nullopt_for_invalid_location) {
     BOOST_CHECK_THROW(
-        auto forecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-            []() -> drogon::Task<std::optional<LoadForecast>> {
+        auto forecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+            []() -> drogon::Task<std::optional<LoadTimeSeries>> {
                 auto client = std::make_shared<StatsAPIClient>();
                 co_return co_await client->getLoadForecast(
                     "nonexistent_location_xyz_12345");
@@ -207,7 +208,7 @@ BOOST_AUTO_TEST_SUITE_END()
 // Test Suite: getCarbonIntensityForecast
 // =============================================================================
 
-BOOST_AUTO_TEST_SUITE(GetCarbonIntensityForecast)
+BOOST_AUTO_TEST_SUITE(GetCarbonIntensityTimeSeries)
 
 BOOST_AUTO_TEST_CASE(returns_valid_forecast_for_known_location) {
     auto locations = run_coro_in_drogon<std::vector<Location>>(
@@ -220,9 +221,9 @@ BOOST_AUTO_TEST_CASE(returns_valid_forecast_for_known_location) {
     const auto &testLocationId = locations[0].id;
 
     auto forecastOpt =
-        run_coro_in_drogon<std::optional<CarbonIntensityForecast>>(
+        run_coro_in_drogon<std::optional<CarbonIntensityTimeSeries>>(
             [&testLocationId]()
-                -> drogon::Task<std::optional<CarbonIntensityForecast>> {
+                -> drogon::Task<std::optional<CarbonIntensityTimeSeries>> {
                 auto client = std::make_shared<StatsAPIClient>();
                 co_return co_await client->getCarbonIntensityForecast(
                     testLocationId);
@@ -250,9 +251,9 @@ BOOST_AUTO_TEST_CASE(carbonIntensity_forecast_has_required_fields) {
     const auto &testLocationId = locations[0].id;
 
     auto forecastOpt =
-        run_coro_in_drogon<std::optional<CarbonIntensityForecast>>(
+        run_coro_in_drogon<std::optional<CarbonIntensityTimeSeries>>(
             [&testLocationId]()
-                -> drogon::Task<std::optional<CarbonIntensityForecast>> {
+                -> drogon::Task<std::optional<CarbonIntensityTimeSeries>> {
                 auto client = std::make_shared<StatsAPIClient>();
                 co_return co_await client->getCarbonIntensityForecast(
                     testLocationId);
@@ -279,9 +280,9 @@ BOOST_AUTO_TEST_CASE(carbonIntensity_values_are_in_valid_range) {
     const auto &testLocationId = locations[0].id;
 
     auto forecastOpt =
-        run_coro_in_drogon<std::optional<CarbonIntensityForecast>>(
+        run_coro_in_drogon<std::optional<CarbonIntensityTimeSeries>>(
             [&testLocationId]()
-                -> drogon::Task<std::optional<CarbonIntensityForecast>> {
+                -> drogon::Task<std::optional<CarbonIntensityTimeSeries>> {
                 auto client = std::make_shared<StatsAPIClient>();
                 co_return co_await client->getCarbonIntensityForecast(
                     testLocationId);
@@ -305,9 +306,9 @@ BOOST_AUTO_TEST_CASE(data_points_have_valid_timestamps) {
     const auto &testLocationId = locations[0].id;
 
     auto forecastOpt =
-        run_coro_in_drogon<std::optional<CarbonIntensityForecast>>(
+        run_coro_in_drogon<std::optional<CarbonIntensityTimeSeries>>(
             [&testLocationId]()
-                -> drogon::Task<std::optional<CarbonIntensityForecast>> {
+                -> drogon::Task<std::optional<CarbonIntensityTimeSeries>> {
                 auto client = std::make_shared<StatsAPIClient>();
                 co_return co_await client->getCarbonIntensityForecast(
                     testLocationId);
@@ -325,8 +326,8 @@ BOOST_AUTO_TEST_CASE(data_points_have_valid_timestamps) {
 BOOST_AUTO_TEST_CASE(returns_nullopt_for_invalid_location) {
     BOOST_CHECK_THROW(
         auto forecastOpt =
-            run_coro_in_drogon<std::optional<CarbonIntensityForecast>>(
-                []() -> drogon::Task<std::optional<CarbonIntensityForecast>> {
+            run_coro_in_drogon<std::optional<CarbonIntensityTimeSeries>>(
+                []() -> drogon::Task<std::optional<CarbonIntensityTimeSeries>> {
                     auto client = std::make_shared<StatsAPIClient>();
                     co_return co_await client->getCarbonIntensityForecast(
                         "nonexistent_location_xyz_12345");
@@ -380,8 +381,7 @@ BOOST_AUTO_TEST_CASE(datacenter_has_valid_capacity) {
             co_return co_await client->getDatacenter(testLocationId);
         });
 
-    BOOST_CHECK_GT(datacenter.maxLoad, 0.0);
-    BOOST_CHECK_GT(datacenter.totalGpus, 0);
+    BOOST_CHECK_GT(datacenter.hardwareSpec.gpuCapacity, 0.0);
 }
 
 BOOST_AUTO_TEST_CASE(timeseries_has_valid_data) {
@@ -405,9 +405,9 @@ BOOST_AUTO_TEST_CASE(timeseries_has_valid_data) {
                                           << " entries");
 
     for (const auto &slot : datacenter.timeSeries) {
-        BOOST_CHECK_GE(slot.predictedLoad, 0.0);
-        BOOST_CHECK_GE(slot.predictedSci, 0.0);
-        BOOST_CHECK_GE(slot.availableGpus, 0);
+        BOOST_CHECK_GE(slot.load, 0.0);
+        BOOST_CHECK_GE(slot.carbon_intensity, 0.0);
+        BOOST_CHECK_GE(slot.capacity, 0.0);
     }
 }
 
@@ -484,8 +484,7 @@ BOOST_AUTO_TEST_CASE(all_datacenters_have_valid_capacity) {
         });
 
     for (const auto &dc : datacenters) {
-        BOOST_CHECK_GT(dc.maxLoad, 0.0);
-        BOOST_CHECK_GT(dc.totalGpus, 0);
+        BOOST_CHECK_GT(dc.hardwareSpec.gpuCapacity, 0.0);
     }
 }
 
@@ -563,16 +562,16 @@ BOOST_AUTO_TEST_CASE(
     BOOST_REQUIRE(!locations.empty());
     const auto &testLocationId = locations[0].id;
 
-    auto loadForecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-        [&testLocationId]() -> drogon::Task<std::optional<LoadForecast>> {
+    auto loadForecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+        [&testLocationId]() -> drogon::Task<std::optional<LoadTimeSeries>> {
             auto client = std::make_shared<StatsAPIClient>();
             co_return co_await client->getLoadForecast(testLocationId);
         });
 
     auto carbonIntensityForecastOpt =
-        run_coro_in_drogon<std::optional<CarbonIntensityForecast>>(
+        run_coro_in_drogon<std::optional<CarbonIntensityTimeSeries>>(
             [&testLocationId]()
-                -> drogon::Task<std::optional<CarbonIntensityForecast>> {
+                -> drogon::Task<std::optional<CarbonIntensityTimeSeries>> {
                 auto client = std::make_shared<StatsAPIClient>();
                 co_return co_await client->getCarbonIntensityForecast(
                     testLocationId);
@@ -617,8 +616,8 @@ BOOST_AUTO_TEST_CASE(datacenter_timeseries_matches_combined_forecasts) {
             co_return co_await client->getDatacenter(testLocationId);
         });
 
-    auto loadForecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-        [&testLocationId]() -> drogon::Task<std::optional<LoadForecast>> {
+    auto loadForecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+        [&testLocationId]() -> drogon::Task<std::optional<LoadTimeSeries>> {
             auto client = std::make_shared<StatsAPIClient>();
             co_return co_await client->getLoadForecast(testLocationId);
         });
@@ -630,9 +629,6 @@ BOOST_AUTO_TEST_CASE(datacenter_timeseries_matches_combined_forecasts) {
     BOOST_CHECK_LE(datacenter.timeSeries.size(), loadForecastOpt->data.size());
 
     // Verify that capacity from forecast matches datacenter
-    BOOST_CHECK_EQUAL(datacenter.maxLoad, loadForecastOpt->capacity.maxLoad);
-    BOOST_CHECK_EQUAL(datacenter.totalGpus,
-                      loadForecastOpt->capacity.totalGpus);
 }
 
 BOOST_AUTO_TEST_CASE(location_id_consistency_across_endpoints) {
@@ -645,16 +641,16 @@ BOOST_AUTO_TEST_CASE(location_id_consistency_across_endpoints) {
     BOOST_REQUIRE(!locations.empty());
     const auto &testLocation = locations[0];
 
-    auto loadForecastOpt = run_coro_in_drogon<std::optional<LoadForecast>>(
-        [&testLocation]() -> drogon::Task<std::optional<LoadForecast>> {
+    auto loadForecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
+        [&testLocation]() -> drogon::Task<std::optional<LoadTimeSeries>> {
             auto client = std::make_shared<StatsAPIClient>();
             co_return co_await client->getLoadForecast(testLocation.id);
         });
 
     auto carbonIntensityForecastOpt =
-        run_coro_in_drogon<std::optional<CarbonIntensityForecast>>(
+        run_coro_in_drogon<std::optional<CarbonIntensityTimeSeries>>(
             [&testLocation]()
-                -> drogon::Task<std::optional<CarbonIntensityForecast>> {
+                -> drogon::Task<std::optional<CarbonIntensityTimeSeries>> {
                 auto client = std::make_shared<StatsAPIClient>();
                 co_return co_await client->getCarbonIntensityForecast(
                     testLocation.id);

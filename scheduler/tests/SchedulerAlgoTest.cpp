@@ -382,8 +382,8 @@ BOOST_AUTO_TEST_CASE(works_with_LocationCost) {
     // LocationCost holds references; vectors must not reallocate after this
     auto costs = std::vector<LocationCost>{};
     costs.reserve(2);
-    costs.emplace_back(caps[0], greens[0]);
-    costs.emplace_back(caps[1], greens[1]);
+    costs.emplace_back(greens[0], 1.0);
+    costs.emplace_back(greens[1], 1.0);
 
     auto loads =
         std::vector{std::vector<double>(n, 0.0), std::vector<double>(n, 0.0)};
