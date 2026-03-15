@@ -215,7 +215,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/LoadGreenessForecastDataPoint'
+                  $ref: '#/components/schemas/DCInfo'
         "400":
           description: Python API is unresponsive
           content:
@@ -452,44 +452,6 @@ components:
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
 
-    LoadGreenessForecastDataPoint:
-      properties:
-        max_load:
-          type: number
-          title: max_load
-          description: maximum load of the datacenter
-        location:
-          type: string
-          title: location
-          description: location of the greeness data
-        timeseries:
-          type: array
-          items:
-            $ref: '#/components/schemas/LoadGreenessPoint'
-      type: object
-      required:
-      - location
-      - timeseries
-      - max_load
-    
-    LoadGreenessPoint:
-      type: object
-      properties:
-        timestamp:
-          type: string
-          format: date-time
-          description: Start time of the scheduled block
-          example: "2025-12-08T02:00:00Z"
-        greeness:
-          type: number
-          description: greeness at the location at the time
-          example: 5.4
-        load:
-          type: number
-          description: load at the locatioin at the time
-          example: 6.9
-
-
     ScheduleImpact:
       type: object
       properties:
@@ -507,6 +469,61 @@ components:
           type: number
           description: Software Carbon Intensity score for the schedule
           example: 20
+
+    DCInfoHardwareSpec:
+      type: object
+      properties:
+        gpuSKU:
+          type: string
+          description: SKU of the GPU available
+          example: "V100_PCIE"
+        gpuCapacity:
+          type: number
+          description: Computational capacity of the GPU in teraFLOPS
+          example: 40
+        gpuPower:
+          type: number
+          description: Power consumption of the GPU in watts
+          example: 250
+
+    DCInfo:
+      properties:
+        location:
+          type: string
+          title: location
+          description: location of the greeness data
+        hardwareSpec:
+          $ref: "#/components/schemas/DCInfoHardwareSpec"
+        timeseries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DCInfoTSDataPoint'
+      type: object
+      required:
+      - location
+      - timeseries
+      - hardwareSpec
+    
+    DCInfoTSDataPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Start time of the scheduled block
+          example: "2025-12-08T02:00:00Z"
+        load:
+          type: number
+          description: load at the location at the time, in FLOs
+          example: 1e14
+        carbon_intensity:
+          type: number
+          description: carbon intensity at the location at the time
+          example: 50.0
+        capacity:
+          type: number
+          description: computational capacity available at the location at the time in FLOs
+          example: 1e15
 
     Error:
       type: object
