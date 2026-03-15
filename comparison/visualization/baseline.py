@@ -116,6 +116,37 @@ class BaselineVisulizer(Visualizer):
         plt.grid(True, linestyle=":", alpha=0.5)
         plt.tight_layout()
 
+        # Calculate percentages at the final data point
+        last_idx = pivot_df.index[-1]
+        base_val = pivot_df.loc[last_idx, f"GSF SDK ({best_dc})"]
+        dp_local_val = pivot_df.loc[last_idx, f"DP Algorithm ({best_dc})"]
+        global_val = pivot_df.loc[last_idx, "DP Algorithm (Global Optimal)"]
+
+        # % Reduction vs Baseline
+        pct_temporal = ((base_val - dp_local_val) / base_val) * 100  # type: ignore
+        pct_total = ((base_val - global_val) / base_val) * 100  # type: ignore
+
+        # Add text labels to the right of the last points
+        plt.text(
+            last_idx + 20,
+            dp_local_val,  # type: ignore
+            f"-{pct_temporal:.1f}% (Temporal)",
+            color="#3498db",
+            fontweight="bold",
+            va="center",
+        )
+        plt.text(
+            last_idx + 20,
+            global_val,  # type: ignore
+            f"-{pct_total:.1f}% (Temporal \n+ Spatial)",
+            color="#2ecc71",
+            fontweight="bold",
+            va="center",
+        )
+
+        # Adjust x-axis to make room for text
+        plt.xlim(right=last_idx + 400)
+
         plt.savefig(
             self.save_path + "plot_baseline_validation_spatial_difference.png",
             bbox_inches="tight",
