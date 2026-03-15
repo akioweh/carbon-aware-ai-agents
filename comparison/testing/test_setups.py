@@ -88,15 +88,17 @@ def get_load_energy_kwh(model_gb: float, gpu_type: str, p_full_kw: float) -> flo
 # =============================================================================
 
 models: list[ModelConfig] = [
-    {"name": "BERT-L", "gb": 3},
     {"name": "Llama7B", "gb": 14},
-    {"name": "Llama13B", "gb": 26},
+    {"name": "Llama-3-70B", "gb": 140},
 ]
 
 configs: list[SystemConfig] = [
     {"id": "V100-5x", "type": "V100_PCIE", "n": 5},
-    {"id": "A100-5x", "type": "A100_SXM4", "n": 5},
     {"id": "A100-10x", "type": "A100_SXM4", "n": 10},
+    {"id": "A100-15x", "type": "A100_SXM4", "n": 15},
+    {"id": "A100-20x", "type": "A100_SXM4", "n": 20},
+    {"id": "V100-30x", "type": "V100_PCIE", "n": 30},
+    {"id": "V100-40x", "type": "V100_PCIE", "n": 40},
     {"id": "V100-50x", "type": "V100_PCIE", "n": 50},
 ]
 
