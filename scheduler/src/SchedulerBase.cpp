@@ -15,19 +15,19 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
     assert(job.workload_amount >= 0.);
     assert(job.earliest_start <= job.latest_finish);
 
-    const auto time_index_offset = time_gridder.toIndex(job.earliest_start);
+    const auto time_index_offset = TIME_GRIDDER.toIndex(job.earliest_start);
 
     const auto time_to_index =
-        [&](const decltype(time_gridder)::time_point_t &tp) -> int64_t {
-        return time_gridder.toIndex(tp) - time_index_offset;
+        [&](const decltype(TIME_GRIDDER)::time_point_t &tp) -> int64_t {
+        return TIME_GRIDDER.toIndex(tp) - time_index_offset;
     };
     const auto index_to_time =
-        [&](const int64_t i) -> decltype(time_gridder)::time_point_t {
-        return time_gridder.toTimePoint(i + time_index_offset);
+        [&](const int64_t i) -> decltype(TIME_GRIDDER)::time_point_t {
+        return TIME_GRIDDER.toTimePoint(i + time_index_offset);
     };
 
     const auto n_intervals =
-        time_gridder.toIndexCeil(job.latest_finish) - time_index_offset;
+        TIME_GRIDDER.toIndexCeil(job.latest_finish) - time_index_offset;
 
     if (n_intervals <= 0) {
         throw exceptions::SchedulingException("Time window too narrow");

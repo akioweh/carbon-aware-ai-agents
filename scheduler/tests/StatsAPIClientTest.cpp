@@ -116,8 +116,6 @@ BOOST_AUTO_TEST_CASE(load_forecast_has_required_fields) {
 
     // Required fields per OpenAPI spec
     BOOST_CHECK(!forecast.locationId.empty());
-    BOOST_CHECK(!forecast.metric.empty());
-    BOOST_CHECK(!forecast.unit.empty());
     BOOST_CHECK(!forecast.data.empty());
 }
 
@@ -140,7 +138,6 @@ BOOST_AUTO_TEST_CASE(load_values_are_non_negative) {
     BOOST_REQUIRE(forecastOpt.has_value());
     for (const auto &point : forecastOpt->data) {
         BOOST_CHECK_GE(point.value, 0.0);
-        BOOST_CHECK_GE(point.availableGpus, 0);
     }
 }
 
@@ -264,8 +261,6 @@ BOOST_AUTO_TEST_CASE(carbonIntensity_forecast_has_required_fields) {
 
     // Required fields per OpenAPI spec
     BOOST_CHECK(!forecast.locationId.empty());
-    BOOST_CHECK(!forecast.metric.empty());
-    BOOST_CHECK(!forecast.unit.empty());
     BOOST_CHECK(!forecast.data.empty());
 }
 

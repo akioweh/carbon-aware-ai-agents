@@ -1,6 +1,7 @@
 #include "StatsAPIClient.hpp"
 #include "structs/Datacenter.hpp"
 #include "utils/Coro.hpp"
+#include "utils/TimeGridder.hpp"
 #include "utils/Utils.hpp"
 #include <algorithm>
 #include <drogon/HttpClient.h>
@@ -9,7 +10,6 @@
 #include <drogon/HttpTypes.h>
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
-#include <map>
 #include <optional>
 #include <trantor/utils/Logger.h>
 
@@ -32,7 +32,7 @@ auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
 }
 
 auto StatsAPIClient::getLoadForecast(const string &location)
-    -> Task<std::optional<LoadTimeSeries>> {
+    -> Task<optional<LoadTimeSeries>> {
     auto jsonPtr = co_await utils::makeGetRequest(host, getLoadPath(location));
     assert(jsonPtr);
     const auto &json = *jsonPtr;
@@ -44,10 +44,7 @@ auto StatsAPIClient::getLoadForecast(const string &location)
     if (!json.isMember("data") || !json["data"].isArray()) {
         LOG_WARN << "Response missing 'data' array for location " << location
                  << ", returning empty time series";
-        co_return LoadTimeSeries{.locationId = location,
-                                 .metric = "TO REMOVE",
-                                 .unit = "TO REMOVE",
-                                 .data = {}};
+        co_return LoadTimeSeries{.locationId = location, .data = {}};
     }
 
     auto data = decltype(LoadTimeSeries::data){};
@@ -66,13 +63,11 @@ auto StatsAPIClient::getLoadForecast(const string &location)
 
     co_return LoadTimeSeries{.locationId =
                                  json.get("location_id", location).asString(),
-                             .metric = "TO REMOVE",
-                             .unit = "TO REMOVE",
                              .data = std::move(data)};
 }
 
 auto StatsAPIClient::getCarbonIntensityForecast(const string &location)
-    -> Task<std::optional<CarbonIntensityTimeSeries>> {
+    -> Task<optional<CarbonIntensityTimeSeries>> {
     auto jsonPtr =
         co_await utils::makeGetRequest(host, getCarbonIntensityPath(location));
     assert(jsonPtr);
@@ -87,8 +82,6 @@ auto StatsAPIClient::getCarbonIntensityForecast(const string &location)
                  << ", returning empty time series";
         co_return CarbonIntensityTimeSeries{
             .locationId = json.get("location_id", location).asString(),
-            .metric = "TO REMOVE",
-            .unit = "TO REMOVE",
             .data = {}};
     }
 
@@ -107,8 +100,6 @@ auto StatsAPIClient::getCarbonIntensityForecast(const string &location)
 
     co_return CarbonIntensityTimeSeries{
         .locationId = json.get("location_id", location).asString(),
-        .metric = "TO REMOVE",
-        .unit = "TO REMOVE",
         .data = std::move(data)};
 }
 
@@ -124,23 +115,33 @@ auto StatsAPIClient::getDatacenter(const string &datacenterName)
 
     const auto &load = *loadOpt;
     const auto &carbon_intensity = *carbon_intensityOpt;
-    // TODO: do we really want a map here?
-    map<chrono::system_clock::time_point, double> ci_map;
-    for (const auto &point : carbon_intensity.data)
-        ci_map.emplace(point.timestamp, point.value);
+    // detect start and end times
+    const auto tps1 = load.data | views::transform(&LoadDataPoint::timestamp);
+    const auto tps2 = carbon_intensity.data |
+                      views::transform(&CarbonIntensityDataPoint::timestamp);
+    auto start = min(ranges::min(tps1), ranges::min(tps2));
+    auto end = max(ranges::max(tps1), ranges::max(tps2));
 
-    auto timeSeries = decltype(Datacenter::timeSeries){};
-    timeSeries.reserve(load.data.size());
-
-    for (const auto &point : load.data) {
-        if (ci_map.contains(point.timestamp)) {
-            timeSeries.emplace_back(point.timestamp, point.value,
-                                    ci_map.at(point.timestamp),
-                                    point.availableGpus);
-        }
+    // use time gridder to align data points by timestamp and
+    // transform into a sorted time series. missing data is defaulted to 0
+    // as a side effect, this "aligns" all timestamps to whole-5-min marks
+    const auto index_offset = TIME_GRIDDER.toIndex(start);
+    const auto n = TIME_GRIDDER.toIndexCeil(end) - index_offset;
+    auto timeSeries = decltype(Datacenter::timeSeries)(n);
+    for (const auto idx : views::iota(int64_t{}, n))
+        timeSeries[idx].timestamp = TIME_GRIDDER.toTimePoint(idx);
+    // assume no multiple data points within an interval; overwrite
+    for (const auto &pt : load.data) {
+        const auto idx = TIME_GRIDDER.toIndex(pt.timestamp) - index_offset;
+        // out of bounds should be impossible
+        timeSeries[idx].load = pt.value;
+        timeSeries[idx].capacity = pt.capacity;
+        // isForecast is ignored
     }
-
-    ranges::sort(timeSeries);
+    for (const auto &pt : carbon_intensity.data) {
+        const auto idx = TIME_GRIDDER.toIndex(pt.timestamp) - index_offset;
+        timeSeries[idx].carbon_intensity = pt.value;
+    }
 
     co_return Datacenter{
         .id = load.locationId,

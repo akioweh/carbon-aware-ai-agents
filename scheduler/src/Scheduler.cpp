@@ -28,8 +28,8 @@ auto Scheduler::scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
     auto blocks = vector<InternalBlock>{};
 
     const auto index_to_time = [&](const int64_t i)
-        -> decltype(scheduler::time_gridder)::time_point_t {
-        return scheduler::time_gridder.toTimePoint(i + data.time_index_offset);
+        -> decltype(scheduler::TIME_GRIDDER)::time_point_t {
+        return scheduler::TIME_GRIDDER.toTimePoint(i + data.time_index_offset);
     };
 
     for (size_t i = 0; i < optimal_schedule.size(); ++i) {

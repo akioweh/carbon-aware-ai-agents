@@ -11,11 +11,6 @@
 
 namespace scheduler {
 
-using FiveMinutes = std::chrono::duration<int, std::ratio<300>>;
-
-inline constexpr auto time_gridder =
-    scheduler::utils::TimeGridder<FiveMinutes>{};
-
 struct SchedulerData {
     std::vector<std::string> location_ids;
     std::vector<std::vector<double>> loads_f;

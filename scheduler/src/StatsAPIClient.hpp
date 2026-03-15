@@ -41,9 +41,6 @@ struct LoadDataPoint {
  */
 struct LoadTimeSeries {
     std::string locationId;
-    // TODO: remove these dumb metric/unit fields
-    std::string metric;
-    std::string unit;
     std::vector<LoadDataPoint> data;
 };
 
@@ -60,9 +57,6 @@ struct CarbonIntensityDataPoint {
  */
 struct CarbonIntensityTimeSeries {
     std::string locationId;
-    // TODO: remove these dumb metric/unit fields
-    std::string metric;
-    std::string unit;
     std::vector<CarbonIntensityDataPoint> data;
 };
 

@@ -129,8 +129,8 @@ auto TrivialScheduler::scheduleJob(JobRequest job)
     auto blocks_count = 0;
 
     const auto index_to_time = [&](const uint64_t i)
-        -> decltype(scheduler::time_gridder)::time_point_t {
-        return scheduler::time_gridder.toTimePoint(i + data.time_index_offset);
+        -> decltype(scheduler::TIME_GRIDDER)::time_point_t {
+        return scheduler::TIME_GRIDDER.toTimePoint(i + data.time_index_offset);
     };
 
     for (size_t i = 0; i < n_locations; ++i) {
