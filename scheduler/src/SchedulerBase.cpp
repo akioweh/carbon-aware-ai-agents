@@ -10,7 +10,7 @@ using namespace std;
 using namespace drogon;
 using namespace scheduler::exceptions;
 
-auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
+auto SchedulerBase::fetch_data(const JobRequest &job)
     -> drogon::Task<SchedulerData> {
     assert(job.workload_amount >= 0.);
     assert(job.earliest_start <= job.latest_finish);
@@ -43,29 +43,33 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
     auto data = SchedulerData{};
     data.n_intervals = n_intervals;
     data.time_index_offset = time_index_offset;
-    data.loads_f.reserve(n_locations);
     data.location_ids.reserve(n_locations);
+    data.loads_f.reserve(n_locations);
     data.capacities_f.reserve(n_locations);
-    data.sci_scores.reserve(n_locations);
+    data.carbon_intensities_f.reserve(n_locations);
+    data.kwh_per_flo.reserve(n_locations);
 
     for (const auto &loc : locations) {
         data.location_ids.push_back(loc.id);
-        data.capacities_f.emplace_back(n_intervals, job.max_load);
+        const auto flops_per_gpu = loc.hardwareSpec.gpuCapacity * 1e12;
+        const auto kwh_per_flo =
+            loc.hardwareSpec.gpuPower / (flops_per_gpu * 3600.);
+        data.kwh_per_flo.push_back(kwh_per_flo);
 
         auto load = vector(n_intervals, 0.);
-        auto sci = vector(n_intervals, 1.);
-        const auto &ts_data = loc.timeSeries;
-        for (const auto &tp : ts_data) {
-            if (tp.timestamp < time_start || tp.timestamp >= time_end)
-                continue;
+        auto capacity = vector(n_intervals, 0.);
+        auto carbon_intensity = vector(n_intervals, 0.);
+        for (const auto &tp : loc.timeSeries) {
             const auto index = time_to_index(tp.timestamp);
-            if (index >= 0 && index < n_intervals) {
-                load[index] = tp.predictedLoad;
-                sci[index] = tp.predictedSci;
-            }
+            if (index < 0 || index >= n_intervals)
+                continue;
+            load[index] = tp.load;
+            capacity[index] = tp.capacity;
+            carbon_intensity[index] = tp.carbon_intensity;
         }
-        data.sci_scores.push_back(std::move(sci));
         data.loads_f.push_back(std::move(load));
+        data.capacities_f.push_back(std::move(capacity));
+        data.carbon_intensities_f.push_back(std::move(carbon_intensity));
     }
 
     for (const auto &block : existing_schedule) {
@@ -79,11 +83,15 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
         }
     }
 
-    for (const auto i : std::views::iota(0ULL, n_locations)) {
-        const double physical_limit = locations[i].maxLoad;
-        for (auto &current_load : data.loads_f[i]) {
-            double remaining = physical_limit - current_load;
-            current_load = job.max_load - min(remaining, job.max_load);
+    // HACK: we're hijacking the load and capacity vectors to enforce the
+    // max_load constraint from the job request... as existing loads are
+    // "discarded", we effectively schedule on a "clean" calendar
+    for (const auto i : std::views::iota(0UZ, n_locations)) {
+        for (const auto j : std::views::iota(int64_t{}, n_intervals)) {
+            const auto remaining = data.capacities_f[i][j] - data.loads_f[i][j];
+            data.loads_f[i][j] = job.max_load - min(remaining, job.max_load);
+            data.capacities_f[i][j] =
+                min(data.capacities_f[i][j], job.max_load);
         }
     }
 

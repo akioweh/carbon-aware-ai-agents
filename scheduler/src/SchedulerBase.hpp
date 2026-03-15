@@ -20,33 +20,31 @@ struct SchedulerData {
     std::vector<std::string> location_ids;
     std::vector<std::vector<double>> loads_f;
     std::vector<std::vector<double>> capacities_f;
-    std::vector<std::vector<double>> sci_scores;
-    std::vector<double> penalties_f;
+    std::vector<std::vector<double>> carbon_intensities_f;
+    std::vector<double> kwh_per_flo;
+    std::vector<double> penalties_f; // startup overhead, same units as workload
     int64_t n_intervals;
     int64_t time_index_offset;
 
-    auto generateCostsF() -> std::vector<LocationCost> {
-        std::vector<LocationCost> costs_f;
-        costs_f.reserve(capacities_f.size());
-        for (size_t i = 0; i < capacities_f.size(); ++i) {
-            costs_f.emplace_back(LocationCost{.capacities = capacities_f[i],
-                                              .sci_scores = sci_scores[i]});
-        }
-        return costs_f;
+    auto generate_cost_functions() -> std::vector<LocationCost> {
+        auto res = std::vector<LocationCost>{};
+        res.reserve(capacities_f.size());
+        for (const auto [carbon_intensity, efficiency] :
+             std::views::zip(carbon_intensities_f, kwh_per_flo))
+            res.emplace_back(carbon_intensity, efficiency);
+        return res;
     }
 };
 
 class SchedulerBase {
   protected:
-    static constexpr unsigned int KWH = 1000 * 60 * 60;
     StatsAPIClient stats_api;
 
   public:
     virtual ~SchedulerBase() = default;
 
   protected:
-    auto fetchAndPrepareData(const JobRequest &job)
-        -> drogon::Task<SchedulerData>;
+    auto fetch_data(const JobRequest &job) -> drogon::Task<SchedulerData>;
 };
 
 } // namespace scheduler

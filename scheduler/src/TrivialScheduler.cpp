@@ -15,13 +15,12 @@ constexpr double EPSILON = 1e-6;
 constexpr double MIN_CAPACITY_THRESHOLD = 0.1;
 constexpr double TARGET_UTILIZATION = 0.5;
 
-auto TrivialScheduler::scheduleJob(
-    JobRequest job) // NOLINT(readability-function-cognitive-complexity)
+auto TrivialScheduler::scheduleJob(JobRequest job)
     -> drogon::Task<SchedulerOutput> {
-    auto data = co_await fetchAndPrepareData(job);
+    auto data = co_await fetch_data(job);
     const auto n_locations = data.location_ids.size();
     const auto n_intervals = data.n_intervals;
-    auto costs_f = data.generateCostsF();
+    auto costs_f = data.generate_cost_functions();
 
     // Reorder indices based on preferred_datacenter if it exists
     auto location_indices = vector<size_t>(n_locations);
@@ -125,6 +124,7 @@ auto TrivialScheduler::scheduleJob(
     auto total_emissions = 0.0;
     auto total_carbon_intensity_sum = 0.0;
     auto total_sci = 0.0;
+    auto total_kwh = 0.0;
     auto blocks = vector<InternalBlock>{};
     auto blocks_count = 0;
 
@@ -136,7 +136,8 @@ auto TrivialScheduler::scheduleJob(
     for (size_t i = 0; i < n_locations; ++i) {
         const auto &loc_id = data.location_ids[i];
         const auto &schedule_vec = res[i];
-        const auto &sci_vec = data.sci_scores[i];
+        const auto &sci_vec = data.carbon_intensities_f[i];
+        const auto kwh = data.kwh_per_flo[i];
 
         for (const auto j : views::iota(int64_t{}, n_intervals)) {
             const auto load = schedule_vec[j];
@@ -151,8 +152,9 @@ auto TrivialScheduler::scheduleJob(
             ++blocks_count;
 
             const auto current_sci = sci_vec[j];
-            total_emissions += load * current_sci;
+            total_emissions += load * kwh * current_sci;
             total_carbon_intensity_sum += current_sci;
+            total_kwh += load * kwh;
             total_sci += costs_f[i][j](data.loads_f[i][j] + load) -
                          costs_f[i][j](data.loads_f[i][j]);
         }
@@ -165,7 +167,7 @@ auto TrivialScheduler::scheduleJob(
                                               static_cast<double>(blocks_count)
                                         : 0.0,
                    .total_emissions = total_emissions,
-                   .sci = total_sci,
+                   .sci = (total_kwh > 0.0 ? total_sci / total_kwh : 0.0),
                }};
 }
 
