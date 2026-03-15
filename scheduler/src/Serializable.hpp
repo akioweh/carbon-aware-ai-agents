@@ -1,8 +1,7 @@
 #ifndef SCHEDULER_SERIALIZABLE_HPP
 #define SCHEDULER_SERIALIZABLE_HPP
-#pragma once
-
 #include <concepts>
+#pragma once
 #include <json/value.h>
 #include <map>
 #include <optional>

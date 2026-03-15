@@ -182,6 +182,12 @@ inline void vectorizeDpTransition(const int w_prev, const int tot_work,
     transitionAVX(start_wi_new_run, end_wi_new_run, prev1V, ones, penalty);
 }
 
+inline auto get_e_work(const double tot_work_f, const int resolution)
+    -> double {
+    constexpr double min_e_work = 0.001;
+    return std::max(tot_work_f / resolution, min_e_work);
+}
+
 inline auto calc_single(const std::vector<double> &load_f,
                         const std::vector<double> &capacity_f,
                         const CostFunction<double> auto &cost_f,
@@ -190,7 +196,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     using namespace std;
     const auto n = static_cast<int>(load_f.size());
     // discretization
-    const auto e_work = max(tot_work_f / resolution, 0.5);
+    const auto e_work = get_e_work(tot_work_f, resolution);
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
     auto load = vector<int>(n);
     transform(execution::unseq, load_f.begin(), load_f.end(), load.begin(),
@@ -342,7 +348,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     for (auto i : views::iota(0UZ, m))
         tie(locations_cost_vector[i], locations_memo[i]) = futures[i].get();
 
-    const auto e_work = max(tot_work_f / resolution, 0.5);
+    const auto e_work = get_e_work(tot_work_f, resolution);
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
 
     // result validation

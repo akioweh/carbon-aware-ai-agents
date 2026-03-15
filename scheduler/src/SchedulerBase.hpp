@@ -11,7 +11,9 @@
 
 namespace scheduler {
 
-using FiveMinutes = std::chrono::duration<int, std::ratio<300>>;
+constexpr int NumberOfSecondsIn5Minutes = 300;
+using FiveMinutes =
+    std::chrono::duration<int, std::ratio<NumberOfSecondsIn5Minutes>>;
 
 inline constexpr auto time_gridder =
     scheduler::utils::TimeGridder<FiveMinutes>{};
