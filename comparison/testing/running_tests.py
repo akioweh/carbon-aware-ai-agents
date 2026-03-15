@@ -58,7 +58,7 @@ def get_real_length_of_computation(
     return int(ceil(effective_length_of_computation + (overhead / power) * 60.0))
 
 
-def run_specific_test(params: TestParams) -> TestResult:
+def run_specific_test(params: TestParams, preffered_datacenter: str = "") -> TestResult:
     """Self-contained test runner targeting local APIs for on-demand graph generation."""
     c: TestConfig = params["config"]
     length: float = params["length_of_computation"]
@@ -97,6 +97,7 @@ def run_specific_test(params: TestParams) -> TestResult:
         length=int(length),
         gpu_count=c["system"]["n"],
         model_size=c["model"]["gb"],
+        location=preffered_datacenter,
     )
     runtime_sec: float = time.perf_counter() - t0
 

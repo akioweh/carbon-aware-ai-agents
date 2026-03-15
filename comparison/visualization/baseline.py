@@ -20,39 +20,104 @@ class BaselineVisulizer(Visualizer):
         workloads = get_lengths_of_computation()
         data = []
         c = self.configs[0]
+        best_dc = "Data-Center-5"
 
         for w in workloads:
-            params: TestParams = {
+            # Pass 1: Restricted to Best Single DC (DC5)
+            # Provides: SDK (Contiguous) vs DP (Splitting)
+            params_restricted: TestParams = {
                 "config": c,
                 "window_hours": 36,
                 "length_of_computation": w,
                 "volatility_override": 15,
             }
-            res = run_specific_test(params)
+            res_r = run_specific_test(params_restricted, best_dc)
+
+            # Pass 2: Unrestricted Global (All DCs)
+            # Provides: DP (Splitting + Routing)
+            params_global: TestParams = {
+                "config": c,
+                "window_hours": 36,
+                "length_of_computation": w,
+                "volatility_override": 15,
+            }
+            res_g = run_specific_test(params_global)
+
+            # Tier 1: Industry Standard (SDK on best DC)
             data.append(
                 {
                     "Workload (min)": w,
-                    "Emissions": res["sdk_emissions_kg"],
-                    "Strategy": "GSF SDK",
+                    "Emissions": res_r["sdk_emissions_kg"],
+                    "Strategy": f"GSF SDK ({best_dc})",
                 }
             )
+            # Tier 2: DP Temporal Advantage (Same DC, but splitting allowed)
             data.append(
                 {
                     "Workload (min)": w,
-                    "Emissions": res["agent_emissions_kg"],
-                    "Strategy": "Agent",
+                    "Emissions": res_r["agent_emissions_kg"],
+                    "Strategy": f"DP Algorithm ({best_dc})",
+                }
+            )
+            # Tier 3: DP Global Advantage (Splitting + 5-DC Routing)
+            data.append(
+                {
+                    "Workload (min)": w,
+                    "Emissions": res_g["agent_emissions_kg"],
+                    "Strategy": "DP Algorithm (Global Optimal)",
                 }
             )
 
         df = pd.DataFrame(data)
+        plt.figure(figsize=(10, 6))
+
+        # Define palette to clearly distinguish between temporal and spatial gains
+        palette = {
+            f"GSF SDK ({best_dc})": "#95a5a6",  # Gray (Baseline)
+            f"DP Algorithm ({best_dc})": "#3498db",  # Blue (Temporal Gain)
+            "DP Algorithm (Global Optimal)": "#2ecc71",  # Green (Spatial Gain)
+        }
+
         sns.lineplot(
-            data=df, x="Workload (min)", y="Emissions", hue="Strategy", marker="o"
+            data=df,
+            x="Workload (min)",
+            y="Emissions",
+            hue="Strategy",
+            palette=palette,
+            marker="o",
+            linewidth=2.5,
         )
-        plt.title("Baseline Validation: Agent vs GSF SDK (window = 36h)")
+
+        # Shading areas to highlight "Sources of Superiority"
+        # Note: These values must be pivot-aligned for fill_between
+        pivot_df = df.pivot(
+            index="Workload (min)", columns="Strategy", values="Emissions"
+        )
+        plt.fill_between(
+            pivot_df.index,
+            pivot_df[f"GSF SDK ({best_dc})"],
+            pivot_df[f"DP Algorithm ({best_dc})"],
+            color="#3498db",
+            alpha=0.1,
+        )
+        plt.fill_between(
+            pivot_df.index,
+            pivot_df[f"DP Algorithm ({best_dc})"],
+            pivot_df["DP Algorithm (Global Optimal)"],
+            color="#2ecc71",
+            alpha=0.1,
+        )
+
+        plt.title(
+            "Emissions Hierarchy: Temporal Splitting vs. Spatial Routing (36h Window)"
+        )
         plt.ylabel(r"Emissions (g $CO_2e$)")
+        plt.xlabel("Workload Length (minutes)")
+        plt.grid(True, linestyle=":", alpha=0.5)
         plt.tight_layout()
+
         plt.savefig(
-            self.save_path + "plot_baseline_validation.png", bbox_inches="tight"
+            self.save_path + "plot_baseline_validation_final.png", bbox_inches="tight"
         )
         plt.close()
 
@@ -143,4 +208,4 @@ class BaselineVisulizer(Visualizer):
 
 if __name__ == "__main__":
     vis = BaselineVisulizer()
-    vis.generate_model_comparison_table()
+    vis.plot_baseline_validation()
