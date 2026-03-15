@@ -117,7 +117,8 @@ class BaselineVisulizer(Visualizer):
         plt.tight_layout()
 
         plt.savefig(
-            self.save_path + "plot_baseline_validation_final.png", bbox_inches="tight"
+            self.save_path + "plot_baseline_validation_spatial_difference.png",
+            bbox_inches="tight",
         )
         plt.close()
 
