@@ -44,21 +44,6 @@ inline auto f_toJson(const TimeSlot &obj) -> Json::Value {
     return res;
 }
 
-// WIP
-struct HardwareSpec {
-    std::string gpuSKU;
-    double gpuCapacity{}; // in teraFLOPS
-    double gpuPower{};    // in watts
-};
-
-inline auto f_toJson(const HardwareSpec &obj) -> Json::Value {
-    auto res = Json::Value{};
-    res["gpuSKU"] = obj.gpuSKU;
-    res["gpuCapacity"] = obj.gpuCapacity;
-    res["gpuPower"] = obj.gpuPower;
-    return res;
-}
-
 /**
  * @class Datacenter
  * @brief Internal aggregator of datacenter-specific info needed for scheduling.
@@ -69,14 +54,12 @@ inline auto f_toJson(const HardwareSpec &obj) -> Json::Value {
 struct Datacenter {
     std::string id;
     std::string name;
-    HardwareSpec hardwareSpec{};
     std::vector<TimeSlot> timeSeries;
 };
 
 inline auto f_toJson(const Datacenter &obj) -> Json::Value {
     auto res = Json::Value{};
     res["location"] = obj.id;
-    res["hardwareSpec"] = toJson(obj.hardwareSpec);
     res["timeseries"] = Json::Value(Json::arrayValue);
     for (const auto &block : obj.timeSeries)
         res["timeseries"].append(toJson(block));

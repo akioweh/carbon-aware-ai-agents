@@ -51,9 +51,9 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
 
     for (const auto &loc : locations) {
         data.location_ids.push_back(loc.id);
-        const auto flops_per_gpu = loc.hardwareSpec.gpuCapacity * 1e12;
-        const auto kwh_per_flo =
-            loc.hardwareSpec.gpuPower / (flops_per_gpu * 3600.);
+
+        // HACK: placeholder dummy value for hardware specification
+        const auto kwh_per_flo = 1.0e-12; // dummy value
         data.kwh_per_flo.push_back(kwh_per_flo);
 
         auto load = vector(n_intervals, 0.);
