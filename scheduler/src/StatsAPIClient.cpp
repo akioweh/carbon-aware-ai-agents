@@ -57,8 +57,8 @@ auto StatsAPIClient::getLoadForecast(const string &location)
             continue;
         }
         data.emplace_back(tsOpt.value(), item["value"].asDouble(),
-                          item["is_forecast"].asBool(),
-                          item["capacity"].asDouble());
+                          item["capacity"].asDouble(),
+                          item["is_forecast"].asBool());
     }
 
     co_return LoadTimeSeries{.locationId =

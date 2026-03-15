@@ -26,9 +26,9 @@ struct Location {
 struct LoadDataPoint {
     std::chrono::system_clock::time_point timestamp;
     double value;
+    double capacity; // FLO (for this 5 min interval)
     // TODO: optimize struct padding alignment
     bool isForecast;
-    double capacity; // FLO (for this 5 min interval)
 };
 
 /**
