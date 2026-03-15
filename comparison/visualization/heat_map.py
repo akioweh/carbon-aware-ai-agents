@@ -56,7 +56,7 @@ class HeatmapVisulizer(Visualizer):
             fmt=".1f",
             cbar_kws={"label": "% Savings"},
         )
-        plt.title("ROI Heatmap: Configuration vs. User Patience")
+        plt.title("ROI Heatmap: Configuration vs. User Patience (Workload length: 9h)")
         plt.gca().invert_yaxis()
         plt.tight_layout()
         plt.savefig(self.save_path + "plot_roi_heatmap.png", bbox_inches="tight")

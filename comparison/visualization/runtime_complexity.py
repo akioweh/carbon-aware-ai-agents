@@ -60,7 +60,7 @@ class RuntimeComplexityVisulizer(Visualizer):
             marker="o",
             linewidth=2,
         )
-        plt.title(r"Runtime complexity with window size")
+        plt.title(r"Runtime complexity with window size (length of workload: 3h)")
         plt.tight_layout()
         plt.savefig(
             self.save_path + "plot_complexity_scaling_window.png", bbox_inches="tight"
@@ -96,7 +96,7 @@ class RuntimeComplexityVisulizer(Visualizer):
             marker="o",
             linewidth=2,
         )
-        plt.title(r"Runtime complexity with length of schedule")
+        plt.title(r"Runtime complexity with length of workload (window: 48h)")
         plt.tight_layout()
         plt.savefig(
             self.save_path + "plot_complexity_scaling_length_of_schedule.png",

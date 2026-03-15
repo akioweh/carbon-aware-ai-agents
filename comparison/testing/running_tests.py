@@ -68,7 +68,7 @@ def run_specific_test(params: TestParams) -> TestResult:
     vol_override: float = params["volatility_override"]
 
     # Only manipulate hours, entirely dropping days/offsets
-    start_dt: datetime = datetime(2026, 3, 15, 20, 0, tzinfo=timezone.utc)
+    start_dt: datetime = datetime(2026, 3, 16, 4, 0, tzinfo=timezone.utc)
     end_dt: datetime = start_dt + timedelta(hours=window)
     start_str: str = start_dt.isoformat().replace("+00:00", "Z")
     end_str: str = end_dt.isoformat().replace("+00:00", "Z")

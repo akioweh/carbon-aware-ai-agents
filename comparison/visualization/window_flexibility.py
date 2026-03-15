@@ -42,7 +42,7 @@ class WindowFlexibilityVisulizer(Visualizer):
             marker="s",
             linewidth=2.5,
         )
-        plt.title("Flexibility Frontier: Diminishing Returns")
+        plt.title("Window size impact: Diminishing Returns (length of workload: 15h)")
         plt.ylabel("% Saved over Baseline")
         plt.tight_layout()
         plt.savefig(

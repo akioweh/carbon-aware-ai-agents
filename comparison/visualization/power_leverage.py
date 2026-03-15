@@ -79,7 +79,9 @@ class PowerLeverageVisulizer(Visualizer):
         )
 
         plt.legend(title="Hardware Config", bbox_to_anchor=(1.05, 1), loc="upper left")
-        plt.title(f"Relative Efficiency Stability ({target_model_gb}B Model)")
+        plt.title(
+            "Relative power impact on savings (window = 24h, length of workload: 9h)"
+        )
         plt.ylabel("Carbon Savings (%)")
         y_min = df["Savings (%)"].min() - 1
         y_max = df["Savings (%)"].max() + 1
@@ -143,7 +145,9 @@ class PowerLeverageVisulizer(Visualizer):
         )
 
         plt.legend(title="Hardware Config", bbox_to_anchor=(1.05, 1), loc="upper left")
-        plt.title(f"System Leverage ({target_model_gb}B Model)")
+        plt.title(
+            "Absolute power impact on savings (window = 36h, length of workload: 9h)"
+        )
         plt.ylabel(r"Absolute Saved (kg $CO_2e$)")
         plt.grid(True, linestyle=":", alpha=0.5)
         plt.tight_layout()

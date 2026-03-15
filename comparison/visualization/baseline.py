@@ -48,7 +48,7 @@ class BaselineVisulizer(Visualizer):
         sns.lineplot(
             data=df, x="Workload (min)", y="Emissions", hue="Strategy", marker="o"
         )
-        plt.title("Baseline Validation: Agent vs GSF SDK")
+        plt.title("Baseline Validation: Agent vs GSF SDK (window = 36h)")
         plt.ylabel(r"Emissions (g $CO_2e$)")
         plt.tight_layout()
         plt.savefig(
@@ -125,7 +125,10 @@ class BaselineVisulizer(Visualizer):
         table.set_fontsize(9)
         table.scale(1.0, 1.5)
 
-        plt.title("Detailed System Efficiency Comparison (48h Window)", pad=20)
+        plt.title(
+            "Detailed System Efficiency Comparison (48h Window, Varying length of a workload)",
+            pad=20,
+        )
 
         # Ensure self.save_path ends with / or use os.path.join
         save_file = os.path.join(self.save_path, "model_comparison_table.png")
