@@ -152,8 +152,7 @@ paths:
     post:
       operationId: scheduleJob
       summary: Create a Schedule
-      description:
-        Submit a job and get back a schedule ID
+      description: Submit a job and get back a schedule ID
       requestBody:
         required: true
         content:
@@ -186,8 +185,7 @@ paths:
         "422":
           description: >
             Semantically invalid request body (e.g. missing required fields,
-            invalid date format, latest_finish
-            before earliest_start)
+            invalid date format, latest_finish before earliest_start)
           content:
             application/json:
               schema:
@@ -204,24 +202,26 @@ paths:
     get:
       operationId: GetForcast
       summary: Gets forcast from python API.
-      description: Gets full forecast for a specific datacenter, or for all depending on whether datacenter location is provied.
+      description:
+        Gets full forecast for a specific datacenter, or for all depending on
+        whether datacenter location is provied.
       parameters:
-        - $ref: '#/components/parameters/DatacenterLocationParam'
+        - $ref: "#/components/parameters/DatacenterLocationParam"
       responses:
         "200":
           description: Successfull response with requested datacenter
           content:
-            application/json: 
+            application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/DCInfo'
+                  $ref: "#/components/schemas/DCInfo"
         "400":
           description: Python API is unresponsive
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/hardwareSpecs/gpus:
     get:
@@ -234,11 +234,12 @@ paths:
           content:
             application/json:
               schema:
-                  type: array
-                  items:
-                    type: string
-                  example: ["V100_PCIE", "A100_SXM4"]
-
+                type: array
+                items:
+                  type: string
+                example:
+                  - "V100_PCIE"
+                  - "A100_SXM4"
 
 components:
   parameters:
@@ -316,7 +317,9 @@ components:
           additionalProperties: true
         preferred_datacenter:
           type: string
-          description: Optional preferred datacenter to prioritize allocating work on if possible (useful for trivial scheduler baseline comparisons)
+          description:
+            Optional preferred datacenter to prioritize allocating work on if
+            possible (useful for trivial scheduler baseline comparisons)
           example: "us-west-1"
         gpu_type:
           type: string
@@ -332,7 +335,9 @@ components:
           example: 5
         model_size:
           type: integer
-          description: size of the model to train in GBs. This means how much VRam is needed for it to run.
+          description:
+            size of the model to train in GBs. This means how much VRam is
+            needed for it to run.
           example: 26
 
     ScheduleResponse:
@@ -458,8 +463,7 @@ components:
         carbon_intensity:
           type: number
           description:
-            average carbon intensity during the scheduled period in kg
-            CO2/kWh
+            average carbon intensity during the scheduled period in kg CO2/kWh
           example: 50.0
         total_emissions:
           type: number
@@ -497,13 +501,13 @@ components:
         timeseries:
           type: array
           items:
-            $ref: '#/components/schemas/DCInfoTSDataPoint'
+            $ref: "#/components/schemas/DCInfoTSDataPoint"
       type: object
       required:
-      - location
-      - timeseries
-      - hardwareSpec
-    
+        - location
+        - timeseries
+        - hardwareSpec
+
     DCInfoTSDataPoint:
       type: object
       properties:
@@ -522,7 +526,8 @@ components:
           example: 50.0
         capacity:
           type: number
-          description: computational capacity available at the location at the time in FLOs
+          description:
+            computational capacity available at the location at the time in FLOs
           example: 1e15
 
     Error:
