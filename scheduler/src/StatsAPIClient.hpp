@@ -28,8 +28,6 @@ struct LoadDataPoint {
     double value;
     // TODO: optimize struct padding alignment
     bool isForecast;
-    // TODO: remove useless field
-    int availableGpus;
     double capacity; // FLO (for this 5 min interval)
 };
 
