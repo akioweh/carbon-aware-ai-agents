@@ -35,12 +35,12 @@ class ModelsizeVisulizer(Visualizer):
 
         sns.boxplot(data=df, x="Model Size", y="Savings (%)", width=0.3, palette="Set2")
         sns.stripplot(
-            data=df, x="Model Size", y="Savings (%)", color=".3", size=3, jitter=0.05
+            data=df, x="Model Size", y="Savings (%)", color=".1", size=5, jitter=0.05
         )
 
         plt.title("Carbon Savings Efficiency Stability (48h Window, <= 9h workload)")
         plt.ylabel("Carbon Savings (%)")
-        plt.ylim(0, 100)
+        plt.ylim(50, 80)
         plt.grid(axis="y", linestyle="--", alpha=0.7)
 
         plt.savefig(
