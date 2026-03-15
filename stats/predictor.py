@@ -7,6 +7,9 @@ import db_utils
 from predictor_linreg import get_next_week_load, get_next_week_greenness
 
 
+DEFAULT_CAPACITY = 50.0 * 1e12
+
+
 def generate_next_week_load_prediction(location):
     """Generate load predictions for the next week at a specific location."""
     # Get history for specific location from database
@@ -31,17 +34,14 @@ def generate_next_week_load_prediction(location):
     # Format as unified metric time-series
     return {
         'location_id': location,
-        'metric': 'forecast_load',
-        'unit': 'utilization_units',
-        'capacity': {'max_load': 50.0, 'total_gpus': 32},
+        'metric': 'Floating Point Compute',
+        'unit': 'FLOs/5min',
         'data': [
             {
                 'timestamp': next_week_load_df.iloc[i]['ds'].isoformat(),
                 'value': max(0.0, float(next_week_load_df.iloc[i]['yhat'])),
                 'is_forecast': True,
-                'available_gpus': max(
-                    0, int(32 - (next_week_load_df.iloc[i]['yhat'] / 50.0 * 32))
-                ),
+                'capacity': DEFAULT_CAPACITY,
             }
             for i in range(len(next_week_load_df))
         ],
@@ -74,8 +74,8 @@ def generate_next_week_greenness_prediction(location):
     # Note: greenness is inverse of carbon intensity for this prototype
     return {
         'location_id': location,
-        'metric': 'forecast_greenness',
-        'unit': 'greenness_score',
+        'metric': 'Software Carbon Intensity',
+        'unit': 'gCO2eq/kWh',
         'data': [
             {
                 'timestamp': next_week_greenness_df.iloc[i]['ds'].isoformat(),
