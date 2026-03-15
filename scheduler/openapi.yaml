@@ -186,7 +186,7 @@ paths:
         "422":
           description: >
             Semantically invalid request body (e.g. missing required fields,
-            invalid date format, non-positive workload_amount, latest_finish
+            invalid date format, latest_finish
             before earliest_start)
           content:
             application/json:
@@ -222,6 +222,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /api/hardwareSpecs/gpus:
+    get:
+      operationId: getGpuSpecs
+      summary: Gets available GPU specs
+      description: Lists GPUs convertible to functional units of computation.
+      responses:
+        "200":
+          description: Successful response with requested GPU list.
+          content:
+            application/json:
+              schema:
+                  type: array
+                  items:
+                    type: string
+                  example: ["V100_PCIE", "A100_SXM4"]
 
 
 components:
@@ -273,21 +289,18 @@ components:
       type: object
       required:
         - job_type
-        - workload_amount
         - earliest_start
         - latest_finish
+        - gpu_type
+        - length
+        - gpu_count
+        - model_size
       properties:
         job_type:
           type: string
           description: Type of AI workload
           enum: ["training", "inference", "batch"]
           example: "training"
-        workload_amount:
-          type: number
-          description: Amount of workload in the specified functional unit
-          minimum: 0
-          exclusiveMinimum: true
-          example: 20
         earliest_start:
           type: string
           format: date-time
@@ -305,6 +318,22 @@ components:
           type: string
           description: Optional preferred datacenter to prioritize allocating work on if possible (useful for trivial scheduler baseline comparisons)
           example: "us-west-1"
+        gpu_type:
+          type: string
+          description: type of available gpu to the user.
+          example: "V100_PCIE"
+        length:
+          type: integer
+          description: esitmated time of the work in minutes
+          example: 20
+        gpu_count:
+          type: integer
+          description: number of available gpus.
+          example: 5
+        model_size:
+          type: integer
+          description: size of the model to train in GBs. This means how much VRam is needed for it to run.
+          example: 26
 
     ScheduleResponse:
       type: array
