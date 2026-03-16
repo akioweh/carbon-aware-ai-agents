@@ -12,6 +12,18 @@ interface DatacenterApiRecord extends ActiveDatacenter {
   active: boolean
 }
 
+function getDatacenterOrder(id: string): number {
+  const match = id.match(/Data-Center-(\d+)/i)
+  if (!match) return Number.MAX_SAFE_INTEGER
+  return Number(match[1])
+}
+
+function formatDatacenterId(id: string): string {
+  const match = id.match(/Data-Center-(\d+)/i)
+  if (!match) return id.replace(/-/g, " ")
+  return `Data Center ${match[1]}`
+}
+
 const FALLBACK_DATACENTERS: ActiveDatacenter[] = [
   { id: "Data-Center-1", name: "London", region_id: 13 },
   { id: "Data-Center-2", name: "North Scotland", region_id: 1 },
@@ -36,7 +48,7 @@ export function useActiveDatacenters() {
         const data = (await response.json()) as DatacenterApiRecord[]
         const active = data
           .filter((dc) => dc.active)
-          .sort((a, b) => a.region_id - b.region_id)
+          .sort((a, b) => getDatacenterOrder(a.id) - getDatacenterOrder(b.id))
           .map((dc) => ({ id: dc.id, name: dc.name, region_id: dc.region_id }))
 
         setDatacenters(active.length > 0 ? active : FALLBACK_DATACENTERS)
@@ -52,7 +64,7 @@ export function useActiveDatacenters() {
   }, [])
 
   const options = useMemo(
-    () => datacenters.map((dc) => ({ value: dc.id, label: `${dc.id} (${dc.name})` })),
+    () => datacenters.map((dc) => ({ value: dc.id, label: `${formatDatacenterId(dc.id)} (${dc.name})` })),
     [datacenters]
   )
 

@@ -100,7 +100,10 @@ export function DataCentreConfig({ onClose }: DataCentreConfigProps) {
       await Promise.all(changed.map((dc) => patchDataCentreActive(dc.id, dc.active)))
       setInitialState(Object.fromEntries(centres.map((dc) => [dc.id, dc.active])))
       setSavedBanner(true)
-      setTimeout(() => setSavedBanner(false), 2500)
+      setTimeout(() => {
+        setSavedBanner(false)
+        onClose()
+      }, 250)
     } catch (err) {
       console.error(err)
       setError("Failed to save one or more datacenter updates.")
