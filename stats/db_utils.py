@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
-DB_FILE = 'cache.db'
+DB_FILE = Path(__file__).parent / 'cache.db'
 CARBON_DB_FILE = Path(
     os.environ.get('CARBON_DB_PATH', Path(__file__).parent / 'carbon_intensity.db')
 )
@@ -16,8 +16,8 @@ CARBON_DB_FILE = Path(
 # Map UK regions to Data Center locations
 UK_REGION_TO_DC = {
     13: 'Data-Center-1',  # London
-    1: 'Data-Center-2',  # North Scotland
-    2: 'Data-Center-3',  # South Scotland
+    14: 'Data-Center-2',  # South East England
+    5: 'Data-Center-3',  # South Yorkshire
     3: 'Data-Center-4',  # North West England
     4: 'Data-Center-5',  # North East England
 }
@@ -123,13 +123,13 @@ def insert_historical_data_bulk(data: List[Dict]):
     """Insert multiple historical data points efficiently.
 
     Args:
-        data: List of dicts with keys: location, timestamp, load, carbon_intensity
+        data: List of dicts with keys: location, timestamp, load, and carbon_intensity
     """
     try:
         with get_connection() as conn:
             conn.executemany(
-                """INSERT OR REPLACE INTO historical_data 
-                   (location, timestamp, load, carbon_intensity) 
+                """INSERT OR REPLACE INTO historical_data
+                   (location, timestamp, load, carbon_intensity)
                    VALUES (?, ?, ?, ?)""",
                 [
                     (
@@ -159,38 +159,49 @@ def get_historical_data(
         end_time: Optional end time filter
 
     Returns:
-        List of dicts with keys: timestamp (datetime), load, carbon_intensity
+        List of dicts with keys: timestamp (datetime), load, and optionally carbon_intensity
     """
     try:
         with get_connection() as conn:
+            cursor = conn.execute('PRAGMA table_info(historical_data)')
+            select_cols = 'timestamp, load, carbon_intensity'
+
             if start_time and end_time:
                 cursor = conn.execute(
-                    """SELECT timestamp, load, carbon_intensity 
-                       FROM historical_data 
+                    f"""SELECT {select_cols}
+                       FROM historical_data
                        WHERE location = ? AND timestamp >= ? AND timestamp <= ?
                        ORDER BY timestamp ASC""",
                     (location, start_time.timestamp(), end_time.timestamp()),
                 )
             elif start_time:
                 cursor = conn.execute(
-                    """SELECT timestamp, load, carbon_intensity 
-                       FROM historical_data 
+                    f"""SELECT {select_cols}
+                       FROM historical_data
+                       WHERE location = ? AND timestamp >= ?
+                       ORDER BY timestamp ASC""",
+                    (location, start_time.timestamp()),
+                )
+
+                cursor = conn.execute(
+                    f"""SELECT {select_cols}
+                       FROM historical_data
                        WHERE location = ? AND timestamp >= ?
                        ORDER BY timestamp ASC""",
                     (location, start_time.timestamp()),
                 )
             elif end_time:
                 cursor = conn.execute(
-                    """SELECT timestamp, load, carbon_intensity 
-                       FROM historical_data 
+                    f"""SELECT {select_cols}
+                       FROM historical_data
                        WHERE location = ? AND timestamp <= ?
                        ORDER BY timestamp ASC""",
                     (location, end_time.timestamp()),
                 )
             else:
                 cursor = conn.execute(
-                    """SELECT timestamp, load, carbon_intensity 
-                       FROM historical_data 
+                    f"""SELECT {select_cols}
+                       FROM historical_data
                        WHERE location = ?
                        ORDER BY timestamp ASC""",
                     (location,),
@@ -212,17 +223,13 @@ def get_historical_data(
 
 def delete_old_data(days: int = 30):
     """Delete historical data older than specified number of days."""
-    try:
-        cutoff = datetime.now() - timedelta(days=days)
-        with get_connection() as conn:
-            cursor = conn.execute(
-                'DELETE FROM historical_data WHERE timestamp < ?', (cutoff.timestamp(),)
-            )
-            deleted_count = cursor.rowcount
-            print(f'Deleted {deleted_count} old historical data points')
-    except sqlite3.Error as e:
-        print(f'Error deleting old data: {e}')
-        raise
+    cutoff = datetime.now() - timedelta(days=days)
+    with get_connection() as conn:
+        cursor = conn.execute(
+            'DELETE FROM historical_data WHERE timestamp < ?', (cutoff.timestamp(),)
+        )
+        deleted_count = cursor.rowcount
+        print(f'Deleted {deleted_count} old historical data points')
 
 
 def get_latest_timestamp(location: str) -> Optional[datetime]:
@@ -240,56 +247,6 @@ def get_latest_timestamp(location: str) -> Optional[datetime]:
     except sqlite3.Error as e:
         print(f'Error getting latest timestamp: {e}')
         return None
-
-
-def migrate_json_to_db(json_file: str = 'history.json'):
-    """Migrate data from history.json to the database.
-
-    Args:
-        json_file: Path to the JSON file to migrate
-    """
-    if not os.path.exists(json_file):
-        print(f'{json_file} not found, skipping migration')
-        return
-
-    print(f'Migrating data from {json_file} to database...')
-
-    try:
-        with open(json_file, 'r') as f:
-            history_json = json.load(f)
-
-        # Prepare bulk insert data
-        bulk_data = []
-        for location, entries in history_json.items():
-            for entry in entries:
-                bulk_data.append(
-                    {
-                        'location': location,
-                        'timestamp': datetime.fromisoformat(entry['timestamp']),
-                        'load': entry['load'],
-                        'carbon_intensity': entry.get(
-                            'carbon_intensity', entry.get('greenness')
-                        ),
-                    }
-                )
-
-        # Insert all data
-        if bulk_data:
-            insert_historical_data_bulk(bulk_data)
-            print(
-                f'Successfully migrated {len(bulk_data)} data points from {json_file}'
-            )
-
-            # Rename the old file as backup
-            backup_file = f'{json_file}.backup'
-            os.rename(json_file, backup_file)
-            print(f'Backed up {json_file} to {backup_file}')
-        else:
-            print('No data found in JSON file')
-
-    except Exception as e:
-        print(f'Error during migration: {e}')
-        raise
 
 
 def count_historical_data() -> int:
@@ -404,7 +361,7 @@ def sync_carbon_to_historical(days_back: int = 30) -> int:
             {
                 'location': location,
                 'timestamp': timestamp,
-                'load': 25.0,  # Default load - carbon API doesn't provide this
+                'load': 50 * 1e12,  # TODO: stop hardcode dumb value
                 'carbon_intensity': carbon_intensity,
             }
         )

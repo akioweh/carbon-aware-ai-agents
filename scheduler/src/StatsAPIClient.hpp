@@ -4,6 +4,7 @@
 
 #include "structs/Datacenter.hpp"
 #include <chrono>
+#include <cstdlib>
 #include <drogon/drogon.h>
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
@@ -59,9 +60,19 @@ struct CarbonIntensityTimeSeries {
 };
 
 class StatsAPIClient {
+  public:
+    static constexpr auto DEFAULT_STATS_API_HOST = "http://140.238.79.139:5000";
+
   private:
     std::string host;
 
+    static auto getDefaultHost() -> const std::string & {
+        static const auto res = []() -> std::string {
+            const auto *env = std::getenv("STATS_API_HOST");
+            return env ? std::string(env) : std::string(DEFAULT_STATS_API_HOST);
+        }();
+        return res;
+    }
     static auto getLoadPath(const std::string &locationId) -> std::string {
         return "/locations/" + locationId + "/metrics/forecast_load";
     }
@@ -73,7 +84,8 @@ class StatsAPIClient {
     static auto getLocationsPath() -> std::string { return "/locations"; }
 
   public:
-    explicit StatsAPIClient(std::string host = "http://140.238.79.139:5000");
+    StatsAPIClient();
+    explicit StatsAPIClient(std::string host);
 
     auto getLocations() -> drogon::Task<std::vector<Location>>;
     // TODO: why do the following two return optional?

@@ -22,10 +22,10 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
 
   // Form Fields
   const [jobType, setJobType] = useState("training")
-  const [gpuType, setGpuType] = useState("")
-  const [length, setLength] = useState<number | "">("")
-  const [gpuCount, setGpuCount] = useState<number | "">("")
-  const [modelSize, setModelSize] = useState<number | "">("")
+  const [gpuType, setGpuType] = useState("A100_SXM4")
+  const [gpuCount, setGpuCount] = useState<number | "">(8)
+  const [modelSize, setModelSize] = useState<number | "">(50)
+  const [length, setLength] = useState<number | "">(120)
   const [preferredDatacenter, setPreferredDatacenter] = useState<string>("none")
 
   // Set default dates
@@ -70,10 +70,24 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
     e.preventDefault()
     setError(null)
 
-    if (!length || !gpuCount || !modelSize || !gpuType) {
+    if (!gpuCount || Number(gpuCount) <= 0) {
       setError({
         title: "Invalid Input",
-        message: "Please fill out all required hardware specifications.",
+        message: "GPU count must be greater than 0.",
+      })
+      return
+    }
+    if (!modelSize || Number(modelSize) <= 0) {
+      setError({
+        title: "Invalid Input",
+        message: "Model size must be greater than 0.",
+      })
+      return
+    }
+    if (!length || Number(length) <= 0) {
+      setError({
+        title: "Invalid Input",
+        message: "Length must be greater than 0.",
       })
       return
     }
@@ -94,12 +108,12 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
 
     const jobRequest: any = {
       job_type: jobType,
+      gpu_type: gpuType,
+      gpu_count: Number(gpuCount),
+      model_size: Number(modelSize),
+      length: Number(length),
       earliest_start: startDate.toISOString(),
       latest_finish: endDate.toISOString(),
-      gpu_type: gpuType,
-      length: Number(length),
-      gpu_count: Number(gpuCount),
-      model_size: Number(modelSize)
     }
 
     if (preferredDatacenter !== "none") {

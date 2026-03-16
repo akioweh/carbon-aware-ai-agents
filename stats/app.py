@@ -25,14 +25,7 @@ from carbon_collector import (
 )
 
 DB_FILE = 'cache.db'
-HISTORY_FILE = 'history.json'
 LOG_FILE = os.environ.get('STATS_LOG_FILE', 'app.log')
-
-"""
-See logs on the oracle server with:
-tail -f app.log
-grep CRITICAL app.log  # just see alerts
-"""
 
 # Logging setup — writes to both stdout and a persistent log file
 _log_fmt = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
@@ -98,15 +91,21 @@ def prediction_loop():
         logger.info('Updating predictions cache...')
         for dc in DATA_CENTRES:
             try:
+                # Update Load Predictions
                 load_data = generate_next_week_load_prediction(dc)
                 db_utils.save_prediction(f'load_forecast_{dc}', load_data)
 
-                carbon_intensity_data = generate_next_week_carbon_intensity_prediction(
-                    dc
-                )
-                db_utils.save_prediction(
-                    f'carbon_intensity_forecast_{dc}', carbon_intensity_data
-                )
+                # Update Carbon Intensity Predictions
+                try:
+                    ci_data = generate_next_week_carbon_intensity_prediction(dc)
+                    db_utils.save_prediction(f'carbon_intensity_forecast_{dc}', ci_data)
+                except ValueError as e:
+                    logger.warning(
+                        'ValueError updating CI predictions for %s: %s', dc, e
+                    )
+                    logger.warning(
+                        'No carbon intensity data for %s, skipping CI forecast', dc
+                    )
 
                 if consecutive_failures[dc]:
                     logger.info(
@@ -115,12 +114,13 @@ def prediction_loop():
                         consecutive_failures[dc],
                     )
                 consecutive_failures[dc] = 0
-            except Exception:
+            except Exception as e:
                 consecutive_failures[dc] += 1
                 logger.error(
-                    'Error updating predictions for %s (consecutive failures: %d)',
+                    'Error updating predictions for %s (consecutive failures: %d): %s',
                     dc,
                     consecutive_failures[dc],
+                    e,
                     exc_info=True,
                 )
                 if consecutive_failures[dc] >= _FAILURE_ALERT_THRESHOLD:
@@ -168,7 +168,6 @@ def carbon_collector_loop():
     logger.info('Database: %s', CARBON_DB_PATH)
 
     conn = init_carbon_db(CARBON_DB_PATH)
-    backfill(conn)
 
     consecutive_failures = 0
     while True:
@@ -196,35 +195,39 @@ def carbon_collector_loop():
         time.sleep(CARBON_INTERVAL_MINUTES * 60)
 
 
-# does some housekeeping stuff including
-# generating history and auto-updating the api schema file
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db_utils.initialize_db()
 
-    # Try to use real carbon data if available
+    # Step 1: Backfill carbon data from API BEFORE anything else.
+    if CARBON_COLLECTION_ENABLED:
+        logger.info('Running carbon collector backfill from API...')
+        try:
+            conn = init_carbon_db(CARBON_DB_PATH)
+            backfill(conn)
+            conn.close()
+            logger.info('Carbon backfill complete')
+        except Exception:
+            logger.error('Carbon backfill failed on startup', exc_info=True)
+
+    # Step 2: Sync carbon data into historical_data table
     if db_utils.has_carbon_data():
-        logger.info('Carbon intensity database found, syncing real data...')
+        logger.info('Syncing carbon data to historical_data...')
         try:
             count = db_utils.sync_carbon_to_historical(days_back=30)
             logger.info('Synced %d carbon readings to historical data', count)
         except Exception:
             logger.error('Failed to sync carbon data on startup', exc_info=True)
 
-    # Fall back to other data sources if no historical data
+    # Step 3: Fall back to synthetic data only if no historical data at all
     if db_utils.count_historical_data() == 0:
-        if os.path.exists(HISTORY_FILE):
-            print('Migrating history.json to database...')
-            db_utils.migrate_json_to_db(HISTORY_FILE)
-        else:
-            print('No historical data found, generating initial data...')
-            generate_history()
+        print('No historical data found, generating initial data...')
+        generate_history()
 
-    # Start background threads
+    # Step 4: Start background threads
     prediction_thread = threading.Thread(target=prediction_loop, daemon=True)
     prediction_thread.start()
 
-    # Start carbon collector and sync threads if enabled
     if CARBON_COLLECTION_ENABLED:
         collector_thread = threading.Thread(target=carbon_collector_loop, daemon=True)
         collector_thread.start()
@@ -234,7 +237,6 @@ async def lifespan(app: FastAPI):
         sync_thread.start()
         print('Carbon sync background thread started')
     elif db_utils.has_carbon_data():
-        # If not collecting but have existing data, still sync it
         sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
         sync_thread.start()
         print('Carbon sync background thread started')
@@ -272,10 +274,6 @@ def get_load_forecast(location: str):
         if cached_result:
             return cached_result
         else:
-            # when not in cache, we can either:
-            # 1. generate immediately (slower response path), or
-            # 2. return 404/503.
-            # for now, we generate on-demand so the endpint is always "reliable"
             data = generate_next_week_load_prediction(location)
             db_utils.save_prediction(cache_key, data)
             return data
