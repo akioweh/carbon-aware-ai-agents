@@ -18,6 +18,7 @@ namespace scheduler {
 using namespace std;
 using namespace drogon;
 
+StatsAPIClient::StatsAPIClient() : host(getDefaultHost()) {}
 StatsAPIClient::StatsAPIClient(string host) : host(std::move(host)) {}
 
 auto StatsAPIClient::getLocations() -> Task<vector<Location>> {

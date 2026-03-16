@@ -12,11 +12,7 @@ using namespace scheduler;
 
 // Helper to get client with configurable host for testing
 inline auto getTestClient() -> std::shared_ptr<StatsAPIClient> {
-    const char *host = std::getenv("STATS_API_HOST");
-    if (host != nullptr) {
-        return std::make_shared<StatsAPIClient>(host);
-    }
-    return std::make_shared<StatsAPIClient>("http://127.0.0.1:5000");
+    return std::make_shared<StatsAPIClient>();
 }
 
 // NOTE: By default, tests run against localhost:5000, but this can be
