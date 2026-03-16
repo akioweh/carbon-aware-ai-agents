@@ -58,13 +58,13 @@ accurate forecasts to shift compute to low-carbon windows.
 
 ### Visualizations
 
-![Raw Comparison](analysis_raw_comparison.png)
+![Raw Comparison](./analysis/analysis_raw_comparison.png)
 
-![Smoothing](analysis_smoothing.png)
+![Smoothing](./analysis/analysis_smoothing.png)
 
-![STL Decomposition](analysis_stl_decomposition.png)
+![STL Decomposition](./analysis/analysis_stl_decomposition.png)
 
-![Weekly Variance](analysis_weekly_variance.png)
+![Weekly Variance](./analysis/analysis_weekly_variance.png)
 
 ## 3. Stage 1: Baseline Benchmark (18 Models)
 
@@ -191,9 +191,9 @@ longer-range signals:
 | Random Forest | 50.67 | 51.26 | +0.59 | +1.2% |
 | Direct-XGB | 33.50 | 34.10 | +0.60 | +1.8% |
 
-![Enhanced Features Comparison](benchmark_enhanced_features_comparison.png)
+![Enhanced Features Comparison](./experiments/enhanced_features_comparison.png)
 
-![Enhanced Features Predictions](benchmark_enhanced_features_predictions.png)
+![Enhanced Features Predictions](./experiments/enhanced_features_predictions.png)
 
 ### Stage 2 Key Findings
 
@@ -227,9 +227,9 @@ identical to the enhanced set.
 | LightGBM | 49.44 | 39.12 | 39.70 | -9.73 | +0.58 |
 | Direct-XGB | 33.50 | 34.10 | 34.47 | +0.97 | +0.37 |
 
-![Residual Comparison](benchmark_residual_comparison.png)
+![Residual Comparison](./experiments/residual_comparison.png)
 
-![Residual Predictions](benchmark_residual_predictions.png)
+![Residual Predictions](./experiments/residual_predictions.png)
 
 ### Stage 3 Key Findings
 
@@ -280,9 +280,9 @@ best-performing variant from Stages 2–3. Added seasonal features:
 | Direct-XGB | 33.50 | 37.74 | +4.24 |
 | XGBoost | 35.44 | 43.91 | +8.47 |
 
-![Seasonal Comparison](benchmark_seasonal_comparison.png)
+![Seasonal Comparison](./experiments/seasonal_comparison.png)
 
-![Seasonal Predictions](benchmark_seasonal_predictions.png)
+![Seasonal Predictions](./experiments/seasonal_predictions.png)
 
 ### Stage 4 Key Findings
 
@@ -364,11 +364,11 @@ solar radiation):
 Weather enrichment helps most at longer horizons (Day 7: -13.81 MAE) where lag
 features are stale but weather signals remain informative.
 
-![Weather Comparison](benchmark_weather_comparison.png)
+![Weather Comparison](./experiments/weather_comparison.png)
 
-![Weather Predictions](benchmark_weather_predictions.png)
+![Weather Predictions](./experiments/weather_predictions.png)
 
-![Weather Horizon Analysis](benchmark_weather_horizon.png)
+![Weather Horizon Analysis](./experiments/weather_horizon.png)
 
 ### Stage 5 Key Findings
 

@@ -16,4 +16,4 @@ prose nicely.
 
 For detailed language-specific or component-specific guidelines, refer to:
 
-- **Scheduler:** [scheduler/CODING_STYLE.md](./../scheduler/CODING_STYLE.md)
+- **Scheduler:** [scheduler/CODING_STYLE.md](../../scheduler/CODING_STYLE.md)
