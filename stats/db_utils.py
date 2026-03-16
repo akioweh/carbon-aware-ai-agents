@@ -60,9 +60,21 @@ def initialize_db():
                 timestamp REAL NOT NULL,
                 load REAL NOT NULL,
                 carbon_intensity REAL NOT NULL,
+                capacity REAL NOT NULL DEFAULT 0.0,
                 PRIMARY KEY (location, timestamp)
             )
         """)
+
+        # Migrate existing tables that are missing the capacity column
+        cursor = conn.execute('PRAGMA table_info(historical_data)')
+        existing_cols = [col[1] for col in cursor.fetchall()]
+        if 'capacity' not in existing_cols:
+            try:
+                conn.execute(
+                    'ALTER TABLE historical_data ADD COLUMN capacity REAL NOT NULL DEFAULT 0.0'
+                )
+            except sqlite3.OperationalError as e:
+                print(f'Warning: could not add capacity column (migration may be incomplete): {e}')
 
         # Create indexes for efficient querying
         conn.execute("""
@@ -123,19 +135,26 @@ def insert_historical_data_bulk(data: List[Dict]):
     """Insert multiple historical data points efficiently.
 
     Args:
-        data: List of dicts with keys: location, timestamp, load, and carbon_intensity
+        data: List of dicts with keys: location, timestamp, load, capacity, and carbon_intensity
     """
     try:
         with get_connection() as conn:
+            missing_cap = sum(1 for d in data if 'capacity' not in d)
+            if missing_cap:
+                print(
+                    f'Warning: {missing_cap}/{len(data)} records are missing a '
+                    f'"capacity" field; defaulting to 0.0'
+                )
             conn.executemany(
                 """INSERT OR REPLACE INTO historical_data
-                   (location, timestamp, load, carbon_intensity)
-                   VALUES (?, ?, ?, ?)""",
+                   (location, timestamp, load, capacity, carbon_intensity)
+                   VALUES (?, ?, ?, ?, ?)""",
                 [
                     (
                         d['location'],
                         d['timestamp'].timestamp(),
                         d['load'],
+                        d.get('capacity', 0.0),
                         d['carbon_intensity'],
                     )
                     for d in data
@@ -164,7 +183,7 @@ def get_historical_data(
     try:
         with get_connection() as conn:
             cursor = conn.execute('PRAGMA table_info(historical_data)')
-            select_cols = 'timestamp, load, carbon_intensity'
+            select_cols = 'timestamp, load, carbon_intensity, capacity'
 
             if start_time and end_time:
                 cursor = conn.execute(
@@ -213,6 +232,7 @@ def get_historical_data(
                     'timestamp': datetime.fromtimestamp(row[0]),
                     'load': row[1],
                     'carbon_intensity': row[2],
+                    'capacity': row[3],
                 }
                 for row in rows
             ]
@@ -362,6 +382,7 @@ def sync_carbon_to_historical(days_back: int = 30) -> int:
                 'location': location,
                 'timestamp': timestamp,
                 'load': 50 * 1e12,  # TODO: stop hardcode dumb value
+                'capacity': 100 * 1e12,  # TODO: derive from per-datacenter GPU config
                 'carbon_intensity': carbon_intensity,
             }
         )
