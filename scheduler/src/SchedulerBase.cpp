@@ -27,7 +27,7 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
     };
 
     const auto n_intervals =
-        TIME_GRIDDER.toIndexCeil(job.latest_finish) - time_index_offset;
+        TIME_GRIDDER.toIndex(job.latest_finish) - time_index_offset + 1;
 
     if (n_intervals <= 0) {
         throw exceptions::SchedulingException("Time window too narrow");

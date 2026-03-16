@@ -126,7 +126,7 @@ auto StatsAPIClient::getDatacenter(const string &datacenterName)
     // transform into a sorted time series. missing data is defaulted to 0
     // as a side effect, this "aligns" all timestamps to whole-5-min marks
     const auto index_offset = TIME_GRIDDER.toIndex(start);
-    const auto n = std::max(0L, TIME_GRIDDER.toIndexCeil(end) - index_offset);
+    const auto n = TIME_GRIDDER.toIndex(end) - index_offset + 1;
     auto timeSeries = decltype(Datacenter::timeSeries)(n);
     for (const auto idx : views::iota(int64_t{}, n))
         timeSeries[idx].timestamp =
@@ -134,17 +134,13 @@ auto StatsAPIClient::getDatacenter(const string &datacenterName)
     // assume no multiple data points within an interval; overwrite
     for (const auto &pt : load.data) {
         const auto idx = TIME_GRIDDER.toIndex(pt.timestamp) - index_offset;
-        if (idx >= 0 && idx < n) {
-            timeSeries[idx].load = pt.value;
-            timeSeries[idx].capacity = pt.capacity;
-        }
+        timeSeries[idx].load = pt.value;
+        timeSeries[idx].capacity = pt.capacity;
         // isForecast is ignored
     }
     for (const auto &pt : carbon_intensity.data) {
         const auto idx = TIME_GRIDDER.toIndex(pt.timestamp) - index_offset;
-        if (idx >= 0 && idx < n) {
-            timeSeries[idx].carbon_intensity = pt.value;
-        }
+        timeSeries[idx].carbon_intensity = pt.value;
     }
 
     co_return Datacenter{
