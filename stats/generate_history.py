@@ -5,13 +5,6 @@ from datetime import datetime, timedelta
 import db_utils
 
 MAX_CAPACITY = 50
-DATA_CENTRES = [
-    'Data-Center-1',
-    'Data-Center-2',
-    'Data-Center-3',
-    'Data-Center-4',
-    'Data-Center-5',
-]
 
 
 class WeatherSystem:
@@ -112,6 +105,10 @@ def generate_history():
     start = now - timedelta(days=30)
     current = start
 
+    data_centres = db_utils.get_all_datacenter_ids(include_inactive=True)
+    if not data_centres:
+        raise ValueError('No datacenters configured in cache.db')
+
     # Prepare bulk data for efficient insertion
     bulk_data = []
 
@@ -121,7 +118,7 @@ def generate_history():
     while current <= now:
         weather.update()
 
-        for i, dc in enumerate(DATA_CENTRES):
+        for i, dc in enumerate(data_centres):
             bulk_data.append({
                 'location': dc,
                 'timestamp': current,

@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarIcon, X, Loader2 } from "lucide-react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 import { ScheduleBlock } from "../types/schedule"
+import { useActiveDatacenters } from "@/hooks/use-active-datacenters"
 
 interface AggregatedInterval {
   time: Date
@@ -18,14 +18,6 @@ interface WorkloadCalendarProps {
   onClose: () => void
   scheduleId?: string
 }
-
-const DATA_CENTERS = [
-  { id: "dc1", name: "Data Centre 1", backendLocation: "Data-Center-1" },
-  { id: "dc2", name: "Data Centre 2", backendLocation: "Data-Center-2" },
-  { id: "dc3", name: "Data Centre 3", backendLocation: "Data-Center-3" },
-  { id: "dc4", name: "Data Centre 4", backendLocation: "Data-Center-4" },
-  { id: "dc5", name: "Data Centre 5", backendLocation: "Data-Center-5" },
-]
 
 const BLOCK_DURATION_MS = 5 * 60 * 1000
 
@@ -53,7 +45,11 @@ function getDisplayParams(spanMs: number) {
 }
 
 export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps) {
-  const [selectedDC, setSelectedDC] = useState(DATA_CENTERS[0].id)
+  const { datacenters: activeDatacenters, loading: datacentersLoading } = useActiveDatacenters()
+  const dataCenters = useMemo(
+    () => activeDatacenters.map((dc) => ({ id: dc.id, name: dc.name, backendLocation: dc.id })),
+    [activeDatacenters]
+  )
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([])
   const [loading, setLoading] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -92,7 +88,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
   const { intervalsPerDC, rangeStart, rangeEnd } = useMemo(() => {
     if (blocks.length === 0) {
       const defaultIntervals: Record<string, AggregatedInterval[]> = {}
-      for (const dc of DATA_CENTERS) defaultIntervals[dc.id] = []
+      for (const dc of dataCenters) defaultIntervals[dc.id] = []
       return {
         intervalsPerDC: defaultIntervals,
         rangeStart: new Date(),
@@ -119,7 +115,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
 
     // Build aggregated intervals per DC
     const intervalsPerDC: Record<string, AggregatedInterval[]> = {}
-    for (const dc of DATA_CENTERS) {
+    for (const dc of dataCenters) {
       intervalsPerDC[dc.id] = []
       const dcBlocks = blocks.filter(b => b.location === dc.backendLocation)
       
@@ -150,13 +146,14 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     }
 
     return { intervalsPerDC, rangeStart, rangeEnd }
-  }, [blocks])
+  }, [blocks, dataCenters])
 
   const maxValue = 50
   const chartHeight = 120 // compact height since we are stacking 5 of them
 
   // Use the first DC's intervals to calculate total width and shared boundaries
-  const sampleIntervals = intervalsPerDC[DATA_CENTERS[0].id] || []
+  const firstDcId = dataCenters[0]?.id
+  const sampleIntervals = firstDcId ? intervalsPerDC[firstDcId] || [] : []
   const hasData = sampleIntervals.length > 0
   const pxPerBar = 2 // very compact
   const totalWidth = sampleIntervals.length * pxPerBar
@@ -203,9 +200,13 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
         </div>
 
         {/* Chart */}
-        {loading ? (
+        {loading || datacentersLoading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : dataCenters.length === 0 ? (
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            No active data centers configured
           </div>
         ) : !hasData ? (
           <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -223,7 +224,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                   paddingRight: "20px"
                 }}
               >
-                {DATA_CENTERS.map((dc, i) => {
+                {dataCenters.map((dc, i) => {
                   const intervals = intervalsPerDC[dc.id]
                   return (
                     <div key={dc.id} className="relative w-full" style={{ height: `${chartHeight}px` }}>
@@ -266,7 +267,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             minTickGap={60}
                             axisLine={false}
                             tickLine={false}
-                            hide={i !== DATA_CENTERS.length - 1}
+                            hide={i !== dataCenters.length - 1}
                           />
                           
                           <YAxis domain={[0, maxValue]} hide={true} />

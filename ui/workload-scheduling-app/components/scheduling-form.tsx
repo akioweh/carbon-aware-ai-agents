@@ -1,23 +1,26 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, Sparkles, AlertCircle } from "lucide-react"
+import { Loader2, Sparkles, AlertCircle, Settings2 } from "lucide-react"
+import { useActiveDatacenters } from "@/hooks/use-active-datacenters"
 
 interface SchedulingFormProps {
   onScheduleComplete?: (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => void
+  onConfigure?: () => void
 }
 
-export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
+export function SchedulingForm({ onScheduleComplete, onConfigure }: SchedulingFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<{ title: string; message: string } | null>(null)
   const [jobType, setJobType] = useState("training")
   const [workloadAmount, setWorkloadAmount] = useState<number | "">("")
   const [preferredDatacenter, setPreferredDatacenter] = useState<string>("none")
+  const { options: activeDatacenterOptions, loading: datacentersLoading } = useActiveDatacenters()
   
   // Set default dates
   const today = new Date()
@@ -33,6 +36,16 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
 
   const [earliestStart, setEarliestStart] = useState(getLocalIsoString(today))
   const [latestFinish, setLatestFinish] = useState("")
+
+  useEffect(() => {
+    if (
+      preferredDatacenter !== "none" &&
+      activeDatacenterOptions.length > 0 &&
+      !activeDatacenterOptions.some((dc) => dc.value === preferredDatacenter)
+    ) {
+      setPreferredDatacenter("none")
+    }
+  }, [preferredDatacenter, activeDatacenterOptions])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -210,18 +223,32 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
                 value={preferredDatacenter}
                 onChange={(e) => setPreferredDatacenter(e.target.value)}
+                disabled={datacentersLoading}
               >
                 <option value="none">Let optimizer decide</option>
-                <option value="Data-Center-1">Data Centre 1 (us-west-1)</option>
-                <option value="Data-Center-2">Data Centre 2 (us-east-1)</option>
-                <option value="Data-Center-3">Data Centre 3 (eu-west-1)</option>
-                <option value="Data-Center-4">Data Centre 4 (ap-northeast-1)</option>
-                <option value="Data-Center-5">Data Centre 5 (sa-east-1)</option>
+                {activeDatacenterOptions.map((dc) => (
+                  <option key={dc.value} value={dc.value}>
+                    {dc.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row gap-4 pt-6 bg-muted/20 border-t">
+        <CardFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 bg-muted/20 border-t">
+          {onConfigure ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onConfigure}
+              className="w-full sm:w-auto"
+            >
+              <Settings2 className="mr-2 h-4 w-4" />
+              Configure Data Centres
+            </Button>
+          ) : (
+            <div className="hidden sm:block" />
+          )}
           <Button 
             type="submit" 
             className="w-full sm:w-auto min-w-[200px]" 

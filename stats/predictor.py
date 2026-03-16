@@ -89,12 +89,13 @@ def generate_next_week_greenness_prediction(location):
     }
 
 
-from generate_history import DATA_CENTRES
-
 if __name__ == '__main__':
     all_predictions = {}
 
-    for dc in DATA_CENTRES:
+    db_utils.initialize_db()
+    data_centres = db_utils.get_all_datacenter_ids(include_inactive=True)
+
+    for dc in data_centres:
         # Test the prediction functions
         load_pred = generate_next_week_load_prediction(dc)
         print(f'Generated {len(load_pred["data"])} load predictions for {dc}')
