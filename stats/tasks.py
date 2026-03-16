@@ -1,4 +1,4 @@
-import time
+import threading
 
 import db_utils
 from carbon_collector import (
@@ -14,11 +14,13 @@ from predictor import (
     generate_next_week_load_prediction,
 )
 
+stop_event = threading.Event()
+
 
 def prediction_loop():
     """Background loop to update predictions every 5 minutes."""
     consecutive_failures: dict[str, int] = {dc: 0 for dc in DATA_CENTRES}
-    while True:
+    while not stop_event.is_set():
         logger.info('Updating predictions cache...')
         for dc in DATA_CENTRES:
             try:
@@ -61,13 +63,13 @@ def prediction_loop():
                         consecutive_failures[dc],
                     )
 
-        time.sleep(300)
+        stop_event.wait(timeout=CARBON_SYNC_INTERVAL)
 
 
 def carbon_sync_loop():
     """Background loop to sync carbon intensity data periodically."""
     consecutive_failures = 0
-    while True:
+    while not stop_event.is_set():
         try:
             if db_utils.has_carbon_data():
                 count = db_utils.sync_carbon_to_historical(days_back=7)
@@ -90,7 +92,7 @@ def carbon_sync_loop():
                     'ALERT: carbon sync loop has failed %d times in a row — carbon data in cache.db may be stale',
                     consecutive_failures,
                 )
-        time.sleep(CARBON_SYNC_INTERVAL)
+        stop_event.wait(timeout=CARBON_SYNC_INTERVAL)
 
 
 def carbon_collector_loop():
@@ -101,7 +103,7 @@ def carbon_collector_loop():
     conn = init_carbon_db(CARBON_DB_PATH)
 
     consecutive_failures = 0
-    while True:
+    while not stop_event.is_set():
         try:
             collect_current(conn)
             logger.info('Carbon readings total: %d', get_reading_count(conn))
@@ -123,4 +125,4 @@ def carbon_collector_loop():
                     'ALERT: carbon collector has failed %d times in a row — no new carbon readings are being stored',
                     consecutive_failures,
                 )
-        time.sleep(CARBON_INTERVAL_MINUTES * 60)
+        stop_event.wait(CARBON_INTERVAL_MINUTES * 60)
