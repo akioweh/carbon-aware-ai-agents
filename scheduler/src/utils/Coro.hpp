@@ -97,7 +97,7 @@ template <typename Context, bool return_exceptions> struct Awaiter {
 
     // executed after caller is resumed (or if await_ready() == true)
     // to compute the value of the caller's "co_await this" expr
-    auto await_resume() {
+    auto await_resume() -> auto {
         if constexpr (!return_exceptions) {
             if (ctx->exceptionState.load(std::memory_order::acquire) ==
                 EXCEPTION_CAPTURED) // don't think it can still be IN_PROGRESS
