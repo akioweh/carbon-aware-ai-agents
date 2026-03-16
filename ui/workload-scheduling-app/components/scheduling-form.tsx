@@ -16,7 +16,10 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<{ title: string; message: string } | null>(null)
   const [jobType, setJobType] = useState("training")
-  const [workloadAmount, setWorkloadAmount] = useState<number | "">("")
+  const [gpuType, setGpuType] = useState("A100_SXM4")
+  const [gpuCount, setGpuCount] = useState<number | "">(8)
+  const [modelSize, setModelSize] = useState<number | "">(50)
+  const [length, setLength] = useState<number | "">(120)
   const [preferredDatacenter, setPreferredDatacenter] = useState<string>("none")
   
   // Set default dates
@@ -38,10 +41,24 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
     e.preventDefault()
     setError(null)
 
-    if (workloadAmount === "" || Number(workloadAmount) <= 0) {
+    if (!gpuCount || Number(gpuCount) <= 0) {
       setError({
         title: "Invalid Input",
-        message: "Workload amount must be greater than 0.",
+        message: "GPU count must be greater than 0.",
+      })
+      return
+    }
+    if (!modelSize || Number(modelSize) <= 0) {
+      setError({
+        title: "Invalid Input",
+        message: "Model size must be greater than 0.",
+      })
+      return
+    }
+    if (!length || Number(length) <= 0) {
+      setError({
+        title: "Invalid Input",
+        message: "Length must be greater than 0.",
       })
       return
     }
@@ -62,7 +79,10 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
 
     const jobRequest: any = {
       job_type: jobType,
-      workload_amount: Number(workloadAmount),
+      gpu_type: gpuType,
+      gpu_count: Number(gpuCount),
+      model_size: Number(modelSize),
+      length: Number(length),
       earliest_start: startDate.toISOString(),
       latest_finish: endDate.toISOString(),
     }
@@ -156,21 +176,58 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="workloadAmount" className="text-sm font-medium">Workload Amount (kWh)</Label>
-              <div className="relative">
-                <Input
-                  id="workloadAmount"
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  value={workloadAmount}
-                  onChange={(e) => setWorkloadAmount(e.target.value === "" ? "" : Number(e.target.value))}
-                  required
-                  className="pr-12"
-                  placeholder="e.g. 100"
-                />
-                <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">kWh</span>
-              </div>
+              <Label htmlFor="gpuType" className="text-sm font-medium">GPU Type</Label>
+              <select
+                id="gpuType"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={gpuType}
+                onChange={(e) => setGpuType(e.target.value)}
+              >
+                <option value="A100_SXM4">A100 SXM4</option>
+                <option value="V100_PCIE">V100 PCIE</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="gpuCount" className="text-sm font-medium">GPU Count</Label>
+              <Input
+                id="gpuCount"
+                type="number"
+                min="1"
+                step="1"
+                value={gpuCount}
+                onChange={(e) => setGpuCount(e.target.value === "" ? "" : Number(e.target.value))}
+                required
+                placeholder="e.g. 8"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="modelSize" className="text-sm font-medium">Model Size (GB)</Label>
+              <Input
+                id="modelSize"
+                type="number"
+                min="1"
+                step="1"
+                value={modelSize}
+                onChange={(e) => setModelSize(e.target.value === "" ? "" : Number(e.target.value))}
+                required
+                placeholder="e.g. 50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="length" className="text-sm font-medium">Job Length (minutes)</Label>
+              <Input
+                id="length"
+                type="number"
+                min="1"
+                step="1"
+                value={length}
+                onChange={(e) => setLength(e.target.value === "" ? "" : Number(e.target.value))}
+                required
+                placeholder="e.g. 120"
+              />
             </div>
           </div>
 
