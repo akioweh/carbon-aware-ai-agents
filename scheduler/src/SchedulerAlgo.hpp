@@ -80,15 +80,16 @@ using SingleResult = std::pair<CostVector, ChoiceVector>;
 
 struct LocationCost {
     std::vector<double> &capacities;
-    std::vector<double> &greenness_scores;
+    std::vector<double> &sci_scores;
 
-    auto operator[](int i) const {
-        const auto g = greenness_scores.at(i);
+    auto operator[](size_t i) const {
+        const auto sci = sci_scores.at(i);
         const auto c = capacities.at(i);
-        return [g, c](double load) -> double {
-            // cost increases with load and decreases with greenness.
-            // 0.01 to avoid div by zero
-            return load / c / std::max(g, 0.01);
+        return [sci, c](double load) -> double {
+            // cost increases with load and sci.
+            // TODO: not sure if a zero sci might break dp??
+            // TODO: make this sensible (percentage of capacity is NOT sensible)
+            return (load / c) * sci;
         };
     }
 };
@@ -181,16 +182,22 @@ inline void vectorizeDpTransition(const int w_prev, const int tot_work,
     transitionAVX(start_wi_new_run, end_wi_new_run, prev1V, ones, penalty);
 }
 
+inline auto get_e_work(const double tot_work_f, const int resolution)
+    -> double {
+    constexpr double min_e_work = 0.001;
+    return std::max(tot_work_f / resolution, min_e_work);
+}
+
 inline auto calc_single(const std::vector<double> &load_f,
                         const std::vector<double> &capacity_f,
                         const CostFunction<double> auto &cost_f,
                         const double penalty_f, const double tot_work_f,
-                        const int resolution = 1000) -> SingleResult {
+                        const int resolution = 10000) -> SingleResult {
     using namespace std;
     const auto n = static_cast<int>(load_f.size());
     // discretization
-    const auto e_work = tot_work_f / resolution;
-    const auto tot_work = resolution;
+    const auto e_work = get_e_work(tot_work_f, resolution);
+    const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
     auto load = vector<int>(n);
     transform(execution::unseq, load_f.begin(), load_f.end(), load.begin(),
               [e_work](double x) -> int {
@@ -204,7 +211,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     const struct {
         decltype(cost_f) &cost_f_;
         double e_work;
-        auto operator[](int i) const {
+        auto operator[](size_t i) const {
             return [&, i](int load) -> double {
                 return cost_f_[i](load * e_work);
             };
@@ -302,26 +309,30 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
                    const std::vector<std::vector<double>> &capacities_f,
                    const std::vector<CostFunc> &costs_f,
                    const std::vector<double> &penalties_f,
-                   const double tot_work_f, const int resolution = 1000)
+                   const double tot_work_f, const int resolution = 10000)
     -> std::pair<double, std::vector<std::vector<double>>> {
     using namespace std;
     const auto m = loads_f.size();
-    const auto n = m ? loads_f.front().size() : 0ULL;
+    if (m == 0)
+        throw exceptions::SchedulingException(
+            "No locations provided for scheduling");
+    const auto n = loads_f.front().size();
     // input validation
     assert(tot_work_f >= 0.);
     assert(resolution > 0);
     assert(capacities_f.size() == m);
     assert(costs_f.size() == m);
     assert(penalties_f.size() == m);
-    for (const auto i : views::iota(0ULL, m)) {
-        assert(loads_f[i].size() == n);
-        assert(capacities_f[i].size() == n);
-    }
+    assert(ranges::all_of(
+        loads_f, [n](const auto &load_f) { return load_f.size() == n; }));
+    assert(ranges::all_of(capacities_f, [n](const auto &capacity_f) {
+        return capacity_f.size() == n;
+    }));
 
     // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
     futures.reserve(m);
-    for (const auto i : views::iota(0ULL, m))
+    for (const auto i : views::iota(0UZ, m))
         futures.push_back(async(
             launch::async,
             // wrapped in lambda due to template
@@ -334,17 +345,19 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
 
     auto locations_cost_vector = vector<SingleResult::first_type>(m);
     auto locations_memo = vector<SingleResult::second_type>(m);
-    for (auto i : views::iota(0ULL, m))
+    for (auto i : views::iota(0UZ, m))
         tie(locations_cost_vector[i], locations_memo[i]) = futures[i].get();
 
-    const auto e_work = tot_work_f / resolution;
+    const auto e_work = get_e_work(tot_work_f, resolution);
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
 
     // result validation
-    for (const auto i : views::iota(0ULL, m)) {
-        assert(locations_memo[i].size() == n + 1ULL);
-        assert(locations_cost_vector[i].size() == tot_work + 1ULL);
-    }
+    assert(ranges::all_of(locations_memo, [n](const auto &vec) {
+        return vec.size() == n + 1UZ;
+    }));
+    assert(ranges::all_of(locations_cost_vector, [tot_work](const auto &vec) {
+        return vec.size() == tot_work + 1UZ;
+    }));
 
     // multiple choice knapsack
     constexpr auto inf = numeric_limits<double>::max() / 2;
@@ -361,7 +374,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
             memo[0][w] = w;
         }
     }
-    for (const auto i : views::iota(1ULL, m)) {
+    for (const auto i : views::iota(1UZ, m)) {
         const auto &costs = locations_cost_vector[i];
         auto next_dp = vector(tot_work + 1, inf);
         auto &memo_i = memo[i];
@@ -407,7 +420,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     }
 
     // reconstruct the {w_j} work allocation vector for each location
-    for (const auto i : views::iota(0ULL, m)) {
+    for (const auto i : views::iota(0UZ, m)) {
         const auto &loc_memo = locations_memo[i];
         auto &loc_res = res[i];
         loc_res.resize(n);

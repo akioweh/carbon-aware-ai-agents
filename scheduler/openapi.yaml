@@ -14,7 +14,8 @@ paths:
   /api/schedules/{schedule_id}:
     get:
       operationId: getScheduledJob
-      summary: Fetch blocks of specific schedule. Optionally at a specific datacenter.
+      summary:
+        Fetch blocks of specific schedule. Optionally at a specific datacenter.
       description: Gets schedule by its schedule_id.
       parameters:
         - $ref: "#/components/parameters/ScheduleIdParam"
@@ -35,7 +36,8 @@ paths:
                 $ref: "#/components/schemas/Error"
         "422":
           description: >
-            Semantically invalid request (e.g. invalid schedule_id format or non-existent schedule_id)
+            Semantically invalid request (e.g. invalid schedule_id format or
+            non-existent schedule_id)
           content:
             application/json:
               schema:
@@ -58,13 +60,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/schedules/{schedule_id}/trivial:
+    get:
+      operationId: getScheduledJobTrivial
+      summary:
+        Fetch the unoptimized trivial schedule baseline for a specific schedule.
+        Optionally at a specific datacenter.
+      description: Gets the trivial schedule associated with a schedule_id.
+      parameters:
+        - $ref: "#/components/parameters/ScheduleIdParam"
+        - $ref: "#/components/parameters/DatacenterLocationParam"
+      responses:
+        "200":
+          description: Successful response with trivial schedule data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleData"
+        "400":
+          description:
+            Malformed request (e.g. missing or unparseable path parameter)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: >
+            Semantically invalid request (e.g. invalid schedule_id format or
+            non-existent schedule_id)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/schedules/summary:
     get:
-      operationId: getSchedules Summaries
+      operationId: getScheduleSummaries
       summary: Fetch schedule ids and impacts of all schedules.
-      description:
-        Gets all the schedule ids and impacts of all scheduled jobs.
-      parameters:
+      description: Gets all the schedule ids and impacts of all scheduled jobs.
       responses:
         "200":
           description: Successful response with schedule data
@@ -72,8 +105,8 @@ paths:
             application/json:
               schema:
                 type: array
-                items: 
-                  $ref: '#/components/schemas/ScheduleSummary'
+                items:
+                  $ref: "#/components/schemas/ScheduleSummary"
         "400":
           description: Malformed request
           content:
@@ -84,7 +117,9 @@ paths:
   /api/schedules:
     get:
       operationId: getSchedule
-      summary: Fetch blocks across different schedules. Optionally those which are inside the specific datacenter.
+      summary:
+        Fetch blocks across different schedules. Optionally those which are
+        inside the specific datacenter.
       description:
         gets all already-scheduled jobs (gets all blocks) which start after
         start_time and end before end_time. Those arguments are optional, so
@@ -118,8 +153,7 @@ paths:
       operationId: scheduleJob
       summary: Create a Schedule
       description:
-        Submit a job and get back an optimized schedule placement (only blocks
-        of this new job)
+        Submit a job and get back a schedule ID
       requestBody:
         required: true
         content:
@@ -132,7 +166,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ScheduleDetailResponse"
+                $ref: "#/components/schemas/ScheduleCreatedResponse"
         "400":
           description: Malformed request (e.g. missing or unparseable JSON body)
           content:
@@ -152,7 +186,7 @@ paths:
         "422":
           description: >
             Semantically invalid request body (e.g. missing required fields,
-            invalid date format, non-positive workload_amount, latest_finish
+            invalid date format, latest_finish
             before earliest_start)
           content:
             application/json:
@@ -160,63 +194,51 @@ paths:
                 $ref: "#/components/schemas/Error"
         "503":
           description: >
-            Connection to Python API failed in some way. This results in our service being no longer valid and available.
+            Connection to Python API failed in some way. This results in our
+            service being no longer valid and available.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error" 
-
-  /api/schedules/trivialSchedule:
-    post:
-      operationId: scheduleTrivialJob
-      summary: Create a trivial Schedule
-      description:
-        Submit a job and get back an un-optimized schedule impact.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/JobRequest"
+                $ref: "#/components/schemas/Error"
+  /api/forecast:
+    get:
+      operationId: GetForcast
+      summary: Gets forcast from python API.
+      description: Gets full forecast for a specific datacenter, or for all depending on whether datacenter location is provied.
+      parameters:
+        - $ref: '#/components/parameters/DatacenterLocationParam'
       responses:
         "200":
-          description: Schedule calculated successfully
+          description: Successfull response with requested datacenter
           content:
-            application/json:
+            application/json: 
               schema:
-                $ref: '#/components/schemas/ScheduleDetailResponse'
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoadGreenessForecastDataPoint'
         "400":
-          description: Malformed request (e.g. missing or unparseable JSON body)
+          description: Python API is unresponsive
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-        "409":
-          description: >
-            Scheduling conflict: the request is valid but cannot be satisfied
-            given the current system state (e.g. insufficient capacity across
-            all locations, no available data centers, scheduling window too
-            narrow or in the past)
+                $ref: '#/components/schemas/Error'
+
+  /api/hardwareSpecs/gpus:
+    get:
+      operationId: getGpuSpecs
+      summary: Gets available GPU specs
+      description: Lists GPUs convertible to functional units of computation.
+      responses:
+        "200":
+          description: Successful response with requested GPU list.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-        "422":
-          description: >
-            Semantically invalid request body (e.g. missing required fields,
-            invalid date format, non-positive workload_amount, latest_finish
-            before earliest_start)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "503":
-          description: >
-            Connection to Python API failed in some way. This results in our service being no longer valid and available.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error" 
+                  type: array
+                  items:
+                    type: string
+                  example: ["V100_PCIE", "A100_SXM4"]
+
 
 components:
   parameters:
@@ -267,21 +289,18 @@ components:
       type: object
       required:
         - job_type
-        - workload_amount
         - earliest_start
         - latest_finish
+        - gpu_type
+        - length
+        - gpu_count
+        - model_size
       properties:
         job_type:
           type: string
           description: Type of AI workload
           enum: ["training", "inference", "batch"]
           example: "training"
-        workload_amount:
-          type: number
-          description: Amount of workload in the specified functional unit
-          minimum: 0
-          exclusiveMinimum: true
-          example: 20
         earliest_start:
           type: string
           format: date-time
@@ -295,6 +314,26 @@ components:
         additional_constraints:
           type: object
           additionalProperties: true
+        preferred_datacenter:
+          type: string
+          description: Optional preferred datacenter to prioritize allocating work on if possible (useful for trivial scheduler baseline comparisons)
+          example: "us-west-1"
+        gpu_type:
+          type: string
+          description: type of available gpu to the user.
+          example: "V100_PCIE"
+        length:
+          type: integer
+          description: esitmated time of the work in minutes
+          example: 20
+        gpu_count:
+          type: integer
+          description: number of available gpus.
+          example: 5
+        model_size:
+          type: integer
+          description: size of the model to train in GBs. This means how much VRam is needed for it to run.
+          example: 26
 
     ScheduleResponse:
       type: array
@@ -316,7 +355,8 @@ components:
           example: "2025-12-08T02:00:00Z"
         location:
           type: string
-          description: Location of a datacenter in which this block has been scheduled.
+          description:
+            Location of a datacenter in which this block has been scheduled.
           example: "us-west-1"
         schedule_id:
           type: string
@@ -335,15 +375,31 @@ components:
         - impact
       properties:
         schedule_id:
-          $ref: '#/components/schemas/ScheduleDetailResponse/properties/schedule_id'
+          type: string
+          description: assigned id for the job
+          example: "sched-456"
         impact:
-          $ref: '#/components/schemas/ScheduleDetailResponse/properties/impact'
+          $ref: "#/components/schemas/ScheduleImpact"
+        trivialImpact:
+          $ref: "#/components/schemas/ScheduleImpact"
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        locations:
+          type: array
+          items:
+            type: string
+        total_load:
+          type: number
+        block_count:
+          type: integer
 
     ScheduleDetailResponse:
       type: object
-      description:
-        Response after scheduling a job, indicating success and server-assigned
-        schedule ID
+      description: Response when fetching a scheduled job
       required:
         - schedule_id
         - scheduled_blocks
@@ -362,22 +418,95 @@ components:
           items:
             $ref: "#/components/schemas/ScheduleBlock"
         impact:
-          type: object
-          properties:
-            carbon_intensity:
-              type: number
-              description:
-                average carbon intensity during the scheduled period in kg
-                CO2/kWh
-              example: 50.0
-            total_emissions:
-              type: number
-              description: total predicted emissions in kg CO2
-              example: 0.14
-            sci:
-              type: number
-              description: Software Carbon Intensity score for the schedule
-              example: 20
+          $ref: "#/components/schemas/ScheduleImpact"
+
+    ScheduleCreatedResponse:
+      type: object
+      description: Response after successfully submitting a job request
+      required:
+        - schedule_id
+        - message
+      properties:
+        schedule_id:
+          type: string
+          description: assigned id for the newly created job
+          example: "sched-456"
+        message:
+          type: string
+          description: status message
+          example: "Success"
+
+    ScheduleData:
+      type: object
+      required:
+        - schedule_id
+        - scheduled_blocks
+        - impact
+      properties:
+        schedule_id:
+          type: string
+        scheduled_blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleBlock"
+        impact:
+          $ref: "#/components/schemas/ScheduleImpact"
+
+    LoadGreenessForecastDataPoint:
+      properties:
+        max_load:
+          type: number
+          title: max_load
+          description: maximum load of the datacenter
+        location:
+          type: string
+          title: location
+          description: location of the greeness data
+        timeseries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadGreenessPoint'
+      type: object
+      required:
+      - location
+      - timeseries
+      - max_load
+    
+    LoadGreenessPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Start time of the scheduled block
+          example: "2025-12-08T02:00:00Z"
+        greeness:
+          type: number
+          description: greeness at the location at the time
+          example: 5.4
+        load:
+          type: number
+          description: load at the locatioin at the time
+          example: 6.9
+
+
+    ScheduleImpact:
+      type: object
+      properties:
+        carbon_intensity:
+          type: number
+          description:
+            average carbon intensity during the scheduled period in kg
+            CO2/kWh
+          example: 50.0
+        total_emissions:
+          type: number
+          description: total predicted emissions in kg CO2
+          example: 0.14
+        sci:
+          type: number
+          description: Software Carbon Intensity score for the schedule
+          example: 20
 
     Error:
       type: object

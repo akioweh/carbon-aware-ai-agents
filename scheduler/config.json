@@ -1,17 +1,25 @@
 {
-    "db_clients": [
-        {
-            "name": "default",
-            "rdbms": "postgresql",
-            "host": "127.0.0.1",
-            "port": 5432,
-            "dbname": "calendar_db",
-            "user": "postgres",
-            "passwd": "123"
-        }
-    ],
-    "app": {
-        "number_of_threads": 0,
-        "client_max_body_size": "10M"
+  "db_clients": [
+    {
+      "name": "default",
+      "rdbms": "postgresql",
+      "host": "127.0.0.1",
+      "port": 5432,
+      "dbname": "calendar_db",
+      "user": "postgres",
+      "passwd": "123"
     }
+  ],
+  "app": {
+    "number_of_threads": 0,
+
+    "client_max_body_size": "10M",
+    "log": {
+      "log_path": "",
+      "logfile_base_name": "",
+      "log_size_limit": 100000000,
+      "log_level": "DEBUG"
+    }
+  }
 }
+

@@ -36,17 +36,17 @@ class TimeGridder {
 
     // rounds down
     [[nodiscard]] constexpr auto toIndex(const time_point_t &tp) const
-        -> long long {
+        -> int64_t {
         return std::chrono::floor<Resolution>(tp - start_).count();
     }
 
     // rounds up
     [[nodiscard]] constexpr auto toIndexCeil(const time_point_t &tp) const
-        -> long long {
+        -> int64_t {
         return std::chrono::ceil<Resolution>(tp - start_).count();
     }
 
-    [[nodiscard]] constexpr auto toTimePoint(const long long index) const
+    [[nodiscard]] constexpr auto toTimePoint(const int64_t index) const
         -> time_point_t {
         return start_ + Resolution{index};
     }

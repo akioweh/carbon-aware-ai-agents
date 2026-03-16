@@ -86,13 +86,25 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     std::string jobId = (*json)["schedule_id"].asString();
     BOOST_CHECK(!jobId.empty());
 
-    // Check fields in response
-    BOOST_CHECK((*json).isMember("scheduled_blocks"));
-    BOOST_CHECK((*json).isMember("impact"));
-    BOOST_CHECK((*json)["scheduled_blocks"].isArray());
-    BOOST_CHECK((*json)["scheduled_blocks"].size() > 0);
+    // 2. Retrieve the specific schedule to check its fields (GET /api/schedules/{id})
+    auto getSpecificReq = HttpRequest::newHttpRequest();
+    getSpecificReq->setMethod(drogon::Get);
+    getSpecificReq->setPath("/api/schedules/" + jobId);
 
-    // 2. Retrieve the schedule (GET)
+    auto getSpecificRespPair = client->sendRequest(getSpecificReq);
+    BOOST_REQUIRE_EQUAL(getSpecificRespPair.first, ReqResult::Ok);
+    auto getSpecificResponse = getSpecificRespPair.second;
+    BOOST_REQUIRE(getSpecificResponse);
+    BOOST_CHECK_EQUAL(getSpecificResponse->getStatusCode(), k200OK);
+
+    auto specificJson = getSpecificResponse->getJsonObject();
+    BOOST_REQUIRE(specificJson);
+    BOOST_CHECK((*specificJson).isMember("scheduled_blocks"));
+    BOOST_CHECK((*specificJson)["scheduled_blocks"].isArray());
+    BOOST_CHECK((*specificJson)["scheduled_blocks"].size() > 0);
+    BOOST_CHECK((*specificJson).isMember("impact"));
+
+    // 3. Retrieve the schedule blocks for calendar (GET /api/schedules)
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
     getReq->setPath("/api/schedules");
@@ -113,7 +125,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // Should contain at least the blocks we just scheduled
     BOOST_CHECK(getJson->size() > 0);
 
-    // 3. Delete Schedule (Delete)
+    // 4. Delete Schedule (Delete)
     auto deleteReq = HttpRequest::newHttpRequest();
     deleteReq->setMethod(drogon::Delete);
     deleteReq->setPath("/api/schedules/" + jobId);
@@ -124,7 +136,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     BOOST_REQUIRE(deleteResponse);
     BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k200OK);
 
-    // 4. Verify Deletion (GET should not return the deleted blocks)
+    // 5. Verify Deletion (GET should not return the deleted blocks)
     auto verifyReq = HttpRequest::newHttpRequest();
     verifyReq->setMethod(drogon::Get);
     verifyReq->setPath("/api/schedules");
@@ -239,7 +251,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // 2. List Jobs (GET /api/schedule/jobs)
     auto listReq = HttpRequest::newHttpRequest();
     listReq->setMethod(drogon::Get);
-    listReq->setPath("/api/schedules/scheduleSummaries");
+    listReq->setPath("/api/schedules/summary");
 
     auto listRespPair = client->sendRequest(listReq);
     BOOST_REQUIRE_EQUAL(listRespPair.first, ReqResult::Ok);
@@ -278,7 +290,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     auto getJson = getResponse->getJsonObject();
     BOOST_REQUIRE(getJson);
     BOOST_CHECK((*getJson).isMember("schedule_id"));
-    BOOST_CHECK_EQUAL((*getJson)["schedule_id"].asString(), id1);
+    BOOST_CHECK((*getJson)["schedule_id"].asString() == id1);
     BOOST_CHECK((*getJson).isMember("scheduled_blocks"));
     BOOST_CHECK((*getJson)["scheduled_blocks"].isArray());
     BOOST_CHECK((*getJson).isMember("impact"));

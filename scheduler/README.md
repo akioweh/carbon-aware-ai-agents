@@ -292,7 +292,7 @@ logic and persistence code.
 #### 1. Schedule Creation (`POST /api/schedule`)
 
 This is the primary flow. A user submits a job specification, and the system
-returns an optimized schedule with a real, DB-assigned identifier.
+returns an optimized schedule with a real, DB-assigned identifier. In addition, a trivial (unoptimized) schedule is also computed and persisted to provide a baseline for comparison.
 
 ```
 Client
@@ -327,17 +327,22 @@ Scheduler::scheduleJob
   ▼
 ScheduleController (resumed)
   │
-  │  3. Persist: CalendarService::add(output)
+  │  3. Persist Optimized: CalendarService::add(output)
   │     └── INSERT impact row → DB returns auto-increment ID
   │     └── INSERT block rows with foreign key to impact
   │     └── Returns job ID as string
   │
-  │  4. Construct API DTO:
+  │  4. Compute Trivial Schedule: TrivialScheduler::scheduleJob()
+  │     └── Runs a greedy baseline placement algorithm without DP.
+  │     └── CalendarService::addTrivial(trivial_output, job ID)
+  │         └── INSERT into trivial_impacts and trivial_jobs tables
+  │
+  │  5. Construct API DTO:
   │     └── InternalBlock[] + job ID → ScheduleBlock[]
-  │     └── SchedulerOutput + job ID → ScheduleResult
+  │     └── SchedulerOutput + job ID → ScheduleResult (now including trivial comparison data)
   │
   ▼
-Client receives ScheduleResult { schedule_id, schedule[], impact }
+Client receives ScheduleResult { schedule_id, message } (for POST) or ScheduleData { schedule_id, scheduled_blocks[], impact } (for GET)
 ```
 
 #### 2. Schedule Query (`GET /api/schedule`)

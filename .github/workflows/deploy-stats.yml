@@ -1,0 +1,44 @@
+name: Deploy Stats Component
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "stats/**"
+      - ".github/workflows/deploy-stats.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: deployment-stats
+
+    steps:
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/stats/carbon-aware-ai-agents
+
+            echo "Updating repository..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            cd stats
+
+            echo "Updating dependencies..."
+            /home/ubuntu/.local/bin/uv pip install -r requirements.txt
+
+            echo "Updating systemd service..."
+            sudo cp deploy/stats.service /etc/systemd/system/stats.service
+            sudo systemctl daemon-reload
+
+            echo "Restarting stats service..."
+            sudo systemctl enable stats
+            sudo systemctl restart stats
+
+            echo "Deployment successful!"

@@ -1,14 +1,34 @@
 #ifndef SCHEDULER_JOB_REQUEST_HPP
 #define SCHEDULER_JOB_REQUEST_HPP
+#include "utils/HardwareConversion.hpp"
 #pragma once
 
 #include "exceptions/ValidationException.hpp"
 #include "utils/Utils.hpp"
 #include <chrono>
 #include <drogon/HttpRequest.h>
+#include <optional>
 #include <string>
 
 namespace scheduler {
+
+/**
+This is not actually used, but it represents what request as a json is submited
+to the endpoint. We then transform it to our format.
+*/
+struct RawJobRequest {
+    using time_t = std::chrono::sys_time<std::chrono::minutes>;
+
+    std::string job_type;
+    time_t earliest_start;
+    time_t latest_finish;
+    std::optional<std::string> preferred_datacenter;
+    std::string gpu_type;
+    int length; // length of computation in minutes
+    int gpu_count;
+    int model_size;
+};
+
 /**
  * @class JobRequest
  * @brief Scheduler input parameters as per API definition.
@@ -20,6 +40,9 @@ struct JobRequest {
     double workload_amount;
     time_t earliest_start;
     time_t latest_finish;
+    double startup_overhead;
+    double max_load;
+    std::optional<std::string> preferred_datacenter;
 };
 } // namespace scheduler
 
@@ -32,7 +55,8 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
             "JSON body is required");
     const auto &json = *json_ptr;
     for (const auto &field :
-         {"job_type", "workload_amount", "earliest_start", "latest_finish"}) {
+         {"job_type", "earliest_start", "latest_finish", "gpu_type",
+          "gpu_count", "model_size", "length"}) {
         if (json[field].isNull())
             throw scheduler::exceptions::ValidationException(
                 "Field '" + std::string(field) + "' cannot be null");
@@ -40,9 +64,6 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
     if (!json["job_type"].isString())
         throw scheduler::exceptions::ValidationException(
             "Field 'job_type' must be a string");
-    if (!json["workload_amount"].isNumeric())
-        throw scheduler::exceptions::ValidationException(
-            "Field 'workload_amount' must be a number");
     if (!json["earliest_start"].isString())
         throw scheduler::exceptions::ValidationException(
             "Field 'earliest_start' must be a string");
@@ -67,16 +88,28 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
         throw scheduler::exceptions::ValidationException(
             "End time must be in the future!");
     }
+    const auto jobHardwareSpecific =
+        scheduler::utils::convertRawJobRequest(json);
+
     try {
-        const auto workload_amount = json["workload_amount"].asDouble();
-        if (workload_amount < 0.)
-            throw scheduler::exceptions::ValidationException(
-                "workload_amount must be non-negative");
+        std::optional<std::string> pref_dc = std::nullopt;
+        if (!json["preferred_datacenter"].isNull()) {
+            if (!json["preferred_datacenter"].isString()) {
+                throw scheduler::exceptions::ValidationException(
+                    "Field 'preferred_datacenter' must be a string");
+            }
+            pref_dc = json["preferred_datacenter"].asString();
+        }
+
         return scheduler::JobRequest{
             .job_type = json["job_type"].asString(),
-            .workload_amount = workload_amount,
+            .workload_amount = jobHardwareSpecific.workload_amount,
             .earliest_start = earliest_start_opt.value(),
-            .latest_finish = latest_finish_opt.value()};
+            .latest_finish = latest_finish_opt.value(),
+            .startup_overhead = jobHardwareSpecific.startup_overhead,
+            .max_load = jobHardwareSpecific.max_load,
+            .preferred_datacenter = std::move(pref_dc),
+        };
     } catch (const std::exception &e) {
         throw scheduler::exceptions::ValidationException("Invalid body");
     }
