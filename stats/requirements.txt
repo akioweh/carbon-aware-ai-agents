@@ -1,11 +1,11 @@
 fastapi
 pandas==2.*
-matplotlib
 uvicorn
 pyyaml
 scikit-learn
-pytest
-schemathesis
 requests
 schedule
-uvicorn
+numpy
+pytest
+schemathesis
+statsmodels

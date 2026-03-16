@@ -365,7 +365,6 @@ CMakeUserPresets.json
 # Ignore all local history of files
 .history
 .ionide
-
 *.db*
 cache.db
 catboost_info/
@@ -376,11 +375,4 @@ predictions.json
 weather_cache.json
 *results*.json
 CLAUDE.md
-cache.db-shm
-cache.db-wal
-history.json
-prediction.json
-predictions.json
-
-# Frontend development Mock API data
-ui/mock-api/
+*.json
