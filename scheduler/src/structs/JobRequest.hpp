@@ -14,7 +14,7 @@ namespace scheduler {
 
 /**
  * This is not actually used, but it represents what request as a json is
- * submited to the endpoint. We then transform it to our format.
+ * submitted to the endpoint. We then transform it to our format.
  *
  * NOTE: i think this is useful for saving user job input to redisplay in UI?
  */

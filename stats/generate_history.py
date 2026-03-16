@@ -91,7 +91,7 @@ def generate_load(timestamp, dc_index):
     # DC specific variance
     value += (dc_index % 3) * 2  # Slight offset per DC
 
-    return max(0, min(MAX_CAPACITY, value))
+    return max(0, min(MAX_CAPACITY, value)) * 1e12
 
 
 def generate_carbon_intensity(timestamp, weather):

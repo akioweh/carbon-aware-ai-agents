@@ -75,7 +75,7 @@ def generate_next_week_carbon_intensity_prediction(location):
     # Format as unified metric time-series
     return {
         'location_id': location,
-        'metric': 'carbon_intensity',
+        'metric': 'forecast_carbon_intensity',
         'unit': 'gCO2eq/kWh',
         'data': [
             {

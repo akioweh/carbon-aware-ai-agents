@@ -37,8 +37,7 @@ inline auto operator==(const TimeSlot &lhs, const TimeSlot &rhs) {
 inline auto f_toJson(const TimeSlot &obj) -> Json::Value {
     auto res = Json::Value{};
     res["timestamp"] = utils::toIso8601(obj.timestamp);
-    // TODO: api: rename sci to carbonIntensity
-    res["sci"] = obj.carbon_intensity;
+    res["carbon_intensity"] = obj.carbon_intensity;
     res["load"] = obj.load;
     res["capacity"] = obj.capacity;
     return res;

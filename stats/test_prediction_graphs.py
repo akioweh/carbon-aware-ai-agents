@@ -52,7 +52,7 @@ plt.title('Load: History vs Prediction (All Data Centres)')
 plt.legend(loc='upper left', fontsize=8)
 plt.grid(True, alpha=0.3)
 
-# Plot 2: Greenness comparison
+# Plot 2: Carbon Intensity comparison
 plt.subplot(2, 1, 2)
 for idx, dc in enumerate(DATA_CENTRES):
     if dc in history_data:
@@ -85,8 +85,8 @@ for idx, dc in enumerate(DATA_CENTRES):
         )
 
 plt.xlabel('Index (5-minute intervals)')
-plt.ylabel('Greenness')
-plt.title('Greenness: History vs Prediction (All Data Centres)')
+plt.ylabel('Carbon Intensity (gCO2eq/kWh)')
+plt.title('Carbon Intensity: History vs Prediction (All Data Centres)')
 plt.legend(loc='upper left', fontsize=8)
 plt.grid(True, alpha=0.3)
 

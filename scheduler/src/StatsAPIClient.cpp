@@ -115,6 +115,16 @@ auto StatsAPIClient::getDatacenter(const string &datacenterName)
 
     const auto &load = *loadOpt;
     const auto &carbon_intensity = *carbon_intensityOpt;
+
+    if (load.data.empty() || carbon_intensity.data.empty()) {
+        LOG_WARN << "Empty data arrays returned for " << datacenterName;
+        co_return Datacenter{
+            .id = load.locationId,
+            .name = datacenterName,
+            .timeSeries = {},
+        };
+    }
+
     // detect start and end times
     const auto tps1 = load.data | views::transform(&LoadDataPoint::timestamp);
     const auto tps2 = carbon_intensity.data |

@@ -35,6 +35,15 @@ def initialize_db():
         # Enable WAL mode for better concurrent access
         conn.execute('PRAGMA journal_mode=WAL')
 
+        # Check if historical_data table exists and has greenness column
+        cursor = conn.execute('PRAGMA table_info(historical_data)')
+        columns = [col[1] for col in cursor.fetchall()]
+        if 'greenness' in columns and 'carbon_intensity' not in columns:
+            # Migrate old schema
+            conn.execute(
+                'ALTER TABLE historical_data RENAME COLUMN greenness TO carbon_intensity'
+            )
+
         # Predictions cache table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS predictions (
@@ -258,7 +267,9 @@ def migrate_json_to_db(json_file: str = 'history.json'):
                         'location': location,
                         'timestamp': datetime.fromisoformat(entry['timestamp']),
                         'load': entry['load'],
-                        'carbon_intensity': entry['carbon_intensity'],
+                        'carbon_intensity': entry.get(
+                            'carbon_intensity', entry.get('greenness')
+                        ),
                     }
                 )
 

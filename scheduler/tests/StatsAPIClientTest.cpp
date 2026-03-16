@@ -510,7 +510,7 @@ BOOST_AUTO_TEST_CASE(accepts_custom_host) {
 }
 
 BOOST_AUTO_TEST_CASE(default_host_works) {
-    // Verify default host (140.238.79.139:5000) works
+    // Verify default host works via the helper (which defaults to 127.0.0.1:5000 if no env var)
     auto locations = run_coro_in_drogon<std::vector<Location>>(
         []() -> drogon::Task<std::vector<Location>> {
             auto client = getTestClient();
