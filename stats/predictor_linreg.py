@@ -10,15 +10,17 @@ def _build_features(timestamps):
     dow = ts.dt.dayofweek
     minute_of_day = ts.dt.hour * 60 + ts.dt.minute
 
-    features = pd.DataFrame({
-        'hour_sin': np.sin(2 * np.pi * hour / 24),
-        'hour_cos': np.cos(2 * np.pi * hour / 24),
-        'dow_sin': np.sin(2 * np.pi * dow / 7),
-        'dow_cos': np.cos(2 * np.pi * dow / 7),
-        'minute_sin': np.sin(2 * np.pi * minute_of_day / 1440),
-        'minute_cos': np.cos(2 * np.pi * minute_of_day / 1440),
-        'trend': np.arange(len(timestamps), dtype=float),
-    })
+    features = pd.DataFrame(
+        {
+            'hour_sin': np.sin(2 * np.pi * hour / 24),
+            'hour_cos': np.cos(2 * np.pi * hour / 24),
+            'dow_sin': np.sin(2 * np.pi * dow / 7),
+            'dow_cos': np.cos(2 * np.pi * dow / 7),
+            'minute_sin': np.sin(2 * np.pi * minute_of_day / 1440),
+            'minute_cos': np.cos(2 * np.pi * minute_of_day / 1440),
+            'trend': np.arange(len(timestamps), dtype=float),
+        }
+    )
     return features
 
 
@@ -54,5 +56,5 @@ def get_next_week_load(historical_load):
     return _predict(historical_load, 'load', 0, 50)
 
 
-def get_next_week_greenness(historical_greenness):
-    return _predict(historical_greenness, 'greenness', 0, 100)
+def get_next_week_carbon_intensity(historical_carbon_intensity):
+    return _predict(historical_carbon_intensity, 'carbon_intensity', 30, 500)

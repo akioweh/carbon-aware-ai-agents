@@ -61,7 +61,9 @@ auto ScheduleController::
         HttpRequestPtr /*req*/, const ScheduleIdentifierParam schedule_id) const
     -> Task<HttpResponsePtr> {
     co_await calendar::deleteSchedule(schedule_id.getScheduleId());
-    co_return HttpResponse::newHttpResponse();
+    auto resp = HttpResponse::newHttpResponse();
+    resp->setStatusCode(k204NoContent);
+    co_return resp;
 }
 
 auto ScheduleController::

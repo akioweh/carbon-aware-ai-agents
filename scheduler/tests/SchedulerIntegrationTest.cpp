@@ -53,7 +53,10 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 1. Create a schedule (POST)
     Json::Value job;
     job["job_type"] = "batch";
-    job["workload_amount"] = 50.0;
+    job["gpu_type"] = "V100_PCIE";
+    job["gpu_count"] = 1;
+    job["model_size"] = 10;
+    job["length"] = 60;
     // Use dates in the future to ensure we hit the "forecast" part of stats
     // The stats service generates next week prediction.
     // Let's pick a time tomorrow.
@@ -134,7 +137,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
     auto deleteResponse = deleteRespPair.second;
     BOOST_REQUIRE(deleteResponse);
-    BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k200OK);
+    BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k204NoContent);
 
     // 5. Verify Deletion (GET should not return the deleted blocks)
     auto verifyReq = HttpRequest::newHttpRequest();
@@ -196,8 +199,8 @@ BOOST_AUTO_TEST_CASE(test_delete_non_existent) {
     BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
     auto deleteResponse = deleteRespPair.second;
     BOOST_REQUIRE(deleteResponse);
-    // Should be 200 OK (idempotent)
-    BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k200OK);
+    // Should be 204 No Content (idempotent)
+    BOOST_CHECK_EQUAL(deleteResponse->getStatusCode(), k204NoContent);
 }
 
 BOOST_AUTO_TEST_CASE(test_delete_invalid_id) {
@@ -221,7 +224,10 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     auto createJob = [&](const std::string &type) -> std::string {
         Json::Value job;
         job["job_type"] = type;
-        job["workload_amount"] = 30.0;
+        job["gpu_type"] = "V100_PCIE";
+        job["gpu_count"] = 1;
+        job["model_size"] = 10;
+        job["length"] = 60;
         auto now = std::chrono::system_clock::now();
         auto start = now + std::chrono::hours(24);
         auto end = start + std::chrono::hours(24);

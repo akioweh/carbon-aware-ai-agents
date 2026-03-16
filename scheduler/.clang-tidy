@@ -8,3 +8,4 @@ Checks: >
   -readability-identifier-length,
   -bugprone-easily-swappable-parameters,
   -readability-implicit-bool-conversion,
+  -readability-function-cognitive-complexity,

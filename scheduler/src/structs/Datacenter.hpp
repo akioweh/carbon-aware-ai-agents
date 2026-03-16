@@ -13,14 +13,14 @@ namespace scheduler {
 
 /**
  * @class TimeSlot
- * @brief used in \ref Datacenter
+ * @brief used in \ref Datacenter, represents a 5-min interval
  *
  */
 struct TimeSlot {
     std::chrono::system_clock::time_point timestamp;
-    double predictedLoad;
-    double predictedSci;
-    int availableGpus;
+    double load{};             // Floating-Point Operations (FLO) load
+    double carbon_intensity{}; // gCO2eq/kWh
+    double capacity{};         // FLO capacity for this 5 min interval
 };
 
 // defined as a free function for TimeSlot to remain an aggregate type
@@ -29,40 +29,39 @@ inline auto operator<=>(const TimeSlot &lhs, const TimeSlot &rhs) {
 };
 // defined as a free function for TimeSlot to remain an aggregate type
 inline auto operator==(const TimeSlot &lhs, const TimeSlot &rhs) {
-    return lhs.timestamp == rhs.timestamp &&
-           lhs.predictedLoad == rhs.predictedLoad &&
-           lhs.predictedSci == rhs.predictedSci &&
-           lhs.availableGpus == rhs.availableGpus;
+    return lhs.timestamp == rhs.timestamp && lhs.load == rhs.load &&
+           lhs.carbon_intensity == rhs.carbon_intensity &&
+           lhs.capacity == rhs.capacity;
 }
 
 inline auto f_toJson(const TimeSlot &obj) -> Json::Value {
     auto res = Json::Value{};
     res["timestamp"] = utils::toIso8601(obj.timestamp);
-    res["sci"] = obj.predictedSci;
-    res["load"] = obj.predictedLoad;
+    res["carbon_intensity"] = obj.carbon_intensity;
+    res["load"] = obj.load;
+    res["capacity"] = obj.capacity;
     return res;
 }
 
 /**
  * @class Datacenter
- * @brief DTO for per-location information as per stats API definition.
+ * @brief Internal aggregator of datacenter-specific info needed for scheduling.
+ *
+ * Constructed by StatsAPIClient from multiple deserialized API responses.
+ * Also happens to be retunred by the forecast forwarding endpoint.
  */
 struct Datacenter {
     std::string id;
     std::string name;
-    double maxLoad;
-    int totalGpus;
     std::vector<TimeSlot> timeSeries;
 };
 
 inline auto f_toJson(const Datacenter &obj) -> Json::Value {
     auto res = Json::Value{};
     res["location"] = obj.id;
-    res["max_load"] = obj.maxLoad;
     res["timeseries"] = Json::Value(Json::arrayValue);
-    for (const auto &block : obj.timeSeries) {
+    for (const auto &block : obj.timeSeries)
         res["timeseries"].append(toJson(block));
-    }
     return res;
 }
 

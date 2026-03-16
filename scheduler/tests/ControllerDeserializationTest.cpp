@@ -14,7 +14,10 @@ BOOST_AUTO_TEST_SUITE(JobRequestDeserialization)
 BOOST_AUTO_TEST_CASE(valid_request) {
     Json::Value json;
     json["job_type"] = "batch";
-    json["workload_amount"] = 10.5;
+    json["gpu_type"] = "V100_PCIE";
+    json["gpu_count"] = 1;
+    json["model_size"] = 10;
+    json["length"] = 60;
     json["earliest_start"] = "2030-10-26T10:00:00Z";
     json["latest_finish"] = "2030-10-26T12:00:00Z";
 
@@ -22,25 +25,32 @@ BOOST_AUTO_TEST_CASE(valid_request) {
     auto jobRequest = drogon::fromRequest<JobRequest>(*req);
 
     BOOST_CHECK_EQUAL(jobRequest.job_type, "batch");
-    BOOST_CHECK_CLOSE(jobRequest.workload_amount, 10.5, 1e-9);
+    BOOST_CHECK_CLOSE(jobRequest.workload_amount, 0.4, 1e-9);
     // Check if time points are valid (non-zero)
     BOOST_CHECK(jobRequest.earliest_start.time_since_epoch().count() > 0);
     BOOST_CHECK(jobRequest.latest_finish.time_since_epoch().count() > 0);
     BOOST_CHECK(jobRequest.latest_finish > jobRequest.earliest_start);
 }
 
-BOOST_AUTO_TEST_CASE(valid_request_integer_workload) {
+BOOST_AUTO_TEST_CASE(valid_request_hardware_values) {
     // workload_amount can be integer in JSON, should parse to double
     Json::Value json;
     json["job_type"] = "batch";
-    json["workload_amount"] = 10;
+    json["gpu_type"] = "A100_SXM4";
+    json["gpu_count"] = 2;
+    json["model_size"] = 20;
+    json["length"] = 30;
     json["earliest_start"] = "2030-10-26T10:00:00Z";
     json["latest_finish"] = "2030-10-26T12:00:00Z";
 
     auto req = drogon::HttpRequest::newHttpJsonRequest(json);
     auto jobRequest = drogon::fromRequest<JobRequest>(*req);
 
-    BOOST_CHECK_CLOSE(jobRequest.workload_amount, 10.0, 1e-9);
+    // A100_SXM4: tdp 400, sys 230.
+    // 2 * 400 + 230 = 1030W = 1.03kW
+    // length 30m = 0.5h
+    // workload = 1.03 * 0.5 = 0.515
+    BOOST_CHECK_CLOSE(jobRequest.workload_amount, 0.515, 1e-9);
 }
 
 BOOST_AUTO_TEST_CASE(missing_body) {
@@ -63,7 +73,10 @@ BOOST_AUTO_TEST_CASE(missing_fields) {
 BOOST_AUTO_TEST_CASE(null_fields) {
     Json::Value json;
     json["job_type"] = "batch";
-    json["workload_amount"] = Json::nullValue; // Null
+    json["gpu_type"] = "V100_PCIE";
+    json["gpu_count"] = Json::nullValue; // Null
+    json["model_size"] = 10;
+    json["length"] = 60;
     json["earliest_start"] = "2030-10-26T10:00:00Z";
     json["latest_finish"] = "2030-10-26T12:00:00Z";
 
@@ -75,7 +88,10 @@ BOOST_AUTO_TEST_CASE(null_fields) {
 BOOST_AUTO_TEST_CASE(invalid_types_string_for_number) {
     Json::Value json;
     json["job_type"] = "batch";
-    json["workload_amount"] = "10.5"; // String instead of number
+    json["gpu_type"] = "V100_PCIE";
+    json["gpu_count"] = "1"; // String instead of number
+    json["model_size"] = 10;
+    json["length"] = 60;
     json["earliest_start"] = "2030-10-26T10:00:00Z";
     json["latest_finish"] = "2030-10-26T12:00:00Z";
 
@@ -87,7 +103,10 @@ BOOST_AUTO_TEST_CASE(invalid_types_string_for_number) {
 BOOST_AUTO_TEST_CASE(invalid_types_number_for_string) {
     Json::Value json;
     json["job_type"] = 123; // Number instead of string
-    json["workload_amount"] = 10.5;
+    json["gpu_type"] = "V100_PCIE";
+    json["gpu_count"] = 1;
+    json["model_size"] = 10;
+    json["length"] = 60;
     json["earliest_start"] = "2030-10-26T10:00:00Z";
     json["latest_finish"] = "2030-10-26T12:00:00Z";
 
@@ -99,7 +118,10 @@ BOOST_AUTO_TEST_CASE(invalid_types_number_for_string) {
 BOOST_AUTO_TEST_CASE(invalid_time_format) {
     Json::Value json;
     json["job_type"] = "batch";
-    json["workload_amount"] = 10.5;
+    json["gpu_type"] = "V100_PCIE";
+    json["gpu_count"] = 1;
+    json["model_size"] = 10;
+    json["length"] = 60;
     json["earliest_start"] = "invalid-date";
     json["latest_finish"] = "2030-10-26T12:00:00Z";
 
@@ -111,7 +133,10 @@ BOOST_AUTO_TEST_CASE(invalid_time_format) {
 BOOST_AUTO_TEST_CASE(start_after_finish) {
     Json::Value json;
     json["job_type"] = "batch";
-    json["workload_amount"] = 10.5;
+    json["gpu_type"] = "V100_PCIE";
+    json["gpu_count"] = 1;
+    json["model_size"] = 10;
+    json["length"] = 60;
     json["earliest_start"] = "2030-10-26T13:00:00Z"; // After finish
     json["latest_finish"] = "2030-10-26T12:00:00Z";
 
@@ -120,10 +145,13 @@ BOOST_AUTO_TEST_CASE(start_after_finish) {
                       ValidationException);
 }
 
-BOOST_AUTO_TEST_CASE(negative_workload) {
+BOOST_AUTO_TEST_CASE(negative_hardware_metric) {
     Json::Value json;
     json["job_type"] = "batch";
-    json["workload_amount"] = -5.0;
+    json["gpu_type"] = "V100_PCIE";
+    json["gpu_count"] = -1;
+    json["model_size"] = 10;
+    json["length"] = 60;
     json["earliest_start"] = "2030-10-26T10:00:00Z";
     json["latest_finish"] = "2030-10-26T12:00:00Z";
 
