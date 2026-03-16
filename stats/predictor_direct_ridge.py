@@ -16,18 +16,28 @@ import pandas as pd
 import requests
 from sklearn.linear_model import Ridge
 
+import db_utils
+
 warnings.filterwarnings('ignore', module='sklearn')
 
 logger = logging.getLogger('stats.direct_ridge')
 
-# DC → region name and coordinates (inverse of db_utils.UK_REGION_TO_DC)
-DC_REGION_MAP = {
-    'Data-Center-1': ('London', 51.51, -0.13),
-    'Data-Center-2': ('South East England', 51.27, 0.52),
-    'Data-Center-3': ('South Yorkshire', 53.38, -1.47),
-    'Data-Center-4': ('North West England', 53.48, -2.24),
-    'Data-Center-5': ('North East England', 54.97, -1.61),
-}
+# Build DC → (region_name, lat, lon) map from canonical registry in db_utils.
+# This ensures weather coordinates are always aligned with the master datacenter list.
+def _build_dc_region_map():
+    """Build datacenter→region mapping from db_utils registry."""
+    dc_map = {}
+    for dc in db_utils.DEFAULT_DATACENTERS:
+        location_id = dc['location_id']
+        name = dc['name']
+        latitude = dc.get('latitude')
+        longitude = dc.get('longitude')
+        if latitude is not None and longitude is not None:
+            dc_map[location_id] = (name, latitude, longitude)
+    return dc_map
+
+DC_REGION_MAP = _build_dc_region_map()
+
 
 WEATHER_FEATURES = ['wind_speed', 'temperature', 'solar_radiation']
 
