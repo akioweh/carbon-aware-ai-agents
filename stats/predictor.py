@@ -148,13 +148,21 @@ if __name__ == '__main__':
         load_pred = generate_next_week_load_prediction(dc)
         print(f'Generated {len(load_pred["data"])} load predictions for {dc}')
 
-        greenness_pred = generate_next_week_greenness_prediction(dc)
+        greenness_pred = generate_next_week_greenness_and_ci_prediction(dc)
         print(f'Generated {len(greenness_pred["data"])} greenness predictions for {dc}')
+
+        try:
+            ci_pred = generate_next_week_carbon_intensity_prediction(dc)
+            print(f'Generated {len(ci_pred["data"])} carbon intensity predictions for {dc}')
+        except ValueError as exc:
+            ci_pred = {'error': str(exc)}
+            print(f'Skipping carbon intensity for {dc}: {exc}')
 
         # Store predictions for this data centre
         all_predictions[dc] = {
             'load_prediction': load_pred,
             'greenness_prediction': greenness_pred,
+            'carbon_intensity_prediction': ci_pred,
         }
 
     # Save all predictions to JSON file
