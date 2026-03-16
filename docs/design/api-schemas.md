@@ -17,10 +17,10 @@ The system comprises three components that communicate via RESTful HTTP APIs:
 
 Two OpenAPI v3 schemas define the HTTP APIs that power the interactions:
 
-- **[scheduler/openapi.yaml](../scheduler/openapi.yaml)** - the programmatic
+- **[scheduler/openapi.yaml](../../scheduler/openapi.yaml)** - the programmatic
   interface to the scheduling system; exposed by the Scheduler for the UI to
   call
-- **[stats/openapi.yaml](../stats/openapi.yaml)** - the unified data platform
+- **[stats/openapi.yaml](../../stats/openapi.yaml)** - the unified data platform
   interface; exposed by the Stats for the Scheduler to call
 
 Naturally, the interconnection APIs and the overall system weakly follow a
@@ -67,7 +67,7 @@ jobs) and of external origin (i.e. baseline load at data centers).
 
 > [!TIP]  
 > The formal schema definition is in
-> [scheduler/openapi.yaml](../scheduler/openapi.yaml), called `ScheduledBlock`.
+> [scheduler/openapi.yaml](../../scheduler/openapi.yaml), called `ScheduledBlock`.
 
 ### Job Specification
 
@@ -85,7 +85,7 @@ is the only way to influence the scheduling outcome.
 
 > [!TIP]  
 > The formal schema definition is in
-> [scheduler/openapi.yaml](../scheduler/openapi.yaml), called `JobRequest`.
+> [scheduler/openapi.yaml](../../scheduler/openapi.yaml), called `JobRequest`.
 
 ## API Interactions
 

@@ -83,6 +83,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /locations/{location}/metrics/forecast_carbon_intensity:
+    get:
+      tags:
+      - Forecasts
+      summary: Get carbon intensity forecast for next week
+      description: 'Returns SARIMAX-generated carbon intensity predictions (gCO2/kWh)
+        for the next week.
+
+        Results are cached for 5 minutes.'
+      operationId: get_carbon_intensity_forecast_locations__location__metrics_forecast_carbon_intensity_get
+      parameters:
+      - name: location
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Location
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarbonIntensityForecastResponse'
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Internal Server Error
+        '404':
+          description: Location not found or no carbon intensity data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /locations:
     get:
       tags:
@@ -111,6 +153,11 @@ paths:
               parameters:
                 location: $response.body#/0/id
               description: Get greenness forecast for a location from the list
+            GetCarbonIntensityForecast:
+              operationId: get_carbon_intensity_forecast_locations__location__metrics_forecast_carbon_intensity_get
+              parameters:
+                location: $response.body#/0/id
+              description: Get carbon intensity forecast for a location from the list
   /datacenters:
     get:
       tags:
@@ -169,6 +216,26 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
+    BaseForecastDataPoint:
+      properties:
+        timestamp:
+          type: string
+          title: Timestamp
+          description: ISO format timestamp
+        value:
+          type: number
+          title: Value
+          description: Forecasted value
+        is_forecast:
+          type: boolean
+          title: Is Forecast
+          description: Indicates if this is a forecast
+      type: object
+      required:
+      - timestamp
+      - value
+      - is_forecast
+      title: BaseForecastDataPoint
     Capacity:
       properties:
         max_load:
@@ -184,6 +251,33 @@ components:
       - max_load
       - total_gpus
       title: Capacity
+    CarbonIntensityForecastResponse:
+      properties:
+        location_id:
+          type: string
+          title: Location Id
+          description: Datacenter identifier
+        metric:
+          type: string
+          title: Metric
+          description: Metric name (e.g. forecast_load, forecast_greenness)
+        unit:
+          type: string
+          title: Unit
+          description: Unit of measurement
+        data:
+          items:
+            $ref: '#/components/schemas/BaseForecastDataPoint'
+          type: array
+          title: Data
+          description: Time series data
+      type: object
+      required:
+      - location_id
+      - metric
+      - unit
+      - data
+      title: CarbonIntensityForecastResponse
     Datacenter:
       properties:
         id:
@@ -242,6 +336,12 @@ components:
           type: boolean
           title: Is Forecast
           description: Indicates if this is a forecast
+        carbon_intensity:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Carbon Intensity
+          description: Estimated carbon intensity (gCO2/kWh)
       type: object
       required:
       - timestamp
@@ -370,6 +470,11 @@ components:
         type:
           type: string
           title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
       type: object
       required:
       - loc

@@ -7,43 +7,16 @@ import db_utils
 MAX_CAPACITY = 50
 
 
-class WeatherSystem:
-    def __init__(self):
-        self.wind_speed = random.uniform(0, 100)
-        self.cloud_cover = random.uniform(0, 100)
-        self.trend_duration = 0
-        self.wind_trend = 0
-        self.cloud_trend = 0
+def _get_datacenter_ids():
+    """Resolve datacenter IDs from db_utils in a backward-compatible way."""
+    if hasattr(db_utils, 'get_all_datacenter_ids'):
+        return db_utils.get_all_datacenter_ids(include_inactive=True)
 
-    def update(self):
-        # Update weather patterns slowly
-        if self.trend_duration <= 0:
-            self.trend_duration = random.randint(
-                12, 48
-            )  # 1-4 hours (in 5-min intervals)
-            self.wind_trend = random.uniform(-2, 2)
-            self.cloud_trend = random.uniform(-5, 5)
+    if hasattr(db_utils, 'get_datacenters'):
+        dcs = db_utils.get_datacenters(include_inactive=True)
+        return [dc['id'] for dc in dcs]
 
-        self.wind_speed = max(
-            0, min(100, self.wind_speed + self.wind_trend + random.uniform(-1, 1))
-        )
-        self.cloud_cover = max(
-            0, min(100, self.cloud_cover + self.cloud_trend + random.uniform(-2, 2))
-        )
-        self.trend_duration -= 1
-
-
-def get_solar_intensity(timestamp, cloud_cover):
-    hour = timestamp.hour + timestamp.minute / 60
-    # Peak at noon (12), zero before 6 and after 18
-    if 6 <= hour <= 18:
-        # Simple bell-ish curve
-        intensity = math.sin((hour - 6) / 12 * math.pi) * 100
-        # Cloud cover reduces solar
-        intensity *= 1 - (cloud_cover / 100) * 0.8
-    else:
-        intensity = 0
-    return max(0, intensity)
+    raise RuntimeError('No datacenter lookup function found in db_utils.')
 
 
 def generate_load(timestamp, dc_index):
@@ -72,12 +45,17 @@ def generate_load(timestamp, dc_index):
         if 0 <= hour < 5:
             base_curve *= 0.5
 
-    # Add randomness/noise
-    noise = random.uniform(-2, 2)
+    # Add randomness/noise (kept mild so the curve shape stays clean)
+    noise = random.uniform(-3, 3)
 
-    # Occasional spikes (server updates, batch jobs) - more likely at night
+    # Small random baseline shift per day so consecutive days don't look identical
+    day_seed = timestamp.toordinal() + dc_index
+    rng_day = random.Random(day_seed)
+    noise += rng_day.uniform(-2, 2)
+
+    # Occasional spikes (server updates, batch jobs) — 1% chance, mild magnitude
     if random.random() < 0.01:
-        noise += random.uniform(10, 20)
+        noise += random.uniform(2, 5)
 
     value = base_curve + noise
 
@@ -87,44 +65,26 @@ def generate_load(timestamp, dc_index):
     return max(0, min(MAX_CAPACITY, value))
 
 
-def generate_greenness(timestamp, weather):
-    solar = get_solar_intensity(timestamp, weather.cloud_cover)
-    wind = weather.wind_speed * 0.7  # Wind contribution
-
-    # Base grid mix (nuclear/hydro/coal/gas) - varies slowly
-    grid_base = 30 + 10 * math.sin(timestamp.hour / 24 * 2 * math.pi)
-
-    total_greenness = 0.4 * solar + 0.4 * wind + 0.2 * grid_base
-
-    noise = random.uniform(-2, 2)
-    return max(0, min(100, total_greenness + noise))
-
-
 def generate_history():
     now = datetime.now()
     start = now - timedelta(days=30)
     current = start
 
-    data_centres = db_utils.get_all_datacenter_ids(include_inactive=True)
-    if not data_centres:
-        raise ValueError('No datacenters configured in cache.db')
+    datacenters = _get_datacenter_ids()
 
     # Prepare bulk data for efficient insertion
     bulk_data = []
 
-    # Shared weather system (or could be per region)
-    weather = WeatherSystem()
-
     while current <= now:
-        weather.update()
-
-        for i, dc in enumerate(data_centres):
-            bulk_data.append({
-                'location': dc,
-                'timestamp': current,
-                'load': generate_load(current, i),
-                'greenness': generate_greenness(current, weather),
-            })
+        for i, dc in enumerate(datacenters):
+            bulk_data.append(
+                {
+                    'location': dc,
+                    'timestamp': current,
+                    'load': generate_load(current, i),
+                    'greenness': None,
+                }
+            )
         current += timedelta(minutes=5)
 
     # Insert all data into database

@@ -135,10 +135,19 @@ def initialize_db():
                 location TEXT NOT NULL,
                 timestamp REAL NOT NULL,
                 load REAL NOT NULL,
-                greenness REAL NOT NULL,
+                greenness REAL,
+                carbon_intensity REAL,
                 PRIMARY KEY (location, timestamp)
             )
         """)
+
+        # Add carbon_intensity column to existing DBs (no-op if already present)
+        try:
+            conn.execute(
+                "ALTER TABLE historical_data ADD COLUMN carbon_intensity REAL"
+            )
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         
         # Create indexes for efficient querying
         conn.execute("""
@@ -308,15 +317,15 @@ def save_prediction(key: str, data: dict):
 
 
 
-def insert_historical_data(location: str, timestamp: datetime, load: float, greenness: float):
+def insert_historical_data(location: str, timestamp: datetime, load: float, greenness: float, carbon_intensity: float = None):
     """Insert a single historical data point. Replaces if timestamp already exists."""
     try:
         with get_connection() as conn:
             conn.execute(
-                '''INSERT OR REPLACE INTO historical_data 
-                   (location, timestamp, load, greenness) 
-                   VALUES (?, ?, ?, ?)''',
-                (location, timestamp.timestamp(), load, greenness)
+                '''INSERT OR REPLACE INTO historical_data
+                   (location, timestamp, load, greenness, carbon_intensity)
+                   VALUES (?, ?, ?, ?, ?)''',
+                (location, timestamp.timestamp(), load, greenness, carbon_intensity)
             )
     except sqlite3.Error as e:
         print(f'Error inserting historical data: {e}')
@@ -325,17 +334,18 @@ def insert_historical_data(location: str, timestamp: datetime, load: float, gree
 
 def insert_historical_data_bulk(data: List[Dict]):
     """Insert multiple historical data points efficiently.
-    
+
     Args:
-        data: List of dicts with keys: location, timestamp, load, greenness
+        data: List of dicts with keys: location, timestamp, load, greenness, and optional carbon_intensity
     """
     try:
         with get_connection() as conn:
             conn.executemany(
-                '''INSERT OR REPLACE INTO historical_data 
-                   (location, timestamp, load, greenness) 
-                   VALUES (?, ?, ?, ?)''',
-                [(d['location'], d['timestamp'].timestamp(), d['load'], d['greenness']) 
+                '''INSERT OR REPLACE INTO historical_data
+                   (location, timestamp, load, greenness, carbon_intensity)
+                   VALUES (?, ?, ?, ?, ?)''',
+                [(d['location'], d['timestamp'].timestamp(), d['load'], d['greenness'],
+                  d.get('carbon_intensity'))
                  for d in data]
             )
     except sqlite3.Error as e:
@@ -356,49 +366,60 @@ def get_historical_data(
         end_time: Optional end time filter
         
     Returns:
-        List of dicts with keys: timestamp (datetime), load, greenness
+        List of dicts with keys: timestamp (datetime), load, greenness, carbon_intensity
     """
     try:
         with get_connection() as conn:
+            # Detect whether the carbon_intensity column exists (old DBs may lack it)
+            cursor = conn.execute("PRAGMA table_info(historical_data)")
+            col_names = {row[1] for row in cursor.fetchall()}
+            has_ci = 'carbon_intensity' in col_names
+
+            if has_ci:
+                select_cols = 'timestamp, load, greenness, carbon_intensity'
+            else:
+                select_cols = 'timestamp, load, greenness'
+
             if start_time and end_time:
                 cursor = conn.execute(
-                    '''SELECT timestamp, load, greenness 
-                       FROM historical_data 
+                    f'''SELECT {select_cols}
+                       FROM historical_data
                        WHERE location = ? AND timestamp >= ? AND timestamp <= ?
                        ORDER BY timestamp ASC''',
                     (location, start_time.timestamp(), end_time.timestamp())
                 )
             elif start_time:
                 cursor = conn.execute(
-                    '''SELECT timestamp, load, greenness 
-                       FROM historical_data 
+                    f'''SELECT {select_cols}
+                       FROM historical_data
                        WHERE location = ? AND timestamp >= ?
                        ORDER BY timestamp ASC''',
                     (location, start_time.timestamp())
                 )
             elif end_time:
                 cursor = conn.execute(
-                    '''SELECT timestamp, load, greenness 
-                       FROM historical_data 
+                    f'''SELECT {select_cols}
+                       FROM historical_data
                        WHERE location = ? AND timestamp <= ?
                        ORDER BY timestamp ASC''',
                     (location, end_time.timestamp())
                 )
             else:
                 cursor = conn.execute(
-                    '''SELECT timestamp, load, greenness 
-                       FROM historical_data 
+                    f'''SELECT {select_cols}
+                       FROM historical_data
                        WHERE location = ?
                        ORDER BY timestamp ASC''',
                     (location,)
                 )
-            
+
             rows = cursor.fetchall()
             return [
                 {
                     'timestamp': datetime.fromtimestamp(row[0]),
                     'load': row[1],
-                    'greenness': row[2]
+                    'greenness': row[2],
+                    'carbon_intensity': row[3] if has_ci else None,
                 }
                 for row in rows
             ]
@@ -509,20 +530,14 @@ def get_carbon_db_connection():
 def carbon_intensity_to_greenness(intensity: int) -> float:
     """Convert carbon intensity (gCO2/kWh) to greenness score (0-100).
 
-    UK carbon intensity typically ranges from ~50 (very green) to ~400+ (high carbon).
-    We map this to a 0-100 greenness score where:
-    - 100 = very green (low carbon, ~50 gCO2/kWh or less)
-    - 0 = high carbon (~400+ gCO2/kWh)
+    Linear mapping: CI=0 → 100, CI=350 → 0.
     """
     if intensity is None:
         return 50.0  # Default to middle if no data
 
-    # Clamp intensity to expected range
     intensity = max(0, min(500, intensity))
 
-    # Linear mapping: 50 -> 100, 400 -> 0
-    # greenness = 100 - ((intensity - 50) / 350) * 100
-    greenness = 100 - ((intensity - 50) / 3.5)
+    greenness = 100.0 * (1.0 - intensity / 350.0)
     return max(0.0, min(100.0, greenness))
 
 
@@ -611,7 +626,8 @@ def sync_carbon_to_historical(days_back: int = 30) -> int:
             "location": location,
             "timestamp": timestamp,
             "load": 25.0,  # Default load - carbon API doesn't provide this
-            "greenness": greenness
+            "greenness": greenness,
+            "carbon_intensity": intensity,
         })
 
     if bulk_data:

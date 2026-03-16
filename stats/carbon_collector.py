@@ -24,8 +24,6 @@ from pathlib import Path
 # Configuration
 API_BASE_URL = "https://api.carbonintensity.org.uk"
 REGIONS = {
-    1: "North Scotland",
-    2: "South Scotland",
     3: "North West England",
     4: "North East England",
     5: "South Yorkshire",
@@ -37,6 +35,7 @@ REGIONS = {
     11: "South West England",
     12: "South England",
     13: "London",
+    14: "South East England",
     14: "South East England",
 }
 DB_PATH = Path(os.environ.get("CARBON_DB_PATH", Path(__file__).parent / "carbon_intensity.db"))
