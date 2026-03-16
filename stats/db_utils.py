@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
-DB_FILE = 'cache.db'
+DB_FILE = Path(__file__).parent / 'cache.db'
 CARBON_DB_FILE = Path(
     os.environ.get('CARBON_DB_PATH', Path(__file__).parent / 'carbon_intensity.db')
 )
@@ -175,6 +175,14 @@ def get_historical_data(
                     (location, start_time.timestamp(), end_time.timestamp()),
                 )
             elif start_time:
+                cursor = conn.execute(
+                    f"""SELECT {select_cols}
+                       FROM historical_data
+                       WHERE location = ? AND timestamp >= ?
+                       ORDER BY timestamp ASC""",
+                    (location, start_time.timestamp()),
+                )
+
                 cursor = conn.execute(
                     f"""SELECT {select_cols}
                        FROM historical_data
@@ -354,7 +362,7 @@ def sync_carbon_to_historical(days_back: int = 30) -> int:
                 'location': location,
                 'timestamp': timestamp,
                 'load': 50 * 1e12,  # TODO: stop hardcode dumb value
-                'carbon_intensity': intensity,
+                'carbon_intensity': carbon_intensity,
             }
         )
 

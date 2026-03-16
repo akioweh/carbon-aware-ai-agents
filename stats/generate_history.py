@@ -74,6 +74,7 @@ def generate_history():
                     'location': dc,
                     'timestamp': current,
                     'load': generate_load(current, i),
+                    'carbon_intensity': 250.0,
                 }
             )
         current += timedelta(minutes=5)

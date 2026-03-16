@@ -108,7 +108,7 @@ paths:
                 location: $response.body#/0/id
               description: Get load forecast for a location from the list
             GetCarbonIntensityForecast:
-              operationId: get_carbon_intensity_forecast_locations__location__metrics_forecast_carbon_intensity_get
+              operationId: get_carbon_forecast_locations__location__metrics_forecast_carbon_intensity_get
               parameters:
                 location: $response.body#/0/id
               description: Get carbon intensity forecast for a location from the list

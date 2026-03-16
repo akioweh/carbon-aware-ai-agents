@@ -13,6 +13,7 @@ DEFAULT_CAPACITY = 50.0 * 1e12
 
 def generate_next_week_load_prediction(location):
     """Generate load predictions for the next week at a specific location."""
+    now = pd.Timestamp.now().ceil('5min')
     # Get history for specific location from database
     # optimization: limit to 60 days of data
     start_time = datetime.now() - timedelta(days=60)
@@ -30,7 +31,7 @@ def generate_next_week_load_prediction(location):
             for entry in location_history
         ]
     )
-    next_week_load_df = get_next_week_load(historical_load)
+    next_week_load_df = get_next_week_load(historical_load, now=now)
 
     # Format as unified metric time-series
     return {
@@ -51,6 +52,7 @@ def generate_next_week_load_prediction(location):
 
 def generate_next_week_carbon_intensity_prediction(location):
     """Generate carbon intensity predictions for the next week at a specific location."""
+    now = pd.Timestamp.now().ceil('5min')
     # Get history for specific location from database
     # optimization: limit to 60 days of data
     start_time = datetime.now() - timedelta(days=60)
@@ -71,17 +73,16 @@ def generate_next_week_carbon_intensity_prediction(location):
     )
 
     next_week_carbon_intensity_df = get_next_week_carbon_intensity(
-        historical_carbon_intensity
+        historical_carbon_intensity, now=now
     )
 
     # Format as unified metric time-series
     data = []
-    for i in range(len(next_week_greenness_df)):
-        row = next_week_greenness_df.iloc[i]
+    for i in range(len(next_week_carbon_intensity_df)):
+        row = next_week_carbon_intensity_df.iloc[i]
         point = {
             'timestamp': row['ds'].isoformat(),
-            'value': max(0.0, min(100.0, float(row['yhat']))),
-            'carbon_intensity': max(0.0, min(500.0, float(row['ci']))),
+            'value': max(0.0, float(row['yhat'])),
             'is_forecast': True,
         }
         data.append(point)
@@ -91,40 +92,4 @@ def generate_next_week_carbon_intensity_prediction(location):
         'metric': 'forecast_carbon_intensity',
         'unit': 'gCO2eq/kWh',
         'data': data,
-    }
-
-
-def generate_next_week_carbon_intensity_prediction(location):
-    """Generate carbon intensity predictions for the next week at a specific location."""
-    start_time = datetime.now() - timedelta(days=60)
-    location_history = db_utils.get_historical_data(location, start_time=start_time)
-
-    if not location_history:
-        raise ValueError(f'No history found for location: {location}')
-
-        carbon_intensity_pred = generate_next_week_carbon_intensity_prediction(dc)
-        print(
-            f'Generated {len(carbon_intensity_pred["data"])} carbon intensity predictions for {dc}'
-        )
-
-        # Store predictions for this data centre
-        all_predictions[dc] = {
-            'load_prediction': load_pred,
-            'carbon_intensity_prediction': carbon_intensity_pred,
-        }
-
-    next_week_ci_df = get_next_week_carbon_intensity(historical_df)
-
-    return {
-        'location_id': location,
-        'metric': 'forecast_carbon_intensity',
-        'unit': 'gCO2/kWh',
-        'data': [
-            {
-                'timestamp': next_week_ci_df.iloc[i]['ds'].isoformat(),
-                'value': max(0.0, min(500.0, float(next_week_ci_df.iloc[i]['yhat']))),
-                'is_forecast': True,
-            }
-            for i in range(len(next_week_ci_df))
-        ],
     }
