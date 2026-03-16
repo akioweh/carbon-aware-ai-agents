@@ -78,7 +78,7 @@ BOOST_AUTO_TEST_CASE(allocates_at_least_requested_work) {
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
 
     // reconstruct from memo for the full work amount
-    const auto e_work = std::max(requested / TEST_RES, 0.5);
+    const auto e_work = std::max(requested / TEST_RES, 0.001);
     const auto tot_work = static_cast<int>(std::ceil(requested / e_work));
     // The cost vector should have tot_work+1 entries
     BOOST_CHECK_EQUAL(costs.size(), static_cast<std::size_t>(tot_work + 1));
@@ -128,7 +128,7 @@ BOOST_AUTO_TEST_CASE(prefers_greener_blocks) {
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
 
     // Reconstruct the allocation for the full work amount
-    const auto e_work = std::max(requested / TEST_RES, 0.5);
+    const auto e_work = std::max(requested / TEST_RES, 0.001);
     const auto tot_work = static_cast<int>(std::ceil(requested / e_work));
     const auto n = 2;
 
@@ -520,7 +520,7 @@ BOOST_AUTO_TEST_CASE(quadratic_cost_spreads_load) {
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
 
     // Reconstruct allocation
-    const auto e_work = std::max(requested / TEST_RES, 0.5);
+    const auto e_work = std::max(requested / TEST_RES, 0.001);
     const auto tot_work = static_cast<int>(std::ceil(requested / e_work));
 
     int cur_w = tot_work;
@@ -559,7 +559,7 @@ BOOST_AUTO_TEST_CASE(sinusoidal_inputs) {
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
 
     // Reconstruct
-    const auto e_work = std::max(requested / TEST_RES, 0.5);
+    const auto e_work = std::max(requested / TEST_RES, 0.001);
     const auto tot_work = static_cast<int>(std::ceil(requested / e_work));
 
     int cur_w = tot_work;
