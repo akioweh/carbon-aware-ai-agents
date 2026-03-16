@@ -25,6 +25,9 @@ interface WorkloadInterval {
   newJob: number
   carbon_intensity?: number | null
   load?: number | null
+  capacity?: number | null
+  // Use a tuple type for the range
+  outsideLoadRange?: [number, number] | null
 }
 
 interface ScheduleResultProps {
@@ -242,10 +245,20 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           return prev
         }, null)
 
+        const capacity = closestForecast ? closestForecast.capacity : null;
+        const loadAmount = closestForecast ? closestForecast.load : null;
+
+        // Explicitly cast this as a tuple to satisfy the interface
+        const outsideLoadRange: [number, number] | null = (capacity !== null && loadAmount !== null)
+          ? [Math.max(0, capacity - loadAmount), capacity] as [number, number]
+          : null;
+
         return {
           ...interval,
           carbon_intensity: closestForecast ? closestForecast.carbon_intensity : null,
-          load: closestForecast ? closestForecast.load : null
+          load: loadAmount,
+          capacity,
+          outsideLoadRange
         }
       })
     setWorkloadData(intervals)
@@ -266,7 +279,13 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const formatTime = (isoString: string) => new Date(isoString).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
   const formatDateTime = (isoString: string) => new Date(isoString).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
 
-  const maxValue = 50
+  // Adjust max value dynamically to fit capacity line
+  const maxValue = useMemo(() => {
+    const vals = workloadData.flatMap(d => [d.existing + d.newJob, d.capacity || 0]);
+    const max = Math.max(...vals, 50);
+    return Math.ceil(max / 10) * 10;
+  }, [workloadData]);
+
   const { start: rangeStart, end: rangeEnd } = getTimeRange()
 
   return (
@@ -320,7 +339,6 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           </CardHeader>
           <CardContent className="pt-0">
             <div className="grid gap-4 sm:grid-cols-3">
-              {/* Carbon Intensity Card */}
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
                 {!showTrivial && unoptimizedComparison.carbon_intensity && (
                   <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
@@ -332,7 +350,6 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                 <p className="text-xs text-muted-foreground">g CO2/kWh</p>
               </div>
 
-              {/* Total Emissions Card */}
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
                 {!showTrivial && unoptimizedComparison.total_emissions && (
                   <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
@@ -344,7 +361,6 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                 <p className="text-xs text-muted-foreground">g CO2</p>
               </div>
 
-              {/* SCI Card */}
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
                 {!showTrivial && unoptimizedComparison.sci && (
                   <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
@@ -394,8 +410,12 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               <span className="text-muted-foreground">Carbon-Intensity</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-1 w-4 rounded bg-blue-400" />
+              <div className="h-3 w-3 rounded bg-blue-400" />
               <span className="text-muted-foreground">Outside-Load</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1 w-4 rounded bg-purple-500" />
+              <span className="text-muted-foreground">Capacity</span>
             </div>
           </div>
 
@@ -414,6 +434,10 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                       <stop offset="5%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.8} />
                       <stop offset="95%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.1} />
                     </linearGradient>
+                    <linearGradient id="colorOutside" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                   <XAxis dataKey="time" tickFormatter={(time) => formatTime(time)} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} minTickGap={30} axisLine={false} tickLine={false} />
@@ -427,9 +451,10 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                           <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border">
                             <p className="font-medium mb-1 border-b pb-1">{formatTime(label)}</p>
                             {data?.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
-                            {data?.load != null && <p className="text-blue-500 font-semibold">Load: {Number(data.load).toFixed(2)}</p>}
+                            {data?.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} kWh</p>}
+                            {data?.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} kWh</p>}
                             {payload.map((entry, index) => {
-                              if (entry.value === 0 || entry.dataKey === "carbon_intensity" || entry.dataKey === "load") return null
+                              if (entry.value === 0 || entry.dataKey === "carbon_intensity" || entry.dataKey === "outsideLoadRange" || entry.dataKey === "capacity") return null
                               return (
                                 <div key={index} className="flex justify-between gap-4">
                                   <span className="flex items-center gap-1.5">
@@ -446,10 +471,11 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                       return null
                     }}
                   />
+                  <Area yAxisId="left" type="monotone" dataKey="outsideLoadRange" stroke="#3b82f6" fill="url(#colorOutside)" fillOpacity={1} isAnimationActive={false} />
                   <Area yAxisId="left" type="monotone" dataKey="existing" stackId="1" stroke="#9ca3af" fill="url(#colorExisting)" isAnimationActive={false} />
                   <Area yAxisId="left" type="monotone" dataKey="newJob" stackId="1" stroke={showTrivial ? "#ea580c" : "#059669"} fill="url(#colorNew)" isAnimationActive={false} />
                   <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
-                  <Line yAxisId="left" type="monotone" dataKey="load" stroke="#3b82f6" strokeWidth={0.5} dot={false} isAnimationActive={false} />
+                  <Line yAxisId="left" type="monotone" dataKey="capacity" stroke="#a855f7" strokeWidth={2} dot={false} isAnimationActive={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
