@@ -2,6 +2,7 @@
 #include "Calendar.hpp"
 #include "exceptions/SchedulingException.hpp"
 #include "utils/Coro.hpp"
+#include <ranges>
 
 namespace scheduler {
 
@@ -17,11 +18,11 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
     const auto time_index_offset = time_gridder.toIndex(job.earliest_start);
 
     const auto time_to_index =
-        [&](const decltype(time_gridder)::time_point_t &tp) -> long long {
+        [&](const decltype(time_gridder)::time_point_t &tp) -> int64_t {
         return time_gridder.toIndex(tp) - time_index_offset;
     };
     const auto index_to_time =
-        [&](const long long i) -> decltype(time_gridder)::time_point_t {
+        [&](const int64_t i) -> decltype(time_gridder)::time_point_t {
         return time_gridder.toTimePoint(i + time_index_offset);
     };
 
@@ -42,17 +43,17 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
     auto data = SchedulerData{};
     data.n_intervals = n_intervals;
     data.time_index_offset = time_index_offset;
-    data.location_ids.reserve(n_locations);
     data.loads_f.reserve(n_locations);
+    data.location_ids.reserve(n_locations);
     data.capacities_f.reserve(n_locations);
-    data.greennesses.reserve(n_locations);
+    data.sci_scores.reserve(n_locations);
 
     for (const auto &loc : locations) {
         data.location_ids.push_back(loc.id);
-        data.capacities_f.emplace_back(n_intervals, loc.maxLoad);
+        data.capacities_f.emplace_back(n_intervals, job.max_load);
 
         auto load = vector(n_intervals, 0.);
-        auto greenness = vector(n_intervals, 1.);
+        auto sci = vector(n_intervals, 1.);
         const auto &ts_data = loc.timeSeries;
         for (const auto &tp : ts_data) {
             if (tp.timestamp < time_start || tp.timestamp >= time_end)
@@ -60,10 +61,10 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
             const auto index = time_to_index(tp.timestamp);
             if (index >= 0 && index < n_intervals) {
                 load[index] = tp.predictedLoad;
-                greenness[index] = tp.predictedGreenness;
+                sci[index] = tp.predictedSci;
             }
         }
-        data.greennesses.push_back(std::move(greenness));
+        data.sci_scores.push_back(std::move(sci));
         data.loads_f.push_back(std::move(load));
     }
 
@@ -78,7 +79,15 @@ auto SchedulerBase::fetchAndPrepareData(const JobRequest &job)
         }
     }
 
-    data.penalties_f = vector(data.location_ids.size(), 1.);
+    for (const auto i : std::views::iota(0ULL, n_locations)) {
+        const double physical_limit = locations[i].maxLoad;
+        for (auto &current_load : data.loads_f[i]) {
+            double remaining = physical_limit - current_load;
+            current_load = job.max_load - min(remaining, job.max_load);
+        }
+    }
+
+    data.penalties_f = vector(data.location_ids.size(), job.startup_overhead);
 
     if (data.location_ids.empty())
         throw exceptions::SchedulingException(

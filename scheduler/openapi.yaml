@@ -186,7 +186,7 @@ paths:
         "422":
           description: >
             Semantically invalid request body (e.g. missing required fields,
-            invalid date format, non-positive workload_amount, latest_finish
+            invalid date format, latest_finish
             before earliest_start)
           content:
             application/json:
@@ -200,6 +200,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/forecast:
+    get:
+      operationId: GetForcast
+      summary: Gets forcast from python API.
+      description: Gets full forecast for a specific datacenter, or for all depending on whether datacenter location is provied.
+      parameters:
+        - $ref: '#/components/parameters/DatacenterLocationParam'
+      responses:
+        "200":
+          description: Successfull response with requested datacenter
+          content:
+            application/json: 
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoadGreenessForecastDataPoint'
+        "400":
+          description: Python API is unresponsive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/hardwareSpecs/gpus:
+    get:
+      operationId: getGpuSpecs
+      summary: Gets available GPU specs
+      description: Lists GPUs convertible to functional units of computation.
+      responses:
+        "200":
+          description: Successful response with requested GPU list.
+          content:
+            application/json:
+              schema:
+                  type: array
+                  items:
+                    type: string
+                  example: ["V100_PCIE", "A100_SXM4"]
+
 
 components:
   parameters:
@@ -250,21 +289,18 @@ components:
       type: object
       required:
         - job_type
-        - workload_amount
         - earliest_start
         - latest_finish
+        - gpu_type
+        - length
+        - gpu_count
+        - model_size
       properties:
         job_type:
           type: string
           description: Type of AI workload
           enum: ["training", "inference", "batch"]
           example: "training"
-        workload_amount:
-          type: number
-          description: Amount of workload in the specified functional unit
-          minimum: 0
-          exclusiveMinimum: true
-          example: 20
         earliest_start:
           type: string
           format: date-time
@@ -282,6 +318,22 @@ components:
           type: string
           description: Optional preferred datacenter to prioritize allocating work on if possible (useful for trivial scheduler baseline comparisons)
           example: "us-west-1"
+        gpu_type:
+          type: string
+          description: type of available gpu to the user.
+          example: "V100_PCIE"
+        length:
+          type: integer
+          description: esitmated time of the work in minutes
+          example: 20
+        gpu_count:
+          type: integer
+          description: number of available gpus.
+          example: 5
+        model_size:
+          type: integer
+          description: size of the model to train in GBs. This means how much VRam is needed for it to run.
+          example: 26
 
     ScheduleResponse:
       type: array
@@ -399,6 +451,44 @@ components:
             $ref: "#/components/schemas/ScheduleBlock"
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
+
+    LoadGreenessForecastDataPoint:
+      properties:
+        max_load:
+          type: number
+          title: max_load
+          description: maximum load of the datacenter
+        location:
+          type: string
+          title: location
+          description: location of the greeness data
+        timeseries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadGreenessPoint'
+      type: object
+      required:
+      - location
+      - timeseries
+      - max_load
+    
+    LoadGreenessPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Start time of the scheduled block
+          example: "2025-12-08T02:00:00Z"
+        greeness:
+          type: number
+          description: greeness at the location at the time
+          example: 5.4
+        load:
+          type: number
+          description: load at the locatioin at the time
+          example: 6.9
+
 
     ScheduleImpact:
       type: object

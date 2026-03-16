@@ -1,5 +1,7 @@
 #ifndef SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #define SCHEDULER_SCHEDULE_CONTROLLER_HPP
+#include <drogon/HttpRequest.h>
+#include <drogon/HttpTypes.h>
 #pragma once
 
 #include "structs/DatacenterIdentifierParam.hpp"

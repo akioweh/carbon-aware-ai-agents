@@ -1,12 +1,14 @@
 #include "controllers/ScheduleController.hpp"
 #include "Calendar.hpp"
 #include "SchedulingQueue.hpp"
+#include "StatsAPIClient.hpp"
 #include "TrivialScheduler.hpp"
 #include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/ScheduleIdentifierParam.hpp"
 #include "structs/TimeIntervalParams.hpp"
 #include "utils/TimeGridder.hpp"
+#include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
 #include <drogon/HttpTypes.h>
 
@@ -99,5 +101,4 @@ auto ScheduleController::
     const auto resp = HttpResponse::newHttpJsonResponse(ret);
     co_return resp;
 }
-
 } // namespace scheduler::controllers
