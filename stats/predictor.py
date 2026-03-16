@@ -1,12 +1,12 @@
-import json
 from datetime import datetime, timedelta
 
 import pandas as pd
 
 import db_utils
-from predictor_load import get_next_week_load
-from predictor_direct_ridge import get_next_week_carbon_intensity
-
+from different_prediction_models.predictor_direct_ridge import (
+    get_next_week_carbon_intensity,
+)
+from different_prediction_models.predictor_load import get_next_week_load
 
 DEFAULT_CAPACITY = 50.0 * 1e12
 
