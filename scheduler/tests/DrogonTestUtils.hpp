@@ -19,22 +19,22 @@ class DrogonTestRunner {
 
     template <typename T>
     auto run(std::function<drogon::Task<T>()> coroFunc) -> T {
-        std::promise<T> promise;
-        auto future = promise.get_future();
+        auto promise = std::make_shared<std::promise<T>>();
+        auto future = promise->get_future();
 
         getLoop()->queueInLoop(
-            [&promise, coroFunc = std::move(coroFunc)]() -> auto {
-                drogon::async_run([&promise, coroFunc]() -> drogon::Task<void> {
+            [promise, coroFunc = std::move(coroFunc)]() -> auto {
+                drogon::async_run([promise, coroFunc]() -> drogon::Task<void> {
                     try {
                         if constexpr (std::is_same_v<T, void>) {
                             co_await coroFunc();
-                            promise.set_value();
+                            promise->set_value();
                         } else {
                             T result = co_await coroFunc();
-                            promise.set_value(std::move(result));
+                            promise->set_value(std::move(result));
                         }
                     } catch (...) {
-                        promise.set_exception(std::current_exception());
+                        promise->set_exception(std::current_exception());
                     }
                 });
             });

@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 import db_utils
 from generate_history import DATA_CENTRES, generate_history
 from predictor import (
-    generate_next_week_greenness_prediction,
+    generate_next_week_carbon_intensity_prediction,
     generate_next_week_load_prediction,
 )
 from carbon_collector import (
@@ -61,40 +61,30 @@ class Location(BaseModel):
     name: str = Field(..., description='Human-readable name')
 
 
-class Capacity(BaseModel):
-    max_load: float = Field(..., description='Maximum load capacity')
-    total_gpus: int = Field(..., description='Total number of GPUs')
-
-
 class BaseForecastDataPoint(BaseModel):
     timestamp: str = Field(..., description='ISO format timestamp')
     value: float = Field(..., description='Forecasted value')
     is_forecast: bool = Field(..., description='Indicates if this is a forecast')
 
 
-class LoadForecastDataPoint(BaseForecastDataPoint):
-    available_gpus: int = Field(..., description='Number of available GPUs')
-
-
-class GreennessForecastDataPoint(BaseForecastDataPoint):
-    pass
-
-
 class BaseForecastResponse(BaseModel):
     location_id: str = Field(..., description='Datacenter identifier')
     metric: str = Field(
-        ..., description='Metric name (e.g. forecast_load, forecast_greenness)'
+        ..., description='Metric name (e.g. forecast_load, forecast_carbon_intensity)'
     )
     unit: str = Field(..., description='Unit of measurement')
 
 
+class LoadForecastDataPoint(BaseForecastDataPoint):
+    capacity: float = Field(..., description='Capacity in FLOs')
+
+
 class LoadForecastResponse(BaseForecastResponse):
-    capacity: Capacity = Field(..., description='Capacity information')
     data: list[LoadForecastDataPoint] = Field(..., description='Time series data')
 
 
-class GreennessForecastResponse(BaseForecastResponse):
-    data: list[GreennessForecastDataPoint] = Field(..., description='Time series data')
+class CarbonIntensityForecastResponse(BaseForecastResponse):
+    data: list[BaseForecastDataPoint] = Field(..., description='Time series data')
 
 
 class ErrorResponse(BaseModel):
@@ -111,23 +101,33 @@ def prediction_loop():
                 load_data = generate_next_week_load_prediction(dc)
                 db_utils.save_prediction(f'load_forecast_{dc}', load_data)
 
-                greenness_data = generate_next_week_greenness_prediction(dc)
-                db_utils.save_prediction(f'greenness_forecast_{dc}', greenness_data)
+                carbon_intensity_data = generate_next_week_carbon_intensity_prediction(
+                    dc
+                )
+                db_utils.save_prediction(
+                    f'carbon_intensity_forecast_{dc}', carbon_intensity_data
+                )
 
                 if consecutive_failures[dc]:
-                    logger.info('Prediction loop recovered for %s after %d failure(s)', dc, consecutive_failures[dc])
+                    logger.info(
+                        'Prediction loop recovered for %s after %d failure(s)',
+                        dc,
+                        consecutive_failures[dc],
+                    )
                 consecutive_failures[dc] = 0
             except Exception:
                 consecutive_failures[dc] += 1
                 logger.error(
                     'Error updating predictions for %s (consecutive failures: %d)',
-                    dc, consecutive_failures[dc],
+                    dc,
+                    consecutive_failures[dc],
                     exc_info=True,
                 )
                 if consecutive_failures[dc] >= _FAILURE_ALERT_THRESHOLD:
                     logger.critical(
                         'ALERT: prediction loop for %s has failed %d times in a row — predictions may be stale',
-                        dc, consecutive_failures[dc],
+                        dc,
+                        consecutive_failures[dc],
                     )
 
         time.sleep(300)
@@ -142,7 +142,10 @@ def carbon_sync_loop():
                 count = db_utils.sync_carbon_to_historical(days_back=7)
                 logger.info('Carbon sync: %d records updated', count)
             if consecutive_failures:
-                logger.info('Carbon sync loop recovered after %d failure(s)', consecutive_failures)
+                logger.info(
+                    'Carbon sync loop recovered after %d failure(s)',
+                    consecutive_failures,
+                )
             consecutive_failures = 0
         except Exception:
             consecutive_failures += 1
@@ -173,7 +176,10 @@ def carbon_collector_loop():
             collect_current(conn)
             logger.info('Carbon readings total: %d', get_reading_count(conn))
             if consecutive_failures:
-                logger.info('Carbon collector loop recovered after %d failure(s)', consecutive_failures)
+                logger.info(
+                    'Carbon collector loop recovered after %d failure(s)',
+                    consecutive_failures,
+                )
             consecutive_failures = 0
         except Exception:
             consecutive_failures += 1
@@ -282,10 +288,10 @@ def get_load_forecast(location: str):
 
 
 @app.get(
-    '/locations/{location}/metrics/forecast_greenness',
-    response_model=GreennessForecastResponse,
+    '/locations/{location}/metrics/forecast_carbon_intensity',
+    response_model=CarbonIntensityForecastResponse,
     tags=['Forecasts'],
-    summary='Get greenness forecast for next week',
+    summary='Get carbon intensity forecast for next week',
     responses={
         500: {'model': ErrorResponse},
         404: {'model': ErrorResponse, 'description': 'Location not found'},
@@ -293,16 +299,16 @@ def get_load_forecast(location: str):
 )
 def get_carbon_forecast(location: str):
     """
-    Returns ML-generated greenness predictions for the next week.
+    Returns ML-generated carbon intensity predictions for the next week.
     Results are cached for 5 minutes.
     """
     try:
-        cache_key = f'greenness_forecast_{location}'
+        cache_key = f'carbon_intensity_forecast_{location}'
         cached_result = db_utils.get_cached_prediction(cache_key)
         if cached_result:
             return cached_result
         else:
-            data = generate_next_week_greenness_prediction(location)
+            data = generate_next_week_carbon_intensity_prediction(location)
             db_utils.save_prediction(cache_key, data)
             return data
     except ValueError as e:
@@ -326,10 +332,10 @@ def get_carbon_forecast(location: str):
                     'parameters': {'location': '$response.body#/0/id'},
                     'description': 'Get load forecast for a location from the list',
                 },
-                'GetGreennessForecast': {
-                    'operationId': 'get_carbon_forecast_locations__location__metrics_forecast_greenness_get',
+                'GetCarbonIntensityForecast': {
+                    'operationId': 'get_carbon_forecast_locations__location__metrics_forecast_carbon_intensity_get',
                     'parameters': {'location': '$response.body#/0/id'},
-                    'description': 'Get greenness forecast for a location from the list',
+                    'description': 'Get carbon intensity forecast for a location from the list',
                 },
             },
         }

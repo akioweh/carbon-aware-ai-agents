@@ -6,6 +6,8 @@
 
 namespace scheduler::utils {
 
+using FiveMinutes = std::chrono::duration<int, std::ratio<300>>;
+
 using SysNanoseconds = std::chrono::sys_time<std::chrono::nanoseconds>;
 
 inline constexpr SysNanoseconds MIN_TIME =
@@ -25,7 +27,8 @@ concept Duration = is_duration<T>::value;
 template <typename T>
 concept Clock = std::chrono::is_clock_v<T>;
 
-template <Duration Resolution, Clock clock_t = std::chrono::system_clock>
+template <Duration Resolution = FiveMinutes,
+          Clock clock_t = std::chrono::system_clock>
 class TimeGridder {
   public:
     using time_point_t = std::chrono::time_point<clock_t>;
@@ -59,6 +62,12 @@ class TimeGridder {
   private:
     time_point_t start_;
 };
+
 } // namespace scheduler::utils
+
+namespace scheduler {
+// global instance with epoch start, effectively aligning to whole-5-min marks
+static constexpr auto TIME_GRIDDER = utils::TimeGridder{};
+} // namespace scheduler
 
 #endif // SCHEDULER_UTILS_TIMEGRINDER_HPP

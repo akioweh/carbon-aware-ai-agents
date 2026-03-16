@@ -13,43 +13,49 @@
 
 namespace scheduler {
 
-/// Location as returned by /locations endpoint
+/**
+ * @class Location
+ * @brief DTO from GET /locations
+ *
+ */
 struct Location {
     std::string id;
     std::string name;
 };
 
-struct LoadForecastDataPoint {
+struct LoadDataPoint {
     std::chrono::system_clock::time_point timestamp;
     double value;
-    bool isForecast;
-    int availableGpus;
-};
-
-struct Capacity {
-    double maxLoad;
-    int totalGpus;
-};
-
-struct LoadForecast {
-    std::string locationId;
-    std::string metric;
-    std::string unit;
-    Capacity capacity;
-    std::vector<LoadForecastDataPoint> data;
-};
-
-struct CarbonIntensityForecastDataPoint {
-    std::chrono::system_clock::time_point timestamp;
-    double value;
+    double capacity; // FLO (for this 5 min interval)
+    // TODO: optimize struct padding alignment
     bool isForecast;
 };
 
-struct CarbonIntensityForecast {
+/**
+ * @class LoadTimeSeries
+ * @brief DTO from GET /locations/{locationId}/metrics/forecast_load
+ *
+ * also happens to contain capacity info
+ */
+struct LoadTimeSeries {
     std::string locationId;
-    std::string metric;
-    std::string unit;
-    std::vector<CarbonIntensityForecastDataPoint> data;
+    std::vector<LoadDataPoint> data;
+};
+
+struct CarbonIntensityDataPoint {
+    std::chrono::system_clock::time_point timestamp;
+    double value;
+    bool isForecast;
+};
+
+/**
+ * @class CarbonIntensityTimeSeries
+ * @brief DTO from GET /locations/{locationId}/metrics/forecast_carbon_intensity
+ *
+ */
+struct CarbonIntensityTimeSeries {
+    std::string locationId;
+    std::vector<CarbonIntensityDataPoint> data;
 };
 
 class StatsAPIClient {
@@ -70,10 +76,12 @@ class StatsAPIClient {
     explicit StatsAPIClient(std::string host = "http://140.238.79.139:5000");
 
     auto getLocations() -> drogon::Task<std::vector<Location>>;
+    // TODO: why do the following two return optional?
+    // TODO: rename: these don't _only_ get forecasts (but also historical?)
     auto getLoadForecast(const std::string &location)
-        -> drogon::Task<std::optional<LoadForecast>>;
+        -> drogon::Task<std::optional<LoadTimeSeries>>;
     auto getCarbonIntensityForecast(const std::string &location)
-        -> drogon::Task<std::optional<CarbonIntensityForecast>>;
+        -> drogon::Task<std::optional<CarbonIntensityTimeSeries>>;
 
     auto getDatacenter(const std::string &datacenterName)
         -> drogon::Task<Datacenter>;

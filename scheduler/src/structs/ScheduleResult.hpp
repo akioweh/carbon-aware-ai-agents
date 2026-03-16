@@ -87,7 +87,6 @@ struct ScheduleSummary {
 inline auto f_toJson(const ScheduleSummary &obj) -> Json::Value {
     auto res = Json::Value{};
     res["schedule_id"] = obj.scheduleId;
-    res["message"] = "Success";
     res["impact"] = toJson(obj.impact);
     if (obj.trivialImpact.has_value()) {
         res["trivialImpact"] = toJson(obj.trivialImpact.value());
