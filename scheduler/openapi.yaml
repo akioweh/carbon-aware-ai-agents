@@ -414,10 +414,6 @@ components:
           type: string
           description: assigned id for the job
           example: "sched-456"
-        message:
-          type: string
-          nullable: true
-          description: optional message from the server
         scheduled_blocks:
           type: array
           items:
@@ -430,16 +426,11 @@ components:
       description: Response after successfully submitting a job request
       required:
         - schedule_id
-        - message
       properties:
         schedule_id:
           type: string
           description: assigned id for the newly created job
           example: "sched-456"
-        message:
-          type: string
-          description: status message
-          example: "Success"
 
     ScheduleData:
       type: object
@@ -474,30 +465,12 @@ components:
           description: Software Carbon Intensity score for the schedule
           example: 20
 
-    DCInfoHardwareSpec:
-      type: object
-      properties:
-        gpuSKU:
-          type: string
-          description: SKU of the GPU available
-          example: "V100_PCIE"
-        gpuCapacity:
-          type: number
-          description: Computational capacity of the GPU in teraFLOPS
-          example: 40
-        gpuPower:
-          type: number
-          description: Power consumption of the GPU in watts
-          example: 250
-
     DCInfo:
       properties:
         location:
           type: string
           title: location
           description: location of the greeness data
-        hardwareSpec:
-          $ref: "#/components/schemas/DCInfoHardwareSpec"
         timeseries:
           type: array
           items:
