@@ -22,14 +22,25 @@ def transformFromGramToPounds(obj: ForecastPoint) -> ForecastPoint:
 
 
 def getForecastDataForLocation(location: str):
-    statsAPICIEndpoint = f"http://140.238.79.139:5000//locations/{location}/metrics/forecast_carbon_intensity"
+    statsAPICIEndpoint = (
+        f"http://140.238.79.139:5000//locations/{location}/metrics/forecast_greenness"
+    )
 
     try:
         response = requests.get(statsAPICIEndpoint, timeout=10)
         response.raise_for_status()
         external_data = response.json()
+
+        def greeness_to_sci(greeness: float) -> float:
+            greeness /= 100
+            greeness = 1.0 - greeness
+            return greeness * 350
+
         data: list[ForecastPoint] = [
-            {"point_time": point["timestamp"], "value": float(point["value"])}
+            {
+                "point_time": point["timestamp"],
+                "value": greeness_to_sci(float(point["value"])),
+            }
             for point in external_data.get("data", [])
         ]
     except Exception:
