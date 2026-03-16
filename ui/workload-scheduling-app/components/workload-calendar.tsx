@@ -71,16 +71,16 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     fetchData()
   }, [])
 
-  // Calculate synchronized domain for greenness across ALL charts
-  const globalGreennessDomain = useMemo(() => {
+  // Calculate synchronized domain for SCI across ALL charts
+  const globalSCIDomain = useMemo(() => {
     if (!forecasts || forecasts.length === 0) return [0, 1]
     let min = Infinity
     let max = -Infinity
     forecasts.forEach(dc => {
       dc.timeseries?.forEach((point: any) => {
-        if (typeof point.greeness === "number") {
-          min = Math.min(min, point.greeness)
-          max = Math.max(max, point.greeness)
+        if (typeof point.carbon_intensity === "number") {
+          min = Math.min(min, point.carbon_intensity)
+          max = Math.max(max, point.carbon_intensity)
         }
       })
     })
@@ -149,7 +149,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       <CardContent className="space-y-4 pt-4">
         <div className="flex flex-wrap items-center gap-4 text-sm pb-2 border-b">
           <div className="flex items-center gap-2"><div className="h-3 w-3 rounded bg-green-500" /><span className="text-muted-foreground">Scheduled</span></div>
-          <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-emerald-500" /><span className="text-muted-foreground">Greenness</span></div>
+          <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-red-500" /><span className="text-muted-foreground">Carbon-Intensity</span></div>
           <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-blue-400" /><span className="text-muted-foreground">Outside-Load</span></div>
         </div>
 
@@ -174,7 +174,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                       time: interval.time.toISOString(),
                       totalLoad: interval.jobs.reduce((sum, j) => sum + j.load, 0),
                       rawJobs: interval.jobs,
-                      greeness: closestForecast ? closestForecast.greeness : null,
+                      carbon_intensity: closestForecast ? closestForecast.carbon_intensity : null,
                       load: closestForecast ? closestForecast.load : null
                     }
                   })
@@ -203,7 +203,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             tickLine={false}
                           />
                           <YAxis yAxisId="left" domain={[0, MAX_LOAD_VALUE]} hide={true} />
-                          <YAxis yAxisId="right" orientation="right" hide={true} domain={globalGreennessDomain} />
+                          <YAxis yAxisId="right" orientation="right" hide={true} domain={globalSCIDomain} />
                           <Tooltip
                             content={({ active, payload, label }) => {
                               if (active && payload && payload.length) {
@@ -211,7 +211,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                                 return (
                                   <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border z-50">
                                     <p className="font-medium border-b mb-1">{new Date(label).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    {data.greeness != null && <p className="text-emerald-500">Greenness: {data.greeness.toFixed(2)}</p>}
+                                    {data.carbon_intensity != null && <p className="text-red-500">Carbon-Intensity: {data.carbon_intensity.toFixed(2)}</p>}
                                     {data.load != null && <p className="text-blue-500">Load: {data.load.toFixed(2)}</p>}
                                     <p className="text-muted-foreground">Job Load: {data.totalLoad.toFixed(2)} kWh</p>
                                   </div>
@@ -221,7 +221,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             }}
                           />
                           <Area yAxisId="left" type="monotone" dataKey="totalLoad" stroke="#059669" fill={`url(#colorScheduled-${dc.id})`} isAnimationActive={false} />
-                          <Line yAxisId="right" type="monotone" dataKey="greeness" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+                          <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
                           <Line yAxisId="left" type="monotone" dataKey="load" stroke="#3b82f6" strokeWidth={1} dot={false} isAnimationActive={false} />
                           {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
                             <ReferenceLine key={k} yAxisId="left" x={d.time.toISOString()} stroke="#94a3b8" strokeDasharray="4 4" label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fontSize: 10 } : undefined} />

@@ -23,7 +23,7 @@ interface WorkloadInterval {
   time: string
   existing: number
   newJob: number
-  greeness?: number | null
+  carbon_intensity?: number | null
   load?: number | null
 }
 
@@ -93,15 +93,15 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const [fetchedOptData, setFetchedOptData] = useState<any>(null)
   const [fetchedUnoptData, setFetchedUnoptData] = useState<ScheduleData | null>(null)
 
-  const globalGreennessDomain = useMemo(() => {
+  const globalSCIDomain = useMemo(() => {
     if (!forecasts || forecasts.length === 0) return [0, 1]
     let min = Infinity
     let max = -Infinity
     forecasts.forEach(dc => {
       dc.timeseries?.forEach((point: any) => {
-        if (typeof point.greeness === "number") {
-          min = Math.min(min, point.greeness)
-          max = Math.max(max, point.greeness)
+        if (typeof point.carbon_intensity === "number") {
+          min = Math.min(min, point.carbon_intensity)
+          max = Math.max(max, point.carbon_intensity)
         }
       })
     })
@@ -244,7 +244,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
         return {
           ...interval,
-          greeness: closestForecast ? closestForecast.greeness : null,
+          carbon_intensity: closestForecast ? closestForecast.carbon_intensity : null,
           load: closestForecast ? closestForecast.load : null
         }
       })
@@ -390,8 +390,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               <span className="text-muted-foreground">{showTrivial ? "Unoptimised" : "Optimised"}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-1 w-4 rounded bg-emerald-500" />
-              <span className="text-muted-foreground">Greenness</span>
+              <div className="h-1 w-4 rounded bg-red-500" />
+              <span className="text-muted-foreground">Carbon-Intensity</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-1 w-4 rounded bg-blue-400" />
@@ -418,7 +418,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                   <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                   <XAxis dataKey="time" tickFormatter={(time) => formatTime(time)} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} minTickGap={30} axisLine={false} tickLine={false} />
                   <YAxis yAxisId="left" domain={[0, maxValue]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={30} />
-                  <YAxis yAxisId="right" orientation="right" hide={true} domain={globalGreennessDomain} />
+                  <YAxis yAxisId="right" orientation="right" hide={true} domain={globalSCIDomain} />
                   <Tooltip
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length) {
@@ -426,10 +426,10 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                         return (
                           <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border">
                             <p className="font-medium mb-1 border-b pb-1">{formatTime(label)}</p>
-                            {data?.greeness != null && <p className="text-emerald-500 font-semibold">Greenness: {Number(data.greeness).toFixed(2)}</p>}
+                            {data?.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
                             {data?.load != null && <p className="text-blue-500 font-semibold">Load: {Number(data.load).toFixed(2)}</p>}
                             {payload.map((entry, index) => {
-                              if (entry.value === 0 || entry.dataKey === "greeness" || entry.dataKey === "load") return null
+                              if (entry.value === 0 || entry.dataKey === "carbon_intensity" || entry.dataKey === "load") return null
                               return (
                                 <div key={index} className="flex justify-between gap-4">
                                   <span className="flex items-center gap-1.5">
@@ -448,7 +448,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                   />
                   <Area yAxisId="left" type="monotone" dataKey="existing" stackId="1" stroke="#9ca3af" fill="url(#colorExisting)" isAnimationActive={false} />
                   <Area yAxisId="left" type="monotone" dataKey="newJob" stackId="1" stroke={showTrivial ? "#ea580c" : "#059669"} fill="url(#colorNew)" isAnimationActive={false} />
-                  <Line yAxisId="right" type="monotone" dataKey="greeness" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
                   <Line yAxisId="left" type="monotone" dataKey="load" stroke="#3b82f6" strokeWidth={0.5} dot={false} isAnimationActive={false} />
                 </ComposedChart>
               </ResponsiveContainer>
