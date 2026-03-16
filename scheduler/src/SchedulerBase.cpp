@@ -36,7 +36,7 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
     const auto time_start = index_to_time(0);
     const auto time_end = index_to_time(n_intervals);
 
-    const auto &&[locations, existing_schedule] = co_await coro::when_all(
+    const auto [locations, existing_schedule] = co_await coro::when_all(
         stats_api.getAllDatacenters(), calendar::get(time_start, time_end));
     const auto n_locations = locations.size();
 

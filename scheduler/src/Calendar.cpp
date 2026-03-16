@@ -148,7 +148,7 @@ auto get(const string &scheduleIdString, const string &datacenter)
             combineCriteria(jobImpactIdEqualityCriteria(jobIdInt),
                             specificDatacenterCriteria(datacenter));
 
-        auto &&[impactModel, jobsModels] = co_await scheduler::coro::when_all(
+        auto [impactModel, jobsModels] = co_await scheduler::coro::when_all(
             to_task<mappers::ImpactModel>(
                 context.impactMapper.findByPrimaryKey(jobIdInt)),
             to_task<vector<mappers::JobModel>>(
