@@ -1,26 +1,31 @@
 import logging
 import os
+from pathlib import Path
 
-DB_FILE = 'cache.db'
-LOG_FILE = os.environ.get('STATS_LOG_FILE', 'app.log')
+# Paths
+BASE_DIR = Path(__file__).parent
+DB_FILE = BASE_DIR / 'cache.db'
+CARBON_DB_FILE = BASE_DIR / os.environ.get('CARBON_DB_PATH', 'carbon_intensity.db')
 
-# Logging setup — writes to both stdout and a persistent log file
-_log_fmt = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-logging.basicConfig(
-    level=logging.INFO,
-    format=_log_fmt,
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(LOG_FILE),
-    ],
-)
-logger = logging.getLogger('stats.app')
+# Mappings
+UK_REGION_TO_DC = {
+    13: 'Data-Center-1',
+    14: 'Data-Center-2',
+    5: 'Data-Center-3',
+    3: 'Data-Center-4',
+    4: 'Data-Center-5',
+}
+DATA_CENTRES = list(UK_REGION_TO_DC.values())
 
-# Threshold: log a CRITICAL alert after this many consecutive failures in a loop
-_FAILURE_ALERT_THRESHOLD = int(os.environ.get('FAILURE_ALERT_THRESHOLD', 5))
-
-# Configuration for Oracle/server deployment
+# Settings
 HOST = os.environ.get('STATS_HOST', '127.0.0.1')
 PORT = int(os.environ.get('STATS_PORT', 5000))
-CARBON_SYNC_INTERVAL = int(os.environ.get('CARBON_SYNC_INTERVAL', 1800))  # 30 min
+CARBON_SYNC_INTERVAL = int(os.environ.get('CARBON_SYNC_INTERVAL', 1800))
 CARBON_COLLECTION_ENABLED = os.environ.get('CARBON_COLLECTION_ENABLED', '1') == '1'
+FAILURE_THRESHOLD = int(os.environ.get('FAILURE_ALERT_THRESHOLD', 5))
+
+# Logging
+logging.basicConfig(
+    level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+)
+logger = logging.getLogger('stats.app')
