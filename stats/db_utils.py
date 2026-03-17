@@ -13,13 +13,131 @@ CARBON_DB_FILE = Path(
     os.environ.get('CARBON_DB_PATH', Path(__file__).parent / 'carbon_intensity.db')
 )
 
-# Map UK regions to Data Center locations
+# Canonical set of datacenters seeded into cache.db.
+# Keep Data-Center-1..5 mappings stable for scheduler compatibility.
+# Coordinates added for weather API integration (Open-Meteo).
+DEFAULT_DATACENTERS = [
+    {
+        "region_id": 13,
+        "location_id": "Data-Center-1",
+        "name": "London",
+        "latitude": 51.51,
+        "longitude": -0.13,
+        "default_active": True,
+    },
+    {
+        "region_id": 1,
+        "location_id": "Data-Center-2",
+        "name": "North Scotland",
+        "latitude": 57.47,
+        "longitude": -4.04,
+        "default_active": True,
+    },
+    {
+        "region_id": 2,
+        "location_id": "Data-Center-3",
+        "name": "South Scotland",
+        "latitude": 55.31,
+        "longitude": -3.54,
+        "default_active": True,
+    },
+    {
+        "region_id": 3,
+        "location_id": "Data-Center-4",
+        "name": "North West England",
+        "latitude": 54.05,
+        "longitude": -2.80,
+        "default_active": True,
+    },
+    {
+        "region_id": 4,
+        "location_id": "Data-Center-5",
+        "name": "North East England",
+        "latitude": 54.97,
+        "longitude": -1.61,
+        "default_active": True,
+    },
+    {
+        "region_id": 5,
+        "location_id": "Data-Center-6",
+        "name": "South Yorkshire",
+        "latitude": 53.79,
+        "longitude": -1.54,
+        "default_active": False,
+    },
+    {
+        "region_id": 6,
+        "location_id": "Data-Center-7",
+        "name": "North Wales, Merseyside and Cheshire",
+        "latitude": 52.95,
+        "longitude": -3.61,
+        "default_active": False,
+    },
+    {
+        "region_id": 7,
+        "location_id": "Data-Center-8",
+        "name": "South Wales",
+        "latitude": 51.82,
+        "longitude": -3.59,
+        "default_active": False,
+    },
+    {
+        "region_id": 8,
+        "location_id": "Data-Center-9",
+        "name": "West Midlands",
+        "latitude": 52.51,
+        "longitude": -2.01,
+        "default_active": False,
+    },
+    {
+        "region_id": 9,
+        "location_id": "Data-Center-10",
+        "name": "East Midlands",
+        "latitude": 52.95,
+        "longitude": -1.13,
+        "default_active": False,
+    },
+    {
+        "region_id": 10,
+        "location_id": "Data-Center-11",
+        "name": "East England",
+        "latitude": 52.61,
+        "longitude": 1.28,
+        "default_active": False,
+    },
+    {
+        "region_id": 11,
+        "location_id": "Data-Center-12",
+        "name": "South West England",
+        "latitude": 50.71,
+        "longitude": -3.53,
+        "default_active": False,
+    },
+    {
+        "region_id": 12,
+        "location_id": "Data-Center-13",
+        "name": "South England",
+        "latitude": 50.93,
+        "longitude": -1.44,
+        "default_active": False,
+    },
+    {
+        "region_id": 14,
+        "location_id": "Data-Center-14",
+        "name": "South East England",
+        "latitude": 51.27,
+        "longitude": 0.52,
+        "default_active": False,
+    },
+]
+
+# Map UK regions to Data Center locations for carbon sync.
 UK_REGION_TO_DC = {
-    13: 'Data-Center-1',  # London
-    14: 'Data-Center-2',  # South East England
-    5: 'Data-Center-3',  # South Yorkshire
-    3: 'Data-Center-4',  # North West England
-    4: 'Data-Center-5',  # North East England
+    row["region_id"]: row["location_id"] for row in DEFAULT_DATACENTERS
+}
+
+DATACENTER_METADATA_BY_ID = {
+    row["location_id"]: row for row in DEFAULT_DATACENTERS
 }
 
 
@@ -69,6 +187,138 @@ def initialize_db():
             CREATE INDEX IF NOT EXISTS idx_historical_timestamp 
             ON historical_data(timestamp)
         """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS datacenters (
+                location_id TEXT PRIMARY KEY,
+                region_id INTEGER NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            )
+        """)
+
+        now = time.time()
+        conn.executemany(
+            """
+            INSERT OR IGNORE INTO datacenters
+                (location_id, region_id, name, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    dc["location_id"],
+                    dc["region_id"],
+                    dc["name"],
+                    int(dc["default_active"]),
+                    now,
+                    now,
+                )
+                for dc in DEFAULT_DATACENTERS
+            ],
+        )
+
+        # Keep region/name metadata fresh while preserving active user choices.
+        conn.executemany(
+            """
+            UPDATE datacenters
+            SET region_id = ?, name = ?, updated_at = ?
+            WHERE location_id = ?
+            """,
+            [
+                (dc["region_id"], dc["name"], now, dc["location_id"])
+                for dc in DEFAULT_DATACENTERS
+            ],
+        )
+
+
+def _datacenter_row_to_dict(row: tuple) -> Dict:
+    metadata = DATACENTER_METADATA_BY_ID.get(row[0], {})
+    return {
+        "id": row[0],
+        "region_id": row[1],
+        "name": row[2],
+        "active": bool(row[3]),
+        "latitude": metadata.get("latitude"),
+        "longitude": metadata.get("longitude"),
+    }
+
+
+def get_datacenters(include_inactive: bool = True) -> List[Dict]:
+    """Get datacenter configuration entries."""
+    try:
+        with get_connection() as conn:
+            if include_inactive:
+                cursor = conn.execute(
+                    """
+                    SELECT location_id, region_id, name, is_active
+                    FROM datacenters
+                    ORDER BY region_id ASC
+                    """
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT location_id, region_id, name, is_active
+                    FROM datacenters
+                    WHERE is_active = 1
+                    ORDER BY region_id ASC
+                    """
+                )
+            return [_datacenter_row_to_dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        print(f'Error retrieving datacenters: {e}')
+        return []
+
+
+def get_datacenter(location_id: str) -> Optional[Dict]:
+    """Get one datacenter configuration entry by location ID."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT location_id, region_id, name, is_active
+                FROM datacenters
+                WHERE location_id = ?
+                """,
+                (location_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return _datacenter_row_to_dict(row)
+    except sqlite3.Error as e:
+        print(f'Error retrieving datacenter {location_id}: {e}')
+        return None
+
+
+def set_datacenter_active(location_id: str, active: bool) -> bool:
+    """Set active state for a datacenter. Returns False if location is missing."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE datacenters
+                SET is_active = ?, updated_at = ?
+                WHERE location_id = ?
+                """,
+                (int(active), time.time(), location_id),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        print(f'Error updating datacenter active flag for {location_id}: {e}')
+        return False
+
+
+def get_all_datacenter_ids(include_inactive: bool = True) -> List[str]:
+    """Get datacenter IDs ordered by region ID."""
+    return [dc['id'] for dc in get_datacenters(include_inactive=include_inactive)]
+
+
+def get_active_datacenter_ids() -> List[str]:
+    """Get IDs for active datacenters only."""
+    return get_all_datacenter_ids(include_inactive=False)
 
 
 def get_cached_prediction(key: str) -> Optional[dict]:

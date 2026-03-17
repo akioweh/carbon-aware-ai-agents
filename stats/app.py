@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import db_utils
-from generate_history import DATA_CENTRES, generate_history
+from generate_history import generate_history
 from predictor import (
     generate_next_week_carbon_intensity_prediction,
     generate_next_week_load_prediction,
@@ -54,6 +54,24 @@ class Location(BaseModel):
     name: str = Field(..., description='Human-readable name')
 
 
+class Datacenter(BaseModel):
+    id: str = Field(..., description='Location identifier')
+    region_id: int = Field(..., description='UK Carbon Intensity API region ID')
+    name: str = Field(..., description='Human-readable region/location name')
+    active: bool = Field(..., description='Whether scheduler-visible location is enabled')
+    latitude: float | None = Field(None, description='Latitude used for weather and map display')
+    longitude: float | None = Field(None, description='Longitude used for weather and map display')
+
+
+class DatacenterPatchRequest(BaseModel):
+    active: bool = Field(..., description='New active state for this datacenter')
+
+
+class Capacity(BaseModel):
+    max_load: float = Field(..., description='Maximum load capacity')
+    total_gpus: int = Field(..., description='Total number of GPUs')
+
+
 class BaseForecastDataPoint(BaseModel):
     timestamp: str = Field(..., description='ISO format timestamp')
     value: float = Field(..., description='Forecasted value')
@@ -86,10 +104,22 @@ class ErrorResponse(BaseModel):
 
 def prediction_loop():
     """Background loop to update predictions every 5 minutes."""
-    consecutive_failures: dict[str, int] = {dc: 0 for dc in DATA_CENTRES}
+    consecutive_failures: dict[str, int] = {}
     while True:
         logger.info('Updating predictions cache...')
-        for dc in DATA_CENTRES:
+
+        active_datacenters = db_utils.get_active_datacenter_ids()
+        if not active_datacenters:
+            logger.warning('No active datacenters configured; skipping prediction refresh')
+            time.sleep(300)
+            continue
+
+        for dc in list(consecutive_failures):
+            if dc not in active_datacenters:
+                del consecutive_failures[dc]
+
+        for dc in active_datacenters:
+            consecutive_failures.setdefault(dc, 0)
             try:
                 # Update Load Predictions
                 load_data = generate_next_week_load_prediction(dc)
@@ -340,8 +370,66 @@ def get_carbon_forecast(location: str):
     },
 )
 def get_locations() -> list[Location]:
-    """Returns a list of available locations."""
-    return [Location(id=dc, name=dc.replace('-', ' ')) for dc in DATA_CENTRES]
+    """Returns active locations for scheduler consumption."""
+    datacenters = db_utils.get_datacenters(include_inactive=False)
+    return [Location(id=dc['id'], name=dc['name']) for dc in datacenters]
+
+
+@app.get(
+    '/datacenters',
+    response_model=list[Datacenter],
+    tags=['Datacenters'],
+    summary='Get all datacenters and active state',
+)
+def get_datacenters() -> list[Datacenter]:
+    """Returns all known datacenters and active state for UI management."""
+    datacenters = db_utils.get_datacenters(include_inactive=True)
+    return [
+        Datacenter(
+            id=dc['id'],
+            region_id=dc['region_id'],
+            name=dc['name'],
+            active=dc['active'],
+            latitude=dc.get('latitude'),
+            longitude=dc.get('longitude'),
+        )
+        for dc in datacenters
+    ]
+
+
+@app.patch(
+    '/datacenters/{location_id}',
+    response_model=Datacenter,
+    tags=['Datacenters'],
+    summary='Update datacenter active state',
+    responses={
+        404: {'model': ErrorResponse, 'description': 'Datacenter not found'},
+    },
+)
+def patch_datacenter(location_id: str, payload: DatacenterPatchRequest):
+    """Updates whether a datacenter is active for scheduler-visible locations."""
+    updated = db_utils.set_datacenter_active(location_id, payload.active)
+    if not updated:
+        return JSONResponse(
+            status_code=404,
+            content={'error': f'Datacenter not found: {location_id}'},
+        )
+
+    datacenter = db_utils.get_datacenter(location_id)
+    if not datacenter:
+        return JSONResponse(
+            status_code=500,
+            content={'error': f'Failed to load updated datacenter: {location_id}'},
+        )
+
+    return Datacenter(
+        id=datacenter['id'],
+        region_id=datacenter['region_id'],
+        name=datacenter['name'],
+        active=datacenter['active'],
+        latitude=datacenter.get('latitude'),
+        longitude=datacenter.get('longitude'),
+    )
 
 
 if __name__ == '__main__':
