@@ -44,6 +44,7 @@ WEATHER_FEATURES = ['wind_speed', 'temperature', 'solar_radiation']
 
 # ── Weather helpers ──────────────────────────────────────────────────────
 
+
 def _fetch_weather_archive(lat, lon, start_date, end_date):
     """Fetch historical weather from Open-Meteo archive API.
 
@@ -51,10 +52,10 @@ def _fetch_weather_archive(lat, lon, start_date, end_date):
     temperature, solar_radiation.  Returns empty DataFrame on failure.
     """
     url = (
-        f"https://archive-api.open-meteo.com/v1/archive"
-        f"?latitude={lat}&longitude={lon}"
-        f"&start_date={start_date}&end_date={end_date}"
-        f"&hourly=temperature_2m,wind_speed_10m,shortwave_radiation"
+        f'https://archive-api.open-meteo.com/v1/archive'
+        f'?latitude={lat}&longitude={lon}'
+        f'&start_date={start_date}&end_date={end_date}'
+        f'&hourly=temperature_2m,wind_speed_10m,shortwave_radiation'
     )
     try:
         resp = requests.get(url, timeout=30)
@@ -65,16 +66,20 @@ def _fetch_weather_archive(lat, lon, start_date, end_date):
         if not times:
             return pd.DataFrame()
 
-        hdf = pd.DataFrame({
-            'ts': pd.to_datetime(times, utc=True),
-            'temperature': hourly.get('temperature_2m', []),
-            'wind_speed': hourly.get('wind_speed_10m', []),
-            'solar_radiation': hourly.get('shortwave_radiation', []),
-        })
+        hdf = pd.DataFrame(
+            {
+                'ts': pd.to_datetime(times, utc=True),
+                'temperature': hourly.get('temperature_2m', []),
+                'wind_speed': hourly.get('wind_speed_10m', []),
+                'solar_radiation': hourly.get('shortwave_radiation', []),
+            }
+        )
         hdf = hdf.set_index('ts').sort_index()
 
         # Interpolate to 30-min
-        full_idx = pd.date_range(hdf.index.min(), hdf.index.max(), freq='30min', tz='UTC')
+        full_idx = pd.date_range(
+            hdf.index.min(), hdf.index.max(), freq='30min', tz='UTC'
+        )
         hdf = hdf.reindex(full_idx).interpolate(method='time').reset_index()
         hdf.columns = ['ts'] + WEATHER_FEATURES
         return hdf
@@ -90,10 +95,10 @@ def _fetch_weather_forecast(lat, lon):
     temperature, solar_radiation.  Returns empty DataFrame on failure.
     """
     url = (
-        f"https://api.open-meteo.com/v1/forecast"
-        f"?latitude={lat}&longitude={lon}"
-        f"&hourly=temperature_2m,wind_speed_10m,shortwave_radiation"
-        f"&forecast_days=8"
+        f'https://api.open-meteo.com/v1/forecast'
+        f'?latitude={lat}&longitude={lon}'
+        f'&hourly=temperature_2m,wind_speed_10m,shortwave_radiation'
+        f'&forecast_days=8'
     )
     try:
         resp = requests.get(url, timeout=30)
@@ -104,16 +109,20 @@ def _fetch_weather_forecast(lat, lon):
         if not times:
             return pd.DataFrame()
 
-        hdf = pd.DataFrame({
-            'ts': pd.to_datetime(times, utc=True),
-            'temperature': hourly.get('temperature_2m', []),
-            'wind_speed': hourly.get('wind_speed_10m', []),
-            'solar_radiation': hourly.get('shortwave_radiation', []),
-        })
+        hdf = pd.DataFrame(
+            {
+                'ts': pd.to_datetime(times, utc=True),
+                'temperature': hourly.get('temperature_2m', []),
+                'wind_speed': hourly.get('wind_speed_10m', []),
+                'solar_radiation': hourly.get('shortwave_radiation', []),
+            }
+        )
         hdf = hdf.set_index('ts').sort_index()
 
         # Interpolate to 30-min
-        full_idx = pd.date_range(hdf.index.min(), hdf.index.max(), freq='30min', tz='UTC')
+        full_idx = pd.date_range(
+            hdf.index.min(), hdf.index.max(), freq='30min', tz='UTC'
+        )
         hdf = hdf.reindex(full_idx).interpolate(method='time').reset_index()
         hdf.columns = ['ts'] + WEATHER_FEATURES
         return hdf
@@ -124,24 +133,28 @@ def _fetch_weather_forecast(lat, lon):
 
 # ── Feature engineering ──────────────────────────────────────────────────
 
+
 def build_cyclical_features(timestamps):
     """Build sin/cos features for hour, day-of-week, and minute-of-day."""
     ts = pd.Series(timestamps) if not isinstance(timestamps, pd.Series) else timestamps
     hour = ts.dt.hour + ts.dt.minute / 60.0
     dow = ts.dt.dayofweek
     minute_of_day = ts.dt.hour * 60 + ts.dt.minute
-    return pd.DataFrame({
-        'hour_sin': np.sin(2 * np.pi * hour / 24),
-        'hour_cos': np.cos(2 * np.pi * hour / 24),
-        'dow_sin':  np.sin(2 * np.pi * dow / 7),
-        'dow_cos':  np.cos(2 * np.pi * dow / 7),
-        'min_sin':  np.sin(2 * np.pi * minute_of_day / 1440),
-        'min_cos':  np.cos(2 * np.pi * minute_of_day / 1440),
-    })
+    return pd.DataFrame(
+        {
+            'hour_sin': np.sin(2 * np.pi * hour / 24),
+            'hour_cos': np.cos(2 * np.pi * hour / 24),
+            'dow_sin': np.sin(2 * np.pi * dow / 7),
+            'dow_cos': np.cos(2 * np.pi * dow / 7),
+            'min_sin': np.sin(2 * np.pi * minute_of_day / 1440),
+            'min_cos': np.cos(2 * np.pi * minute_of_day / 1440),
+        }
+    )
 
 
-def _build_direct_features(train_ts, train_y, train_origin_ts, test_ts,
-                            train_exog=None, test_exog=None):
+def _build_direct_features(
+    train_ts, train_y, train_origin_ts, test_ts, train_exog=None, test_exog=None
+):
     """Build feature matrices for direct multi-step forecasting.
 
     Unlike the benchmark version which uses array indices for horizon h,
@@ -176,7 +189,7 @@ def _build_direct_features(train_ts, train_y, train_origin_ts, test_ts,
     origin_mean = np.zeros(n_train)
     origin_std = np.zeros(n_train)
     for t in range(min_history, n_train):
-        recent = train_y[max(0, t - 47):t + 1]
+        recent = train_y[max(0, t - 47) : t + 1]
         origin_last[t] = train_y[t]
         origin_mean[t] = np.mean(recent)
         origin_std[t] = np.std(recent) if len(recent) > 1 else 0
@@ -190,8 +203,10 @@ def _build_direct_features(train_ts, train_y, train_origin_ts, test_ts,
         targets = origins + h
         cyc = all_cyc[targets]
         h_col = np.full((len(origins), 1), h / 336.0)
-        h2_col = h_col ** 2
-        of = np.column_stack([origin_last[origins], origin_mean[origins], origin_std[origins]])
+        h2_col = h_col**2
+        of = np.column_stack(
+            [origin_last[origins], origin_mean[origins], origin_std[origins]]
+        )
         x = np.column_stack([cyc, h_col, h2_col, of])
         if has_exog:
             x = np.column_stack([x, train_exog[targets]])
@@ -209,9 +224,11 @@ def _build_direct_features(train_ts, train_y, train_origin_ts, test_ts,
 
     # Compute horizon from actual time deltas (30-min steps)
     test_ts_series = pd.Series(test_ts)
-    h_vals = ((test_ts_series - train_origin_ts).dt.total_seconds() / 1800.0).values.reshape(-1, 1) / 336.0
+    h_vals = (
+        (test_ts_series - train_origin_ts).dt.total_seconds() / 1800.0
+    ).values.reshape(-1, 1) / 336.0
 
-    X_test = np.column_stack([test_cyc, h_vals, h_vals ** 2, of_test])
+    X_test = np.column_stack([test_cyc, h_vals, h_vals**2, of_test])
     if has_exog:
         X_test = np.column_stack([X_test, test_exog])
 
@@ -220,7 +237,8 @@ def _build_direct_features(train_ts, train_y, train_origin_ts, test_ts,
 
 # ── Core prediction pipeline ────────────────────────────────────────────
 
-def _predict_carbon_intensity(historical_df, dc_name=None):
+
+def _predict_carbon_intensity(historical_df, dc_name=None, now=None):
     """Run the Direct Ridge pipeline on historical carbon intensity data.
 
     Parameters
@@ -229,6 +247,8 @@ def _predict_carbon_intensity(historical_df, dc_name=None):
         Must have 'timestamp' and 'carbon_intensity' columns.
     dc_name : str or None
         Data center name for fetching region-specific weather.
+    now : Timestamp or None
+        Optional start timestamp for the forecast.
 
     Returns
     -------
@@ -240,22 +260,39 @@ def _predict_carbon_intensity(historical_df, dc_name=None):
 
     # Use actual discrete observations — no gap interpolation
     series = df[['timestamp', 'carbon_intensity']].dropna(subset=['carbon_intensity'])
-    series = series.drop_duplicates(subset='timestamp').sort_values('timestamp').reset_index(drop=True)
+    series = (
+        series.drop_duplicates(subset='timestamp')
+        .sort_values('timestamp')
+        .reset_index(drop=True)
+    )
 
     if len(series) < 96:  # need at least ~2 days of 30-min data
-        raise ValueError('Not enough carbon intensity data for Direct Ridge (need >= 96 points)')
+        raise ValueError(
+            f'Not enough carbon intensity data for Direct Ridge (need >= 96 points, got {len(series)})'
+        )
 
     train_ts = series['timestamp'].values
     train_y = series['carbon_intensity'].values.astype(float)
     origin_ts = series['timestamp'].iloc[-1]
 
+    # Use passed 'now' or fallback to origin_ts
+    if now is None:
+        start_ts = origin_ts
+    else:
+        # ensure 'now' is UTC if origin_ts is UTC
+        start_ts = pd.to_datetime(now, utc=True)
+
     # Generate 337 forecast timestamps at 30-min intervals
     n_forecast = 337
+    # Round start_ts to 5 min marks to align with resample later
+    start_ts_rounded = start_ts.ceil('5min')
     forecast_30min = pd.date_range(
-        start=origin_ts + pd.Timedelta(minutes=30),
+        start=start_ts_rounded + pd.Timedelta(minutes=30),
         periods=n_forecast,
         freq='30min',
     )
+    # Include the start point to help alignment and interpolation
+    forecast_30min = forecast_30min.insert(0, start_ts_rounded)
 
     # Fetch weather data (graceful fallback if unavailable)
     train_exog = None
@@ -277,7 +314,9 @@ def _predict_carbon_intensity(historical_df, dc_name=None):
             train_df = series.copy()
             train_df['ts'] = train_df['timestamp'].dt.round('30min')
             archive_wx['ts'] = archive_wx['ts'].dt.round('30min')
-            merged = train_df.merge(archive_wx[['ts'] + WEATHER_FEATURES], on='ts', how='left')
+            merged = train_df.merge(
+                archive_wx[['ts'] + WEATHER_FEATURES], on='ts', how='left'
+            )
             for feat in WEATHER_FEATURES:
                 merged[feat] = merged[feat].fillna(0)
 
@@ -291,7 +330,9 @@ def _predict_carbon_intensity(historical_df, dc_name=None):
             test_df = pd.DataFrame({'ts': forecast_30min})
             test_df['ts'] = test_df['ts'].dt.round('30min')
             forecast_wx['ts'] = forecast_wx['ts'].dt.round('30min')
-            test_merged = test_df.merge(forecast_wx[['ts'] + WEATHER_FEATURES], on='ts', how='left')
+            test_merged = test_df.merge(
+                forecast_wx[['ts'] + WEATHER_FEATURES], on='ts', how='left'
+            )
             for feat in WEATHER_FEATURES:
                 test_merged[feat] = test_merged[feat].fillna(0)
 
@@ -300,18 +341,27 @@ def _predict_carbon_intensity(historical_df, dc_name=None):
             test_wx = test_merged[WEATHER_FEATURES].values
             test_exog = np.vstack([last_train_wx.reshape(1, -1), test_wx[:-1]])
 
-            logger.info('Using weather exogenous features (%d train, %d test)',
-                        len(train_exog), len(test_exog))
+            logger.info(
+                'Using weather exogenous features (%d train, %d test)',
+                len(train_exog),
+                len(test_exog),
+            )
         else:
-            logger.info('Weather data unavailable, predicting without exogenous features')
+            logger.info(
+                'Weather data unavailable, predicting without exogenous features'
+            )
 
     # Build features and train
     train_ts_pd = pd.to_datetime(train_ts)
     test_ts_pd = pd.to_datetime(forecast_30min)
 
     X_train, y_train, X_test = _build_direct_features(
-        train_ts_pd, train_y, origin_ts, test_ts_pd,
-        train_exog=train_exog, test_exog=test_exog,
+        train_ts_pd,
+        train_y,
+        origin_ts,
+        test_ts_pd,
+        train_exog=train_exog,
+        test_exog=test_exog,
     )
 
     model = Ridge(alpha=1.0)
@@ -321,7 +371,7 @@ def _predict_carbon_intensity(historical_df, dc_name=None):
 
     # Upsample 30-min → 5-min via linear interpolation
     fc_series = pd.Series(preds, index=forecast_30min)
-    fc_5min = fc_series.resample('5min').interpolate(method='linear')
+    fc_5min = fc_series.resample('5min').interpolate(method='linear').bfill()
     fc_5min = fc_5min.iloc[:2016]  # exactly 7 days at 5-min
 
     yhat = np.clip(fc_5min.values, 0, 500)
@@ -329,6 +379,7 @@ def _predict_carbon_intensity(historical_df, dc_name=None):
 
 
 # ── Public API (same signatures as predictor_sarimax.py) ────────────────
+
 
 def get_next_week_greenness(historical_greenness_df):
     """Predict next-week greenness using Direct Ridge on carbon intensity.
@@ -352,17 +403,18 @@ def get_next_week_greenness(historical_greenness_df):
     return pd.DataFrame({'ds': ci_df['ds'], 'yhat': greenness, 'ci': ci})
 
 
-def get_next_week_carbon_intensity(historical_df):
+def get_next_week_carbon_intensity(historical_df, now=None):
     """Predict next-week carbon intensity (gCO2/kWh) using Direct Ridge.
 
     Args:
         historical_df: DataFrame with columns 'timestamp' and 'carbon_intensity'.
+        now: Optional start timestamp for the forecast.
 
     Returns:
         DataFrame with columns 'ds' (datetime) and 'yhat' (gCO2/kWh, 0-500).
     """
     dc_name = _infer_dc_name(historical_df)
-    return _predict_carbon_intensity(historical_df, dc_name=dc_name)
+    return _predict_carbon_intensity(historical_df, dc_name=dc_name, now=now)
 
 
 def _infer_dc_name(df):

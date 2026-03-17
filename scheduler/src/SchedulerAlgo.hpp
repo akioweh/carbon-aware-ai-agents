@@ -79,17 +79,13 @@ using ChoiceVector = std::vector<std::array<MemoEntryVector, 2>>;
 using SingleResult = std::pair<CostVector, ChoiceVector>;
 
 struct LocationCost {
-    std::vector<double> &capacities;
-    std::vector<double> &sci_scores;
+    std::vector<double> &carbon_intensity;
+    double kwh_per_flo;
 
     auto operator[](size_t i) const {
-        const auto sci = sci_scores.at(i);
-        const auto c = capacities.at(i);
-        return [sci, c](double load) -> double {
-            // cost increases with load and sci.
-            // TODO: not sure if a zero sci might break dp??
-            // TODO: make this sensible (percentage of capacity is NOT sensible)
-            return (load / c) * sci;
+        const auto ci = carbon_intensity.at(i);
+        return [ci, efficiency = kwh_per_flo](double load) -> double {
+            return load * efficiency * ci;
         };
     }
 };

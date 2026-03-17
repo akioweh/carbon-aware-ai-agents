@@ -62,7 +62,7 @@ def generate_load(timestamp, dc_index):
     # DC specific variance
     value += (dc_index % 3) * 2  # Slight offset per DC
 
-    return max(0, min(MAX_CAPACITY, value))
+    return max(0, min(MAX_CAPACITY, value)) * 1e12
 
 
 def generate_history():
@@ -82,14 +82,16 @@ def generate_history():
                     'location': dc,
                     'timestamp': current,
                     'load': generate_load(current, i),
-                    'greenness': None,
+                    'carbon_intensity': 250.0, # Placeholder value, can be made dynamic if needed
                 }
             )
         current += timedelta(minutes=5)
 
     # Insert all data into database
     db_utils.insert_historical_data_bulk(bulk_data)
-    print(f'Generated and inserted {len(bulk_data)} historical data points into database.')
+    print(
+        f'Generated and inserted {len(bulk_data)} historical data points into database.'
+    )
 
 
 if __name__ == '__main__':

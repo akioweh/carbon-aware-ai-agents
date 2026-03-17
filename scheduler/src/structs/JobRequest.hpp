@@ -13,9 +13,11 @@
 namespace scheduler {
 
 /**
-This is not actually used, but it represents what request as a json is submited
-to the endpoint. We then transform it to our format.
-*/
+ * This is not actually used, but it represents what request as a json is
+ * submitted to the endpoint. We then transform it to our format.
+ *
+ * NOTE: i think this is useful for saving user job input to redisplay in UI?
+ */
 struct RawJobRequest {
     using time_t = std::chrono::sys_time<std::chrono::minutes>;
 
@@ -31,18 +33,21 @@ struct RawJobRequest {
 
 /**
  * @class JobRequest
- * @brief Scheduler input parameters as per API definition.
+ * @brief Scheduler input parameters.
  */
 struct JobRequest {
     using time_t = std::chrono::sys_time<std::chrono::minutes>;
 
+    // TODO: make job_type do something or remove it.
     std::string job_type;
-    double workload_amount;
+    double workload_amount; // FLO (floating point operations)
     time_t earliest_start;
     time_t latest_finish;
-    double startup_overhead;
-    double max_load;
+    // TODO: this is actually hardware-specific (so should depend on DC)
+    double startup_overhead; // same unit as workload_amount
+    double max_load;         // parallelization limit: max FLO-per-5-minutes
     std::optional<std::string> preferred_datacenter;
+    // API: ignore the additional_constraints field (for forwards compatibility)
 };
 } // namespace scheduler
 

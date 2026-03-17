@@ -42,57 +42,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-  /locations/{location}/metrics/forecast_greenness:
-    get:
-      tags:
-      - Forecasts
-      summary: Get greenness forecast for next week
-      description: 'Returns ML-generated greenness predictions for the next week.
-
-        Results are cached for 5 minutes.'
-      operationId: get_carbon_forecast_locations__location__metrics_forecast_greenness_get
-      parameters:
-      - name: location
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Location
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GreennessForecastResponse'
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Internal Server Error
-        '404':
-          description: Location not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /locations/{location}/metrics/forecast_carbon_intensity:
     get:
       tags:
       - Forecasts
       summary: Get carbon intensity forecast for next week
-      description: 'Returns Direct Ridge carbon intensity predictions (gCO2/kWh) for
-        the next week.
+      description: 'Returns ML-generated carbon intensity predictions for the next
+        week.
 
         Results are cached for 5 minutes.'
-      operationId: get_carbon_intensity_forecast_locations__location__metrics_forecast_carbon_intensity_get
+      operationId: get_carbon_forecast_locations__location__metrics_forecast_carbon_intensity_get
       parameters:
       - name: location
         in: path
@@ -114,7 +73,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Internal Server Error
         '404':
-          description: Location not found or no carbon intensity data
+          description: Location not found
           content:
             application/json:
               schema:
@@ -148,13 +107,8 @@ paths:
               parameters:
                 location: $response.body#/0/id
               description: Get load forecast for a location from the list
-            GetGreennessForecast:
-              operationId: get_carbon_forecast_locations__location__metrics_forecast_greenness_get
-              parameters:
-                location: $response.body#/0/id
-              description: Get greenness forecast for a location from the list
             GetCarbonIntensityForecast:
-              operationId: get_carbon_intensity_forecast_locations__location__metrics_forecast_carbon_intensity_get
+              operationId: get_carbon_forecast_locations__location__metrics_forecast_carbon_intensity_get
               parameters:
                 location: $response.body#/0/id
               description: Get carbon intensity forecast for a location from the list
@@ -236,21 +190,6 @@ components:
       - value
       - is_forecast
       title: BaseForecastDataPoint
-    Capacity:
-      properties:
-        max_load:
-          type: number
-          title: Max Load
-          description: Maximum load capacity
-        total_gpus:
-          type: integer
-          title: Total Gpus
-          description: Total number of GPUs
-      type: object
-      required:
-      - max_load
-      - total_gpus
-      title: Capacity
     CarbonIntensityForecastResponse:
       properties:
         location_id:
@@ -260,7 +199,7 @@ components:
         metric:
           type: string
           title: Metric
-          description: Metric name (e.g. forecast_load, forecast_greenness)
+          description: Metric name (e.g. forecast_load, forecast_carbon_intensity)
         unit:
           type: string
           title: Unit
@@ -334,59 +273,6 @@ components:
       required:
       - error
       title: ErrorResponse
-    GreennessForecastDataPoint:
-      properties:
-        timestamp:
-          type: string
-          title: Timestamp
-          description: ISO format timestamp
-        value:
-          type: number
-          title: Value
-          description: Forecasted value
-        is_forecast:
-          type: boolean
-          title: Is Forecast
-          description: Indicates if this is a forecast
-        carbon_intensity:
-          anyOf:
-          - type: number
-          - type: 'null'
-          title: Carbon Intensity
-          description: Estimated carbon intensity (gCO2/kWh)
-      type: object
-      required:
-      - timestamp
-      - value
-      - is_forecast
-      title: GreennessForecastDataPoint
-    GreennessForecastResponse:
-      properties:
-        location_id:
-          type: string
-          title: Location Id
-          description: Datacenter identifier
-        metric:
-          type: string
-          title: Metric
-          description: Metric name (e.g. forecast_load, forecast_greenness)
-        unit:
-          type: string
-          title: Unit
-          description: Unit of measurement
-        data:
-          items:
-            $ref: '#/components/schemas/GreennessForecastDataPoint'
-          type: array
-          title: Data
-          description: Time series data
-      type: object
-      required:
-      - location_id
-      - metric
-      - unit
-      - data
-      title: GreennessForecastResponse
     HTTPValidationError:
       properties:
         detail:
@@ -410,16 +296,16 @@ components:
           type: boolean
           title: Is Forecast
           description: Indicates if this is a forecast
-        available_gpus:
-          type: integer
-          title: Available Gpus
-          description: Number of available GPUs
+        capacity:
+          type: number
+          title: Capacity
+          description: Capacity in FLOs
       type: object
       required:
       - timestamp
       - value
       - is_forecast
-      - available_gpus
+      - capacity
       title: LoadForecastDataPoint
     LoadForecastResponse:
       properties:
@@ -430,14 +316,11 @@ components:
         metric:
           type: string
           title: Metric
-          description: Metric name (e.g. forecast_load, forecast_greenness)
+          description: Metric name (e.g. forecast_load, forecast_carbon_intensity)
         unit:
           type: string
           title: Unit
           description: Unit of measurement
-        capacity:
-          $ref: '#/components/schemas/Capacity'
-          description: Capacity information
         data:
           items:
             $ref: '#/components/schemas/LoadForecastDataPoint'
@@ -449,7 +332,6 @@ components:
       - location_id
       - metric
       - unit
-      - capacity
       - data
       title: LoadForecastResponse
     Location:

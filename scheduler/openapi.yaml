@@ -152,8 +152,7 @@ paths:
     post:
       operationId: scheduleJob
       summary: Create a Schedule
-      description:
-        Submit a job and get back a schedule ID
+      description: Submit a job and get back a schedule ID
       requestBody:
         required: true
         content:
@@ -186,8 +185,7 @@ paths:
         "422":
           description: >
             Semantically invalid request body (e.g. missing required fields,
-            invalid date format, latest_finish
-            before earliest_start)
+            invalid date format, latest_finish before earliest_start)
           content:
             application/json:
               schema:
@@ -202,26 +200,28 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/forecast:
     get:
-      operationId: GetForcast
+      operationId: GetForecast
       summary: Gets forcast from python API.
-      description: Gets full forecast for a specific datacenter, or for all depending on whether datacenter location is provied.
+      description:
+        Gets full forecast for a specific datacenter, or for all depending on
+        whether datacenter location is provided.
       parameters:
-        - $ref: '#/components/parameters/DatacenterLocationParam'
+        - $ref: "#/components/parameters/DatacenterLocationParam"
       responses:
         "200":
           description: Successfull response with requested datacenter
           content:
-            application/json: 
+            application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/LoadGreenessForecastDataPoint'
+                  $ref: "#/components/schemas/DCInfo"
         "400":
           description: Python API is unresponsive
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/hardwareSpecs/gpus:
     get:
@@ -234,11 +234,12 @@ paths:
           content:
             application/json:
               schema:
-                  type: array
-                  items:
-                    type: string
-                  example: ["V100_PCIE", "A100_SXM4"]
-
+                type: array
+                items:
+                  type: string
+                example:
+                  - "V100_PCIE"
+                  - "A100_SXM4"
 
 components:
   parameters:
@@ -316,7 +317,9 @@ components:
           additionalProperties: true
         preferred_datacenter:
           type: string
-          description: Optional preferred datacenter to prioritize allocating work on if possible (useful for trivial scheduler baseline comparisons)
+          description:
+            Optional preferred datacenter to prioritize allocating work on if
+            possible (useful for trivial scheduler baseline comparisons)
           example: "us-west-1"
         gpu_type:
           type: string
@@ -332,7 +335,9 @@ components:
           example: 5
         model_size:
           type: integer
-          description: size of the model to train in GBs. This means how much VRam is needed for it to run.
+          description:
+            size of the model to train in GBs. This means how much VRam is
+            needed for it to run.
           example: 26
 
     ScheduleResponse:
@@ -409,10 +414,6 @@ components:
           type: string
           description: assigned id for the job
           example: "sched-456"
-        message:
-          type: string
-          nullable: true
-          description: optional message from the server
         scheduled_blocks:
           type: array
           items:
@@ -425,16 +426,11 @@ components:
       description: Response after successfully submitting a job request
       required:
         - schedule_id
-        - message
       properties:
         schedule_id:
           type: string
           description: assigned id for the newly created job
           example: "sched-456"
-        message:
-          type: string
-          description: status message
-          example: "Success"
 
     ScheduleData:
       type: object
@@ -452,12 +448,25 @@ components:
         impact:
           $ref: "#/components/schemas/ScheduleImpact"
 
-    LoadGreenessForecastDataPoint:
+    ScheduleImpact:
+      type: object
       properties:
-        max_load:
+        carbon_intensity:
           type: number
-          title: max_load
-          description: maximum load of the datacenter
+          description:
+            average carbon intensity during the scheduled period in gCO2eq/kWh
+          example: 50.0
+        total_emissions:
+          type: number
+          description: total predicted emissions in gCO2eq
+          example: 140.0
+        sci:
+          type: number
+          description: Software Carbon Intensity score for the schedule
+          example: 20
+
+    DCInfo:
+      properties:
         location:
           type: string
           title: location
@@ -465,14 +474,13 @@ components:
         timeseries:
           type: array
           items:
-            $ref: '#/components/schemas/LoadGreenessPoint'
+            $ref: "#/components/schemas/DCInfoTSDataPoint"
       type: object
       required:
-      - location
-      - timeseries
-      - max_load
-    
-    LoadGreenessPoint:
+        - location
+        - timeseries
+
+    DCInfoTSDataPoint:
       type: object
       properties:
         timestamp:
@@ -480,33 +488,19 @@ components:
           format: date-time
           description: Start time of the scheduled block
           example: "2025-12-08T02:00:00Z"
-        greeness:
-          type: number
-          description: greeness at the location at the time
-          example: 5.4
         load:
           type: number
-          description: load at the locatioin at the time
-          example: 6.9
-
-
-    ScheduleImpact:
-      type: object
-      properties:
+          description: load at the location at the time, in FLOs
+          example: 1e14
         carbon_intensity:
           type: number
-          description:
-            average carbon intensity during the scheduled period in kg
-            CO2/kWh
+          description: carbon intensity at the location at the time
           example: 50.0
-        total_emissions:
+        capacity:
           type: number
-          description: total predicted emissions in kg CO2
-          example: 0.14
-        sci:
-          type: number
-          description: Software Carbon Intensity score for the schedule
-          example: 20
+          description:
+            computational capacity available at the location at the time in FLOs
+          example: 1e15
 
     Error:
       type: object
