@@ -29,3 +29,8 @@ logging.basicConfig(
     level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 )
 logger = logging.getLogger('stats.app')
+
+
+LOAD_SCALE_FACTOR = float(os.environ.get('LOAD_SCALE_FACTOR', 1e12))
+MAX_CAPACITY_UNITS = 50.0
+TOTAL_CAPACITY = MAX_CAPACITY_UNITS * LOAD_SCALE_FACTOR
