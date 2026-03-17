@@ -82,7 +82,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     })
     if (min === Infinity || max === -Infinity) return [0, 1]
     const padding = (max - min) * 0.05
-    return [min - padding, max + padding]
+    return [Math.max(0, min - padding), max + padding]
   }, [forecasts])
 
   const { intervalsPerDC, rangeStart, rangeEnd } = useMemo(() => {
