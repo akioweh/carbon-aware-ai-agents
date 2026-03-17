@@ -88,8 +88,8 @@ paths:
       tags:
       - Forecasts
       summary: Get carbon intensity forecast for next week
-      description: 'Returns SARIMAX-generated carbon intensity predictions (gCO2/kWh)
-        for the next week.
+      description: 'Returns Direct Ridge carbon intensity predictions (gCO2/kWh) for
+        the next week.
 
         Results are cached for 5 minutes.'
       operationId: get_carbon_intensity_forecast_locations__location__metrics_forecast_carbon_intensity_get
@@ -296,6 +296,18 @@ components:
           type: boolean
           title: Active
           description: Whether scheduler-visible location is enabled
+        latitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Latitude
+          description: Latitude used for weather and map display
+        longitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Longitude
+          description: Longitude used for weather and map display
       type: object
       required:
       - id
@@ -470,11 +482,6 @@ components:
         type:
           type: string
           title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
       type: object
       required:
       - loc

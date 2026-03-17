@@ -45,8 +45,8 @@ DEFAULT_DATACENTERS = [
         "region_id": 3,
         "location_id": "Data-Center-4",
         "name": "North West England",
-        "latitude": 53.48,
-        "longitude": -2.24,
+        "latitude": 54.05,
+        "longitude": -2.80,
         "default_active": True,
     },
     {
@@ -61,16 +61,16 @@ DEFAULT_DATACENTERS = [
         "region_id": 5,
         "location_id": "Data-Center-6",
         "name": "South Yorkshire",
-        "latitude": 53.38,
-        "longitude": -1.47,
+        "latitude": 53.79,
+        "longitude": -1.54,
         "default_active": False,
     },
     {
         "region_id": 6,
         "location_id": "Data-Center-7",
         "name": "North Wales, Merseyside and Cheshire",
-        "latitude": 53.25,
-        "longitude": -2.81,
+        "latitude": 52.95,
+        "longitude": -3.61,
         "default_active": False,
     },
     {
@@ -93,16 +93,16 @@ DEFAULT_DATACENTERS = [
         "region_id": 9,
         "location_id": "Data-Center-10",
         "name": "East Midlands",
-        "latitude": 52.64,
-        "longitude": -1.14,
+        "latitude": 52.95,
+        "longitude": -1.13,
         "default_active": False,
     },
     {
         "region_id": 10,
         "location_id": "Data-Center-11",
         "name": "East England",
-        "latitude": 52.63,
-        "longitude": 0.31,
+        "latitude": 52.61,
+        "longitude": 1.28,
         "default_active": False,
     },
     {
@@ -117,7 +117,7 @@ DEFAULT_DATACENTERS = [
         "region_id": 12,
         "location_id": "Data-Center-13",
         "name": "South England",
-        "latitude": 51.32,
+        "latitude": 50.93,
         "longitude": -1.44,
         "default_active": False,
     },
@@ -134,6 +134,10 @@ DEFAULT_DATACENTERS = [
 # Map UK regions to Data Center locations for carbon sync.
 UK_REGION_TO_DC = {
     row["region_id"]: row["location_id"] for row in DEFAULT_DATACENTERS
+}
+
+DATACENTER_METADATA_BY_ID = {
+    row["location_id"]: row for row in DEFAULT_DATACENTERS
 }
 
 
@@ -230,11 +234,14 @@ def initialize_db():
 
 
 def _datacenter_row_to_dict(row: tuple) -> Dict:
+    metadata = DATACENTER_METADATA_BY_ID.get(row[0], {})
     return {
         "id": row[0],
         "region_id": row[1],
         "name": row[2],
         "active": bool(row[3]),
+        "latitude": metadata.get("latitude"),
+        "longitude": metadata.get("longitude"),
     }
 
 

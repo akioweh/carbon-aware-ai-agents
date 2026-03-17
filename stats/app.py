@@ -67,6 +67,8 @@ class Datacenter(BaseModel):
     region_id: int = Field(..., description='UK Carbon Intensity API region ID')
     name: str = Field(..., description='Human-readable region/location name')
     active: bool = Field(..., description='Whether scheduler-visible location is enabled')
+    latitude: float | None = Field(None, description='Latitude used for weather and map display')
+    longitude: float | None = Field(None, description='Longitude used for weather and map display')
 
 
 class DatacenterPatchRequest(BaseModel):
@@ -438,6 +440,8 @@ def get_datacenters() -> list[Datacenter]:
             region_id=dc['region_id'],
             name=dc['name'],
             active=dc['active'],
+            latitude=dc.get('latitude'),
+            longitude=dc.get('longitude'),
         )
         for dc in datacenters
     ]
@@ -473,6 +477,8 @@ def patch_datacenter(location_id: str, payload: DatacenterPatchRequest):
         region_id=datacenter['region_id'],
         name=datacenter['name'],
         active=datacenter['active'],
+        latitude=datacenter.get('latitude'),
+        longitude=datacenter.get('longitude'),
     )
 
 
