@@ -63,7 +63,7 @@ function formatDatacenterId(id: string): string {
   return `Data Center ${match[1]}`
 }
 
-function scaleDataByConstantToPFLOP(value: number): number {
+export function scaleDataByConstantToPFLOP(value: number): number {
   return value / 1e15
 }
 
@@ -332,6 +332,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
         return {
           ...interval,
+          existing: existingPFLO,
+          newJob: newJobPFLO,
           carbon_intensity: closestForecast ? closestForecast.carbon_intensity : null,
           load: loadAmount,
           capacity,

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { History, X, Loader2, Calendar, MapPin, Leaf } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { JobSummary, ScheduleBlock } from "../types/schedule"
+import { scaleDataByConstantToPFLOP } from "./schedule-result"
 
 interface PreviousJobsProps {
   onClose: () => void
@@ -134,7 +135,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                               {(job as any).block_count || job.scheduled_blocks?.length || 0} block{((job as any).block_count || job.scheduled_blocks?.length || 0) !== 1 && 's'}
                             </p>
                           </div>
-                          
+
                           <div className="hidden sm:flex h-8 w-px bg-border mx-2" />
 
                           <div className="flex flex-col gap-1 text-sm">
@@ -170,16 +171,16 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                       <div className="flex items-center flex-wrap gap-x-4 gap-y-2 pt-3 mt-1 border-t border-border/50">
                         <div className="flex items-center gap-1.5">
                           <Leaf className="h-3.5 w-3.5 text-emerald-500" />
-                          <span className="text-xs font-medium">{((job as any).total_load || getTotalLoad(job.scheduled_blocks)).toFixed(2)} kWh</span>
+                          <span className="text-xs font-medium">{scaleDataByConstantToPFLOP((job as any).total_load || getTotalLoad(job.scheduled_blocks)).toFixed(2)} PFLO</span>
                         </div>
-                        
+
                         {job.impact?.total_emissions && (
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-muted-foreground">Emissions:</span>
                             <span className="text-xs font-semibold">{job.impact.total_emissions.toFixed(2)} kg CO₂</span>
                           </div>
                         )}
-                        
+
                         {job.impact?.total_emissions && job.unoptimizedResult?.impact?.total_emissions && job.unoptimizedResult.impact.total_emissions > job.impact.total_emissions && (
                           <div className="flex items-center">
                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">

@@ -17,6 +17,7 @@ import {
 } from "recharts"
 import { ScheduleBlock } from "../types/schedule"
 import { useActiveDatacenters } from "@/hooks/use-active-datacenters"
+import { scaleDataByConstantToPFLOP } from "./schedule-result"
 
 interface AggregatedInterval {
   time: Date
@@ -189,8 +190,9 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                       return currTime <= tTime ? curr : prev
                     }, null)
 
-                    const capacity = closestForecast ? closestForecast.capacity : null;
-                    const loadAmount = closestForecast ? closestForecast.load : null;
+                    const capacity = closestForecast ? scaleDataByConstantToPFLOP(closestForecast.capacity) : null;
+                    const loadAmount = closestForecast ? scaleDataByConstantToPFLOP(closestForecast.load) : null;
+                    const jobLoad = scaleDataByConstantToPFLOP(interval.jobs.reduce((sum, j) => sum + j.load, 0));
 
                     const outsideLoadRange: [number, number] | null = (capacity !== null && loadAmount !== null)
                       ? [Math.max(0, capacity - loadAmount), capacity] as [number, number]
@@ -198,7 +200,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
 
                     return {
                       time: interval.time.toISOString(),
-                      totalLoad: interval.jobs.reduce((sum, j) => sum + j.load, 0),
+                      totalLoad: jobLoad,
                       rawJobs: interval.jobs,
                       carbon_intensity: closestForecast ? closestForecast.carbon_intensity : null,
                       load: loadAmount,
@@ -250,9 +252,9 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                                   <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border z-50">
                                     <p className="font-medium border-b mb-1">{new Date(label).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                     {data.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
-                                    {data.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} kWh</p>}
-                                    {data.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} kWh</p>}
-                                    <p className="text-muted-foreground mt-1">Job Load: {Number(data.totalLoad).toFixed(2)} kWh</p>
+                                    {data.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} PFLO</p>}
+                                    {data.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} PFLO</p>}
+                                    <p className="text-muted-foreground mt-1">Job Load: {Number(data.totalLoad).toFixed(2)} PFLO</p>
                                   </div>
                                 );
                               }
