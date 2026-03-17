@@ -22,6 +22,7 @@ import { JobScheduleResponse, ScheduleData } from "../types/schedule"
 interface DatacenterApiRecord {
   id: string
   name: string
+  active: boolean
 }
 
 interface DatacenterOption {
@@ -184,6 +185,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         if (datacentersRes && datacentersRes.ok) {
           const datacenterData = (await datacentersRes.json()) as DatacenterApiRecord[]
           apiDatacenters = datacenterData
+            .filter((dc) => dc.active)
             .map((dc) => ({
               id: dc.id,
               name: dc.name,
@@ -249,25 +251,21 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         const normalisedForecasts = Array.isArray(safeForecasts) ? safeForecasts : []
         setForecasts(normalisedForecasts)
 
-        const locationSet = new Set<string>()
-        for (const block of combinedWithNewJob) {
-          if (typeof block?.location === "string" && block.location.length > 0) {
-            locationSet.add(block.location)
-          }
-        }
-        for (const forecast of normalisedForecasts) {
-          if (typeof forecast?.location === "string" && forecast.location.length > 0) {
-            locationSet.add(forecast.location)
-          }
-        }
+        let mergedDatacenters = apiDatacenters
 
-        const known = new Set(apiDatacenters.map((dc) => dc.id))
-        const inferred = Array.from(locationSet)
-          .filter((loc) => !known.has(loc))
-          .map((loc) => ({ id: loc, name: formatDatacenterId(loc), backendLocation: loc }))
+        // Fallback only when datacenter config endpoint is unavailable.
+        if (mergedDatacenters.length === 0) {
+          const locationSet = new Set<string>()
+          for (const block of [...newJobBlocks, ...unoptJobBlocks]) {
+            if (typeof block?.location === "string" && block.location.length > 0) {
+              locationSet.add(block.location)
+            }
+          }
 
-        const mergedDatacenters = [...apiDatacenters, ...inferred]
-          .sort((a, b) => getDatacenterOrder(a.id) - getDatacenterOrder(b.id))
+          mergedDatacenters = Array.from(locationSet)
+            .map((loc) => ({ id: loc, name: formatDatacenterId(loc), backendLocation: loc }))
+            .sort((a, b) => getDatacenterOrder(a.id) - getDatacenterOrder(b.id))
+        }
 
         setDatacenters(mergedDatacenters)
 
