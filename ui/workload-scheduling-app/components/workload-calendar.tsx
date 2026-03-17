@@ -30,7 +30,6 @@ interface WorkloadCalendarProps {
 }
 
 const BLOCK_DURATION_MS = 5 * 60 * 1000
-const MAX_LOAD_VALUE = 50
 
 export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps) {
   const { datacenters: activeDatacenters, loading: datacentersLoading } = useActiveDatacenters()
@@ -68,16 +67,15 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     fetchData()
   }, [])
 
-  // Calculate synchronized domain for greenness across ALL charts
-  const globalGreennessDomain = useMemo(() => {
+  const globalSCIDomain = useMemo(() => {
     if (!forecasts || forecasts.length === 0) return [0, 1]
     let min = Infinity
     let max = -Infinity
     forecasts.forEach(dc => {
       dc.timeseries?.forEach((point: any) => {
-        if (typeof point.greeness === "number") {
-          min = Math.min(min, point.greeness)
-          max = Math.max(max, point.greeness)
+        if (typeof point.carbon_intensity === "number") {
+          min = Math.min(min, point.carbon_intensity)
+          max = Math.max(max, point.carbon_intensity)
         }
       })
     })
@@ -153,8 +151,9 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
       <CardContent className="space-y-4 pt-4">
         <div className="flex flex-wrap items-center gap-4 text-sm pb-2 border-b">
           <div className="flex items-center gap-2"><div className="h-3 w-3 rounded bg-green-500" /><span className="text-muted-foreground">Scheduled</span></div>
-          <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-emerald-500" /><span className="text-muted-foreground">Greenness</span></div>
-          <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-blue-400" /><span className="text-muted-foreground">Outside-Load</span></div>
+          <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-red-500" /><span className="text-muted-foreground">Carbon-Intensity</span></div>
+          <div className="flex items-center gap-2"><div className="h-3 w-3 rounded bg-blue-400" /><span className="text-muted-foreground">Outside-Load</span></div>
+          <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-purple-500" /><span className="text-muted-foreground">Capacity</span></div>
         </div>
 
         {/* Chart */}
@@ -182,25 +181,43 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                 {dataCenters.map((dc, i) => {
                   const intervals = intervalsPerDC[dc.id]
                   const dcForecastTimeseries = forecasts.find(f => f.location === dc.backendLocation)?.timeseries || []
+
                   const chartData = intervals.map(interval => {
                     const tTime = interval.time.getTime()
                     const closestForecast = dcForecastTimeseries.reduce((prev: any, curr: any) => {
                       const currTime = new Date(curr.timestamp).getTime()
                       return currTime <= tTime ? curr : prev
                     }, null)
+
+                    const capacity = closestForecast ? closestForecast.capacity : null;
+                    const loadAmount = closestForecast ? closestForecast.load : null;
+
+                    const outsideLoadRange: [number, number] | null = (capacity !== null && loadAmount !== null)
+                      ? [Math.max(0, capacity - loadAmount), capacity] as [number, number]
+                      : null;
+
                     return {
                       time: interval.time.toISOString(),
                       totalLoad: interval.jobs.reduce((sum, j) => sum + j.load, 0),
                       rawJobs: interval.jobs,
-                      greeness: closestForecast ? closestForecast.greeness : null,
-                      load: closestForecast ? closestForecast.load : null
+                      carbon_intensity: closestForecast ? closestForecast.carbon_intensity : null,
+                      load: loadAmount,
+                      capacity,
+                      outsideLoadRange
                     }
                   })
+
+                  // Calculate a dynamic max value so the capacity line fits
+                  const maxDataValue = Math.max(
+                    50,
+                    ...chartData.flatMap(d => [d.totalLoad, d.capacity || 0])
+                  );
+                  const dynamicMaxValue = Math.ceil(maxDataValue / 10) * 10;
 
                   return (
                     <div key={dc.id} className="relative w-full" style={{ height: `${chartHeight}px` }}>
                       <div className="absolute -left-10 top-0 bottom-0 flex flex-col justify-between text-[10px] text-muted-foreground z-10 w-8 text-right pr-2">
-                        <span>{MAX_LOAD_VALUE}</span><span>0</span>
+                        <span>{dynamicMaxValue}</span><span>0</span>
                       </div>
                       <div className="absolute top-2 left-2 z-20 bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-semibold border shadow-sm">{dc.name}</div>
                       <ResponsiveContainer width="100%" height="100%">
@@ -209,19 +226,22 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                             <linearGradient id={`colorScheduled-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#059669" stopOpacity={0.8} /><stop offset="95%" stopColor="#059669" stopOpacity={0.1} />
                             </linearGradient>
+                            <linearGradient id={`colorOutside-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                            </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                           <XAxis
                             dataKey="time"
                             tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            interval={11 * 3} // Shows a label every 12th point (every hour if 5-min intervals)
+                            interval={11 * 3}
                             tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                             axisLine={false}
                             tickLine={false}
                             hide={i !== dataCenters.length - 1}
                           />
-                          <YAxis yAxisId="left" domain={[0, MAX_LOAD_VALUE]} hide={true} />
-                          <YAxis yAxisId="right" orientation="right" hide={true} domain={globalGreennessDomain} />
+                          <YAxis yAxisId="left" domain={[0, dynamicMaxValue]} hide={true} />
+                          <YAxis yAxisId="right" orientation="right" hide={true} domain={globalSCIDomain} />
                           <Tooltip
                             content={({ active, payload, label }) => {
                               if (active && payload && payload.length) {
@@ -229,18 +249,21 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                                 return (
                                   <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border z-50">
                                     <p className="font-medium border-b mb-1">{new Date(label).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    {data.greeness != null && <p className="text-emerald-500">Greenness: {data.greeness.toFixed(2)}</p>}
-                                    {data.load != null && <p className="text-blue-500">Load: {data.load.toFixed(2)}</p>}
-                                    <p className="text-muted-foreground">Job Load: {data.totalLoad.toFixed(2)} kWh</p>
+                                    {data.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
+                                    {data.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} kWh</p>}
+                                    {data.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} kWh</p>}
+                                    <p className="text-muted-foreground mt-1">Job Load: {Number(data.totalLoad).toFixed(2)} kWh</p>
                                   </div>
                                 );
                               }
                               return null;
                             }}
                           />
+                          <Area yAxisId="left" type="monotone" dataKey="outsideLoadRange" stroke="#3b82f6" fill={`url(#colorOutside-${dc.id})`} fillOpacity={1} isAnimationActive={false} />
                           <Area yAxisId="left" type="monotone" dataKey="totalLoad" stroke="#059669" fill={`url(#colorScheduled-${dc.id})`} isAnimationActive={false} />
-                          <Line yAxisId="right" type="monotone" dataKey="greeness" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
-                          <Line yAxisId="left" type="monotone" dataKey="load" stroke="#3b82f6" strokeWidth={1} dot={false} isAnimationActive={false} />
+                          <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
+                          <Line yAxisId="left" type="monotone" dataKey="capacity" stroke="#a855f7" strokeWidth={2} dot={false} isAnimationActive={false} />
+
                           {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
                             <ReferenceLine key={k} yAxisId="left" x={d.time.toISOString()} stroke="#94a3b8" strokeDasharray="4 4" label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fontSize: 10 } : undefined} />
                           ))}

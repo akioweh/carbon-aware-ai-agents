@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapi
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "carbon-aware-sdk.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "carbon-aware-sdk.selectorLabels" . | nindent 4 }}

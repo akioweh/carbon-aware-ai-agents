@@ -53,7 +53,7 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
         data.location_ids.push_back(loc.id);
 
         // HACK: placeholder dummy value for hardware specification
-        const auto kwh_per_flo = 1.0e-12; // dummy value
+        const auto kwh_per_flo = job.kwh_per_flo;
         data.kwh_per_flo.push_back(kwh_per_flo);
 
         auto load = vector(n_intervals, 0.);
