@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import carbon_collector
 import db_utils
-from config import UK_REGION_TO_DC
+from config import TOTAL_CAPACITY, UK_REGION_TO_DC
 
 
 def sync_carbon_to_historical(days_back=7):
@@ -20,7 +20,7 @@ def sync_carbon_to_historical(days_back=7):
                     'timestamp': datetime.fromisoformat(
                         r['timestamp_from'].replace('Z', '+00:00')
                     ),
-                    'load': 50 * 1e12,  # Static placeholder
+                    'load': TOTAL_CAPACITY,
                     'carbon_intensity': r['actual'],
                 }
             )

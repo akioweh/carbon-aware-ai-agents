@@ -3,15 +3,7 @@ import random
 from datetime import datetime, timedelta
 
 import db_utils
-
-MAX_CAPACITY = 50
-DATA_CENTRES = [
-    'Data-Center-1',
-    'Data-Center-2',
-    'Data-Center-3',
-    'Data-Center-4',
-    'Data-Center-5',
-]
+from config import DATA_CENTRES, LOAD_SCALE_FACTOR, MAX_CAPACITY_UNITS
 
 
 def generate_load(timestamp, dc_index):
@@ -52,12 +44,12 @@ def generate_load(timestamp, dc_index):
     if random.random() < 0.01:
         noise += random.uniform(2, 5)
 
-    value = base_curve + noise
+    base_value = max(0, min(MAX_CAPACITY_UNITS, base_curve + noise))
 
     # DC specific variance
-    value += (dc_index % 3) * 2  # Slight offset per DC
+    base_value += (dc_index % 3) * 2  # Slight offset per DC
 
-    return max(0, min(MAX_CAPACITY, value)) * 1e12
+    return max(0, min(MAX_CAPACITY_UNITS, base_value)) * LOAD_SCALE_FACTOR
 
 
 def generate_history():

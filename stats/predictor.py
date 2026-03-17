@@ -3,12 +3,11 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 import db_utils
+from config import TOTAL_CAPACITY
 from different_prediction_models.predictor_direct_ridge import (
     get_next_week_carbon_intensity,
 )
 from different_prediction_models.predictor_load import get_next_week_load
-
-DEFAULT_CAPACITY = 50.0 * 1e12
 
 
 def generate_next_week_load_prediction(location):
@@ -43,7 +42,7 @@ def generate_next_week_load_prediction(location):
                 'timestamp': next_week_load_df.iloc[i]['ds'].isoformat(),
                 'value': max(0.0, float(next_week_load_df.iloc[i]['yhat'])),
                 'is_forecast': True,
-                'capacity': DEFAULT_CAPACITY,
+                'capacity': TOTAL_CAPACITY,
             }
             for i in range(len(next_week_load_df))
         ],
