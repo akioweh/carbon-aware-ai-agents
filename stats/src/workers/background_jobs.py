@@ -1,13 +1,13 @@
 import threading
 
-from src.core.settings import (
+from ..core.settings import (
     BACKGROUND_JOB_FAILURE_ALERT_THRESHOLD,
     SUPPORTED_DATACENTER_NAMES,
     application_logger,
 )
-from src.database import repository
-from src.services import carbon_api_client, data_synchronizer
-from src.services.forecasting_engine import (
+from ..database import repository
+from ..services import carbon_api_client, data_synchronizer
+from ..services.forecasting_engine import (
     predict_carbon_intensity_for_next_seven_days,
     predict_datacenter_load_for_next_seven_days,
 )

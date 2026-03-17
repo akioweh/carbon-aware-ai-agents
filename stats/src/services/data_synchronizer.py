@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 
-from src.core.settings import UK_CARBON_API_REGION_ID_TO_DATACENTER_NAME_MAPPING
-from src.database import repository
-from src.services import carbon_api_client
+from ..core.settings import UK_CARBON_API_REGION_ID_TO_DATACENTER_NAME_MAPPING
+from ..database import repository
+from . import carbon_api_client
 
 
 def synchronize_carbon_readings_to_main_historical_database(days_to_look_back=7):

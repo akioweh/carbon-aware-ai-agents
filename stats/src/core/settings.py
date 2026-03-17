@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 # Paths
-BASE_PROJECT_DIRECTORY = Path(__file__).parent.parent
+BASE_PROJECT_DIRECTORY = Path(__file__).parent.parent.parent
 MAIN_CACHE_SQLITE_DB_PATH = BASE_PROJECT_DIRECTORY / 'cache.db'
 CARBON_INTENSITY_SQLITE_DB_PATH = BASE_PROJECT_DIRECTORY / os.environ.get(
     'CARBON_DB_PATH', 'carbon_intensity.db'
@@ -33,6 +33,7 @@ IS_CARBON_DATA_COLLECTION_ENABLED = (
 BACKGROUND_JOB_FAILURE_ALERT_THRESHOLD = int(
     os.environ.get('FAILURE_ALERT_THRESHOLD', 5)
 )
+BACKFILL_DAYS = int(os.environ.get('BACKFILL_DAYS', 30))
 
 # Logging
 logging.basicConfig(
@@ -45,4 +46,15 @@ MAXIMUM_DATACENTER_CAPACITY_IN_UNITS = 200.0
 DATACENTER_LOAD_SCALING_MULTIPLIER = float(os.environ.get('LOAD_SCALE_FACTOR', 4.71e15))
 TOTAL_SCALED_DATACENTER_CAPACITY = (
     MAXIMUM_DATACENTER_CAPACITY_IN_UNITS * DATACENTER_LOAD_SCALING_MULTIPLIER
+)
+
+# Forecasting Models (Pluggable)
+# Format: "module_path.function_name"
+LOAD_FORECASTER = os.environ.get(
+    'LOAD_FORECASTER',
+    'stats.different_prediction_models.predictor_load.get_next_week_load',
+)
+CARBON_FORECASTER = os.environ.get(
+    'CARBON_FORECASTER',
+    'stats.different_prediction_models.predictor_direct_ridge.get_next_week_carbon_intensity',
 )

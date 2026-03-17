@@ -3,7 +3,7 @@ import sqlite3
 import time
 from datetime import datetime
 
-from src.core.settings import MAIN_CACHE_SQLITE_DB_PATH
+from ..core.settings import MAIN_CACHE_SQLITE_DB_PATH
 
 
 def get_historical_data_count() -> int:

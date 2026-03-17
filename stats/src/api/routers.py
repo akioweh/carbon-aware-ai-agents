@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException
 
-from src.api.response_schemas import (
+from .response_schemas import (
     ApiErrorResponseModel,
     CarbonIntensityForecastResponseModel,
     DatacenterLoadForecastResponseModel,
     DatacenterLocationResponseModel,
 )
-from src.core.settings import SUPPORTED_DATACENTER_NAMES
-from src.database import repository
-from src.services.forecasting_engine import (
+from ..core.settings import SUPPORTED_DATACENTER_NAMES
+from ..database import repository
+from ..services.forecasting_engine import (
     predict_carbon_intensity_for_next_seven_days,
     predict_datacenter_load_for_next_seven_days,
 )

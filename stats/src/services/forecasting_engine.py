@@ -1,13 +1,24 @@
+import importlib
 from datetime import datetime, timedelta
 
 import pandas as pd
 
-from different_prediction_models.predictor_direct_ridge import (
-    get_next_week_carbon_intensity,
+from ..core.settings import (
+    CARBON_FORECASTER,
+    LOAD_FORECASTER,
+    TOTAL_SCALED_DATACENTER_CAPACITY,
 )
-from different_prediction_models.predictor_load import get_next_week_load
-from src.core.settings import TOTAL_SCALED_DATACENTER_CAPACITY
-from src.database import repository
+from ..database import repository
+
+
+def _load_forecaster_function(config_string: str):
+    """Dynamically loads a forecasting function from a config string 'module.submodule.function'."""
+    try:
+        module_path, function_name = config_string.rsplit('.', 1)
+        module = importlib.import_module(module_path)
+        return getattr(module, function_name)
+    except (ImportError, AttributeError, ValueError) as e:
+        raise ImportError(f'Could not load forecaster {config_string}: {e}')
 
 
 def predict_datacenter_load_for_next_seven_days(datacenter_location_id):
@@ -31,6 +42,7 @@ def predict_datacenter_load_for_next_seven_days(datacenter_location_id):
         ]
     )
 
+    get_next_week_load = _load_forecaster_function(LOAD_FORECASTER)
     forecast_dataframe = get_next_week_load(
         historical_load_dataframe, now=current_time_rounded
     )
@@ -76,6 +88,7 @@ def predict_carbon_intensity_for_next_seven_days(datacenter_location_id):
         ]
     )
 
+    get_next_week_carbon_intensity = _load_forecaster_function(CARBON_FORECASTER)
     forecast_dataframe = get_next_week_carbon_intensity(
         historical_carbon_dataframe, now=current_time_rounded
     )

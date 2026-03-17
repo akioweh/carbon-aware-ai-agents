@@ -2,12 +2,12 @@ import math
 import random
 from datetime import datetime, timedelta
 
-from src.core.settings import (
+from ..core.settings import (
     DATACENTER_LOAD_SCALING_MULTIPLIER,
     MAXIMUM_DATACENTER_CAPACITY_IN_UNITS,
     SUPPORTED_DATACENTER_NAMES,
 )
-from src.database import repository
+from ..database import repository
 
 
 def calculate_simulated_datacenter_load(metric_timestamp, datacenter_list_index):
@@ -64,24 +64,47 @@ def calculate_simulated_datacenter_load(metric_timestamp, datacenter_list_index)
     return final_load_value * DATACENTER_LOAD_SCALING_MULTIPLIER
 
 
-def generate_and_store_mock_historical_data():
+def calculate_simulated_carbon_intensity(metric_timestamp):
+    # 2. Varying Carbon Intensity (Sine wave + noise to make "Greenness" move)
+    # Base of 200, swings +/- 150 based on time of day, + random noise
+    day_progress = (metric_timestamp.hour + metric_timestamp.minute / 60) / 24
+    variation = 150 * math.sin(2 * math.pi * day_progress)
+    noise = random.uniform(-20, 20)
+    sim_carbon = max(50, min(500, 250 + variation + noise))
+    return sim_carbon
+
+
+def generate_and_store_mock_historical_data(days=30):
     current_time = datetime.now()
-    start_time_30_days_ago = current_time - timedelta(days=30)
-    iterating_time = start_time_30_days_ago
-    bulk_data_payload = []
+    start_time = current_time - timedelta(days=days)
+    iterating_time = start_time
+
+    load_payload = []
+    carbon_payload = []
 
     while iterating_time <= current_time:
         for index, datacenter_name in enumerate(SUPPORTED_DATACENTER_NAMES):
             simulated_utilization = calculate_simulated_datacenter_load(
                 iterating_time, index
             )
-            bulk_data_payload.append(
+            load_payload.append(
                 {
                     'location': datacenter_name,
                     'timestamp': iterating_time,
                     'load': simulated_utilization,
                 }
             )
-        iterating_time += timedelta(minutes=5)
 
-    repository.insert_or_update_historical_load_metrics(bulk_data_payload)
+            simulated_carbon = calculate_simulated_carbon_intensity(iterating_time)
+            carbon_payload.append(
+                {
+                    'location': datacenter_name,
+                    'timestamp': iterating_time,
+                    'carbon_intensity': simulated_carbon,
+                }
+            )
+
+        iterating_time += timedelta(minutes=15)
+
+    repository.insert_or_update_historical_load_metrics(load_payload)
+    repository.insert_or_update_historical_carbon_metrics(carbon_payload)

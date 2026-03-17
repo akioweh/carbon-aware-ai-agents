@@ -30,7 +30,7 @@ pip install -r requirements.txt
 Before running the API, optionally generate sample history data:
 
 ```bash
-python generate_history.py
+python -m stats.src.database.seed_database
 ```
 
 This will populate the SQLite database (`cache.db`) with 30 days of historical
@@ -39,7 +39,7 @@ data.
 ### Run the API
 
 ```bash
-python app.py
+python -m stats.app
 ```
 
 The API will start on `http://localhost:5000` by default.
@@ -130,7 +130,7 @@ To run the tests:
 3. **Run the tests**:
 
    ```bash
-   python -m pytest tests/test_api_schema.py
+   python -m pytest stats/tests/test_api_schema.py
    ```
 
    Note: The tests assume the API server to be running on

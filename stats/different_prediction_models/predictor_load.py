@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.scripts.generate_mock_historical_data import (
+from ..src.scripts.generate_mock_historical_data import (
     calculate_simulated_datacenter_load,
 )
 

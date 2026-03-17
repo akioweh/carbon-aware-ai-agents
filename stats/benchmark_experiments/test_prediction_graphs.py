@@ -2,7 +2,7 @@ import json
 
 import matplotlib.pyplot as plt
 
-from generate_history import DATA_CENTRES
+from ..src.core.settings import SUPPORTED_DATACENTER_NAMES as DATA_CENTRES
 
 # Load the data
 with open('history.json', 'r') as f:

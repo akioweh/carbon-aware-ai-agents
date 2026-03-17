@@ -1,11 +1,11 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from src.core.app_startup import initialize_app_and_start_background_workers
+from .src.core.app_startup import initialize_app_and_start_background_workers
 
-from src.api.routers import forecast_api_router
-from src.core.settings import API_HOST_ADDRESS, API_PORT_NUMBER
-from src.workers.background_jobs import background_worker_stop_signal
+from .src.api.routers import forecast_api_router
+from .src.core.settings import API_HOST_ADDRESS, API_PORT_NUMBER
+from .src.workers.background_jobs import background_worker_stop_signal
 
 
 @asynccontextmanager
