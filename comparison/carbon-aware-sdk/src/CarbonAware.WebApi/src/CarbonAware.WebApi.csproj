@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>8d822819-8a1f-45e4-95fb-d4a9c3a9439f</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PublishDocumentationFile>true</PublishDocumentationFile>
+
+    <DocumentationFile>$(AssemblyName).xml</DocumentationFile>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.0-rc.1.23419.4" />
+    <PackageReference Include="Opentelemetry.Exporter.Prometheus.AspNetCore" Version="1.6.0-rc.1" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets"
+      Version="1.14.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.6.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.6.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.5.1-beta.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.5.1-beta.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.20.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="6.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CarbonAware\src\CarbonAware.csproj" />
+    <ProjectReference Include="..\..\GSF.CarbonAware\src\GSF.CarbonAware.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CarbonAware.WebApi.UnitTests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="carbon-aware.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="api\v1" />
+  </ItemGroup>
+
+</Project>
