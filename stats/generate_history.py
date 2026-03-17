@@ -72,7 +72,7 @@ def generate_history():
         current += timedelta(minutes=5)
 
     # Insert all data into database
-    db_utils.insert_historical_data_bulk(bulk_data)
+    db_utils.upsert_load_data(bulk_data)
     print(
         f'Generated and inserted {len(bulk_data)} historical data points into database.'
     )

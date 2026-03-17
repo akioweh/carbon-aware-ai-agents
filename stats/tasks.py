@@ -2,8 +2,12 @@ import threading
 
 import carbon_collector
 import db_utils
+import services
 from config import DATA_CENTRES, FAILURE_THRESHOLD, logger
-from predictor import generate_next_week_load_prediction
+from predictor import (
+    generate_next_week_carbon_intensity_prediction,
+    generate_next_week_load_prediction,
+)
 
 stop_event = threading.Event()
 
@@ -25,13 +29,24 @@ def _run_loop(name, interval, func):
 def prediction_loop():
     def update():
         for dc in DATA_CENTRES:
+            # Generate and cache Load
             db_utils.save_prediction(
                 f'load_{dc}', generate_next_week_load_prediction(dc)
+            )
+            # Generate and cache Carbon
+            db_utils.save_prediction(
+                f'carbon_{dc}', generate_next_week_carbon_intensity_prediction(dc)
             )
 
     _run_loop('Prediction', 300, update)  # Run every 5 mins
 
 
 def carbon_collector_loop():
-    with carbon_collector.get_db() as conn:
-        _run_loop('Collector', 1800, lambda: carbon_collector.fetch_and_store(conn))
+    def collect_and_sync():
+        with carbon_collector.get_db() as conn:
+            carbon_collector.fetch_and_store(conn)
+
+        # Bridge the newly fetched data over to the main cache DB
+        services.sync_carbon_to_historical(days_back=1)
+
+    _run_loop('Collector', 1800, collect_and_sync)  # Run every 30 mins

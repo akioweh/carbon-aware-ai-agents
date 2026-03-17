@@ -31,5 +31,5 @@ logging.basicConfig(
 logger = logging.getLogger('stats.app')
 
 MAX_CAPACITY_UNITS = 50.0
-LOAD_SCALE_FACTOR = float(os.environ.get('LOAD_SCALE_FACTOR', 1e12))
+LOAD_SCALE_FACTOR = float(os.environ.get('LOAD_SCALE_FACTOR', 2))
 TOTAL_CAPACITY = MAX_CAPACITY_UNITS * LOAD_SCALE_FACTOR

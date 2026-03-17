@@ -55,17 +55,26 @@ def get_historical_data(location: str, start_time=None):
         ]
 
 
-def insert_historical_data_bulk(data_list):
+def upsert_load_data(data_list):
+    """Inserts load data. If row exists, updates ONLY the load."""
     with get_connection() as conn:
         conn.executemany(
-            'INSERT OR REPLACE INTO historical_data VALUES (?, ?, ?, ?)',
+            """INSERT INTO historical_data (location, timestamp, load, carbon_intensity) 
+               VALUES (?, ?, ?, 250.0)
+               ON CONFLICT(location, timestamp) DO UPDATE SET load=excluded.load""",
+            [(d['location'], d['timestamp'].timestamp(), d['load']) for d in data_list],
+        )
+
+
+def upsert_carbon_data(data_list):
+    """Inserts carbon data. If row exists, updates ONLY the carbon_intensity."""
+    with get_connection() as conn:
+        conn.executemany(
+            """INSERT INTO historical_data (location, timestamp, load, carbon_intensity) 
+               VALUES (?, ?, 0.0, ?)
+               ON CONFLICT(location, timestamp) DO UPDATE SET carbon_intensity=excluded.carbon_intensity""",
             [
-                (
-                    d['location'],
-                    d['timestamp'].timestamp(),
-                    d['load'],
-                    d['carbon_intensity'],
-                )
+                (d['location'], d['timestamp'].timestamp(), d['carbon_intensity'])
                 for d in data_list
             ],
         )
