@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: casdk-config
-data:
-  # Environment variables would be added by demo.sh

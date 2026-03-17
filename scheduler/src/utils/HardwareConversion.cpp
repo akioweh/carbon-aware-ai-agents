@@ -45,15 +45,6 @@ auto get_workload_amount(const int length, double full_power) -> double {
     return full_power * (length / 60.0);
 }
 
-auto calculate_flo_per_kwh(const std::string &gpu_type) -> double {
-    constexpr auto effectiveness = 0.95;
-    const auto &[gpu_tdp, _, _, _, tflops] =
-        hardwareConstants::HW_LIB.at(gpu_type);
-    const auto total_flo_per_hour = tflops * 1e12 * 3600.0;
-    const auto kwh_per_hour = gpu_tdp / 1000.0;
-    return effectiveness * total_flo_per_hour / kwh_per_hour;
-}
-
 struct HardwareMetrics {
     std::string gpu_type;
     int length; // length of computation in minutes
@@ -107,13 +98,10 @@ auto convertRawJobRequest(const Json::Value &json)
 
     const auto max_workload_completed_in_block = full_power / 12.;
 
-    const auto flo_per_kwh = calculate_flo_per_kwh(hardwareMetrics.gpu_type);
-
     return hardwareConstants::JobHardwareSpecifics{
-        .startup_overhead = (e_base + e_load) * flo_per_kwh,
-        .max_load = max_workload_completed_in_block * flo_per_kwh,
-        .workload_amount = workload_amount * flo_per_kwh,
-        .kwh_per_flo = 1. / flo_per_kwh};
+        .startup_overhead = e_base + e_load,
+        .max_load = max_workload_completed_in_block,
+        .workload_amount = workload_amount};
 }
 
 } // namespace scheduler::utils
