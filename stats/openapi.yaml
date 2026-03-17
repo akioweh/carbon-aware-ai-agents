@@ -1,6 +1,7 @@
 openapi: 3.1.0
 info:
   title: Stats API
+  description: Data provider for carbon-aware scheduling predictions.
   version: 1.0.0
 paths:
   /locations/{location}/metrics/forecast_load:
