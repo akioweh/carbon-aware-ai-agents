@@ -46,7 +46,7 @@ export default function Home() {
   const handleSelectJob = (job: any) => {
     // Check if the backend gave us unoptimizedResult via job.unoptimizedResult (from summary)
     const unopt = job.unoptimizedResult || null;
-    
+
     setScheduleResult(job)
     setUnoptimizedResult(unopt) // Pass it directly
     setTimeRange({ earliestStart: job.start_time, latestFinish: job.end_time })

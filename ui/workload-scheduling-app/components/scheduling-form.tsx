@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,19 +14,25 @@ interface SchedulingFormProps {
 
 export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
   const [loading, setLoading] = useState(false)
+  const [fetchingGpus, setFetchingGpus] = useState(true)
   const [error, setError] = useState<{ title: string; message: string } | null>(null)
+
+  // Available GPU options from the backend
+  const [availableGpus, setAvailableGpus] = useState<string[]>([])
+
+  // Form Fields
   const [jobType, setJobType] = useState("training")
   const [gpuType, setGpuType] = useState("A100_SXM4")
   const [gpuCount, setGpuCount] = useState<number | "">(8)
   const [modelSize, setModelSize] = useState<number | "">(50)
   const [length, setLength] = useState<number | "">(120)
   const [preferredDatacenter, setPreferredDatacenter] = useState<string>("none")
-  
+
   // Set default dates
   const today = new Date()
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
-  
+
   // Adjust time to local timezone for the datetime-local input
   const getLocalIsoString = (date: Date) => {
     const tzOffset = date.getTimezoneOffset() * 60000;
@@ -36,6 +42,29 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
 
   const [earliestStart, setEarliestStart] = useState(getLocalIsoString(today))
   const [latestFinish, setLatestFinish] = useState("")
+
+  // Fetch available GPUs on mount
+  useEffect(() => {
+    async function fetchGpus() {
+      try {
+        const response = await fetch("/api/hardwareSpecs/gpus")
+        if (!response.ok) throw new Error("Failed to fetch GPUs")
+
+        const gpus = await response.json()
+        setAvailableGpus(gpus)
+        if (gpus.length > 0) setGpuType(gpus[0]) // Select first GPU by default
+      } catch (err) {
+        console.error("Error fetching GPUs:", err)
+        setError({
+          title: "Setup Error",
+          message: "Could not load available GPUs. Please refresh the page.",
+        })
+      } finally {
+        setFetchingGpus(false)
+      }
+    }
+    fetchGpus()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,13 +115,12 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
       earliest_start: startDate.toISOString(),
       latest_finish: endDate.toISOString(),
     }
-    
+
     if (preferredDatacenter !== "none") {
       jobRequest.preferred_datacenter = preferredDatacenter
     }
 
     try {
-      // Fetch optimized schedule
       const response = await fetch("/api/schedules", {
         method: "POST",
         headers: {
@@ -106,16 +134,16 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
         let title = "Failed to Schedule";
         try {
           const errorData = await response.json();
-          if (errorData.message) errorMessage = errorData.message;
-        } catch (_) {}
+          if (errorData.error) errorMessage = errorData.error;
+          else if (errorData.message) errorMessage = errorData.message;
+        } catch (_) { }
 
-        if (response.status === 409) {
-          title = "Scheduling Conflict";
-        } else if (response.status === 422) {
-          title = "Validation Error";
-        } else if (response.status === 503) {
+        if (response.status === 400) title = "Malformed Request";
+        else if (response.status === 409) title = "Scheduling Conflict";
+        else if (response.status === 422) title = "Validation Error";
+        else if (response.status === 503) {
           title = "Service Unavailable";
-          errorMessage = "Cannot connect to the forecasting service. Please try again later.";
+          errorMessage = "Cannot connect to the scheduling service. Please try again later.";
         }
 
         setError({ title, message: errorMessage });
@@ -159,7 +187,7 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
               <AlertDescription>{error.message}</AlertDescription>
             </Alert>
           )}
-          
+
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="jobType" className="text-sm font-medium">Job Type</Label>
@@ -169,12 +197,12 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
                 value={jobType}
                 onChange={(e) => setJobType(e.target.value)}
               >
-                <option value="training">Model Training</option>
-                <option value="inference">Batch Inference</option>
-                <option value="data_prep">Data Preparation</option>
+                <option value="training">Training</option>
+                <option value="inference">Inference</option>
+                <option value="batch">Batch</option>
               </select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="gpuType" className="text-sm font-medium">GPU Type</Label>
               <select
@@ -182,57 +210,63 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={gpuType}
                 onChange={(e) => setGpuType(e.target.value)}
+                disabled={fetchingGpus || availableGpus.length === 0}
+                required
               >
-                <option value="A100_SXM4">A100 SXM4</option>
-                <option value="V100_PCIE">V100 PCIE</option>
+                {fetchingGpus ? (
+                  <option value="">Loading GPUs...</option>
+                ) : availableGpus.length === 0 ? (
+                  <option value="">No GPUs Available</option>
+                ) : (
+                  availableGpus.map(gpu => (
+                    <option key={gpu} value={gpu}>{gpu}</option>
+                  ))
+                )}
               </select>
             </div>
-            
+
+            <div className="space-y-2">
+              <Label htmlFor="length" className="text-sm font-medium">Estimated Time (mins)</Label>
+              <Input
+                id="length"
+                type="number"
+                min="1"
+                value={length}
+                onChange={(e) => setLength(e.target.value === "" ? "" : parseInt(e.target.value))}
+                required
+                placeholder="e.g. 120"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="gpuCount" className="text-sm font-medium">GPU Count</Label>
               <Input
                 id="gpuCount"
                 type="number"
                 min="1"
-                step="1"
                 value={gpuCount}
-                onChange={(e) => setGpuCount(e.target.value === "" ? "" : Number(e.target.value))}
+                onChange={(e) => setGpuCount(e.target.value === "" ? "" : parseInt(e.target.value))}
                 required
                 placeholder="e.g. 8"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="modelSize" className="text-sm font-medium">Model Size (GB)</Label>
+              <Label htmlFor="modelSize" className="text-sm font-medium">Model VRAM Size (GB)</Label>
               <Input
                 id="modelSize"
                 type="number"
                 min="1"
-                step="1"
                 value={modelSize}
-                onChange={(e) => setModelSize(e.target.value === "" ? "" : Number(e.target.value))}
+                onChange={(e) => setModelSize(e.target.value === "" ? "" : parseInt(e.target.value))}
                 required
-                placeholder="e.g. 50"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="length" className="text-sm font-medium">Job Length (minutes)</Label>
-              <Input
-                id="length"
-                type="number"
-                min="1"
-                step="1"
-                value={length}
-                onChange={(e) => setLength(e.target.value === "" ? "" : Number(e.target.value))}
-                required
-                placeholder="e.g. 120"
+                placeholder="e.g. 26"
               />
             </div>
           </div>
 
-            <div className="space-y-4 pt-2">
-            <h3 className="text-sm font-medium border-b pb-2">Scheduling Window</h3>
+          <div className="space-y-4 pt-4 border-t mt-4">
+            <h3 className="text-sm font-medium pb-2">Scheduling Window</h3>
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2 relative">
                 <Label htmlFor="earliestStart" className="text-sm">Earliest Start</Label>
@@ -258,7 +292,7 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
               </div>
             </div>
           </div>
-          
+
           <div className="pt-2 pb-2">
             <div className="space-y-2">
               <Label htmlFor="preferredDatacenter" className="text-sm font-medium text-muted-foreground">Preferred Data Center (Optional)</Label>
@@ -269,20 +303,20 @@ export function SchedulingForm({ onScheduleComplete }: SchedulingFormProps) {
                 onChange={(e) => setPreferredDatacenter(e.target.value)}
               >
                 <option value="none">Let optimizer decide</option>
-                <option value="Data-Center-1">Data Centre 1 (us-west-1)</option>
-                <option value="Data-Center-2">Data Centre 2 (us-east-1)</option>
-                <option value="Data-Center-3">Data Centre 3 (eu-west-1)</option>
-                <option value="Data-Center-4">Data Centre 4 (ap-northeast-1)</option>
-                <option value="Data-Center-5">Data Centre 5 (sa-east-1)</option>
+                <option value="us-west-1">us-west-1</option>
+                <option value="us-east-1">us-east-1</option>
+                <option value="eu-west-1">eu-west-1</option>
+                <option value="ap-northeast-1">ap-northeast-1</option>
+                <option value="sa-east-1">sa-east-1</option>
               </select>
             </div>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row gap-4 pt-6 bg-muted/20 border-t">
-          <Button 
-            type="submit" 
-            className="w-full sm:w-auto min-w-[200px]" 
-            disabled={loading}
+          <Button
+            type="submit"
+            className="w-full sm:w-auto min-w-[200px]"
+            disabled={loading || fetchingGpus || availableGpus.length === 0}
             size="lg"
           >
             {loading ? (
