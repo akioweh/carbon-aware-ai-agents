@@ -8,16 +8,39 @@ const CANDIDATE_STATS_BASE_URLS = [
 
 async function fetchFromStats(path: string, init?: RequestInit): Promise<Response> {
   let lastError: unknown
+  let lastResponse: Response | null = null
 
   for (const baseUrl of CANDIDATE_STATS_BASE_URLS) {
     try {
-      return await fetch(`${baseUrl}${path}`, init)
+      const response = await fetch(`${baseUrl}${path}`, init)
+
+      if (response.ok) {
+        return response
+      }
+
+      lastResponse = response
+      console.warn(`Stats host ${baseUrl} returned ${response.status} for ${path}; trying next host`)
     } catch (err) {
       lastError = err
     }
   }
 
+  if (lastResponse) {
+    return lastResponse
+  }
+
   throw lastError ?? new Error("No stats hosts configured")
+}
+
+async function parseBackendBody(response: Response): Promise<unknown> {
+  const raw = await response.text()
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return { message: raw }
+  }
 }
 
 export async function GET() {
@@ -27,7 +50,7 @@ export async function GET() {
       cache: "no-store",
     })
 
-    const data = await backendRes.json()
+    const data = await parseBackendBody(backendRes)
     return NextResponse.json(data, { status: backendRes.status })
   } catch (err) {
     console.error("Error fetching datacenters from stats:", err)

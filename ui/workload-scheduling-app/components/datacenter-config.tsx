@@ -31,6 +31,25 @@ interface DataCentreConfigProps {
   onClose: () => void
 }
 
+function formatDatacenterId(id: string): string {
+  const match = id.match(/Data-Center-(\d+)/i)
+  if (!match) return id.replace(/-/g, " ")
+  return `Data Center ${match[1]}`
+}
+
+function sortConfigDatacenters(data: DatacenterRecord[]): DatacenterRecord[] {
+  return [...data].sort((a, b) => {
+    const aIsLondon = a.name.trim().toLowerCase() === "london"
+    const bIsLondon = b.name.trim().toLowerCase() === "london"
+    if (aIsLondon && !bIsLondon) return -1
+    if (!aIsLondon && bIsLondon) return 1
+
+    const aNum = Number(a.id.match(/Data-Center-(\d+)/i)?.[1] ?? Number.MAX_SAFE_INTEGER)
+    const bNum = Number(b.id.match(/Data-Center-(\d+)/i)?.[1] ?? Number.MAX_SAFE_INTEGER)
+    return aNum - bNum
+  })
+}
+
 async function fetchDataCentres(): Promise<DatacenterRecord[]> {
   const res = await fetch("/api/datacenters", { cache: "no-store" })
   if (!res.ok) {
@@ -66,9 +85,10 @@ export function DataCentreConfig({ onClose }: DataCentreConfigProps) {
     setError(null)
     try {
       const data = await fetchDataCentres()
-      setCentres(data)
-      setInitialState(Object.fromEntries(data.map((dc) => [dc.id, dc.active])))
-      setSelectedId((current) => current ?? data[0]?.id ?? null)
+      const sorted = sortConfigDatacenters(data)
+      setCentres(sorted)
+      setInitialState(Object.fromEntries(sorted.map((dc) => [dc.id, dc.active])))
+      setSelectedId((current) => current ?? sorted[0]?.id ?? null)
     } catch (err) {
       console.error(err)
       setError("Failed to load datacenter configuration from stats API.")
@@ -163,7 +183,7 @@ export function DataCentreConfig({ onClose }: DataCentreConfigProps) {
             </CardDescription>
           </CardHeader>
 
-          <div className="h-[420px] w-full border-t bg-stone-100">
+          <div className="h-[520px] w-full border-t bg-stone-100">
             {loading ? (
               <Skeleton className="h-full w-full rounded-none" />
             ) : mapPoints.length > 0 ? (
@@ -264,7 +284,7 @@ export function DataCentreConfig({ onClose }: DataCentreConfigProps) {
                       }`}
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-sm">{dc.id}</p>
+                        <p className="truncate font-medium text-sm">{formatDatacenterId(dc.id)}</p>
                         <p className="truncate text-xs text-muted-foreground mt-0.5">{dc.name}</p>
                       </div>
 

@@ -12,6 +12,12 @@ interface PreviousJobsProps {
   onSelectJob: (job: JobSummary) => void
 }
 
+function formatDatacenterId(id: string): string {
+  const match = id.match(/Data-Center-(\d+)/i)
+  if (!match) return id
+  return `Data Center ${match[1]}`
+}
+
 export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
   const [jobs, setJobs] = useState<JobSummary[]>([])
   const [loading, setLoading] = useState(false)
@@ -141,7 +147,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <MapPin className="h-3.5 w-3.5" />
                               <span className="text-xs">
-                                {((job as any).locations?.length) || getUniqueLocations(job.scheduled_blocks).length} data centre(s) ({((job as any).locations || getUniqueLocations(job.scheduled_blocks)).join(", ")})
+                                {((job as any).locations?.length) || getUniqueLocations(job.scheduled_blocks).length} data centre(s) ({((job as any).locations || getUniqueLocations(job.scheduled_blocks)).map((location: string) => formatDatacenterId(location)).join(", ")})
                               </span>
                             </div>
                           </div>
