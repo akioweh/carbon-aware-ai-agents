@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Leaf, ArrowLeft, Loader2, Trash2, TrendingDown, ArrowRight } from "lucide-react"
+import { Leaf, ArrowLeft, Loader2, Trash2, TrendingDown } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,8 +16,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Area, ComposedChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
-import { JobScheduleResponse, ScheduleData, ScheduleBlock } from "../types/schedule"
+import { Area, ComposedChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { JobScheduleResponse, ScheduleData } from "../types/schedule"
+
+interface DatacenterApiRecord {
+  id: string
+  name: string
+}
+
+interface DatacenterOption {
+  id: string
+  name: string
+  backendLocation: string
+}
 
 interface WorkloadInterval {
   time: string
@@ -36,17 +47,16 @@ interface ScheduleResultProps {
   onCancel?: () => void
 }
 
-const DATA_CENTERS = [
-  { id: "dc1", name: "Data Centre 1", backendLocation: "Data-Center-1" },
-  { id: "dc2", name: "Data Centre 2", backendLocation: "Data-Center-2" },
-  { id: "dc3", name: "Data Centre 3", backendLocation: "Data-Center-3" },
-  { id: "dc4", name: "Data Centre 4", backendLocation: "Data-Center-4" },
-  { id: "dc5", name: "Data Centre 5", backendLocation: "Data-Center-5" },
-]
+function getDatacenterOrder(id: string): number {
+  const match = id.match(/Data-Center-(\d+)/i)
+  if (!match) return Number.MAX_SAFE_INTEGER
+  return Number(match[1])
+}
 
-function locationToDcId(location: string): string | undefined {
-  const dc = DATA_CENTERS.find(d => d.backendLocation === location)
-  return dc?.id
+function formatDatacenterId(id: string): string {
+  const match = id.match(/Data-Center-(\d+)/i)
+  if (!match) return id.replace(/-/g, " ")
+  return `Data Center ${match[1]}`
 }
 
 function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newScheduleId?: string) {
@@ -82,7 +92,8 @@ function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newSched
 }
 
 export function ScheduleResult({ result, unoptimizedResult, earliestStart, latestFinish, onBack, onCancel }: ScheduleResultProps) {
-  const [selectedDC, setSelectedDC] = useState(DATA_CENTERS[0].id)
+  const [datacenters, setDatacenters] = useState<DatacenterOption[]>([])
+  const [selectedDC, setSelectedDC] = useState<string>("")
   const [workloadData, setWorkloadData] = useState<WorkloadInterval[]>([])
   const [loading, setLoading] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -92,6 +103,14 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
   const [fetchedOptData, setFetchedOptData] = useState<any>(null)
   const [fetchedUnoptData, setFetchedUnoptData] = useState<ScheduleData | null>(null)
+
+  const locationToDcId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const dc of datacenters) {
+      map.set(dc.backendLocation, dc.id)
+    }
+    return (location: string) => map.get(location)
+  }, [datacenters])
 
   const globalGreennessDomain = useMemo(() => {
     if (!forecasts || forecasts.length === 0) return [0, 1]
@@ -159,6 +178,20 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     const loadBlocks = async () => {
       setLoading(true)
       try {
+        const datacentersRes = await fetch("/api/datacenters", { cache: "no-store" }).catch(() => null)
+        let apiDatacenters: DatacenterOption[] = []
+
+        if (datacentersRes && datacentersRes.ok) {
+          const datacenterData = (await datacentersRes.json()) as DatacenterApiRecord[]
+          apiDatacenters = datacenterData
+            .map((dc) => ({
+              id: dc.id,
+              name: dc.name,
+              backendLocation: dc.id,
+            }))
+            .sort((a, b) => getDatacenterOrder(a.id) - getDatacenterOrder(b.id))
+        }
+
         let newJobBlocks: any[] = [];
         let unoptJobBlocks: any[] = [];
         const [scheduleRes, trivialRes, forecastRes] = await Promise.all([
@@ -210,9 +243,39 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           }
         }
 
-        if (forecastRes && forecastRes.ok) {
-          const forecastData = await forecastRes.json()
-          setForecasts(Array.isArray(forecastData) ? forecastData : [])
+        const safeForecasts = forecastRes && forecastRes.ok
+          ? (await forecastRes.json())
+          : []
+        const normalisedForecasts = Array.isArray(safeForecasts) ? safeForecasts : []
+        setForecasts(normalisedForecasts)
+
+        const locationSet = new Set<string>()
+        for (const block of combinedWithNewJob) {
+          if (typeof block?.location === "string" && block.location.length > 0) {
+            locationSet.add(block.location)
+          }
+        }
+        for (const forecast of normalisedForecasts) {
+          if (typeof forecast?.location === "string" && forecast.location.length > 0) {
+            locationSet.add(forecast.location)
+          }
+        }
+
+        const known = new Set(apiDatacenters.map((dc) => dc.id))
+        const inferred = Array.from(locationSet)
+          .filter((loc) => !known.has(loc))
+          .map((loc) => ({ id: loc, name: formatDatacenterId(loc), backendLocation: loc }))
+
+        const mergedDatacenters = [...apiDatacenters, ...inferred]
+          .sort((a, b) => getDatacenterOrder(a.id) - getDatacenterOrder(b.id))
+
+        setDatacenters(mergedDatacenters)
+
+        if (mergedDatacenters.length > 0) {
+          const hasSelected = mergedDatacenters.some((dc) => dc.id === selectedDC)
+          if (!hasSelected) {
+            setSelectedDC(mergedDatacenters[0].id)
+          }
         }
       } catch (err) {
         console.error("Failed to load blocks", err)
@@ -224,13 +287,23 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   }, [result.schedule_id])
 
   useEffect(() => {
+    if (datacenters.length === 0 || selectedDC) return
+    setSelectedDC(datacenters[0].id)
+  }, [datacenters, selectedDC])
+
+  useEffect(() => {
+    if (!selectedDC) {
+      setWorkloadData([])
+      return
+    }
+
     const { start, end } = getTimeRange()
     const dcBlocks = allBlocks.filter((b: any) => locationToDcId(b.location) === selectedDC)
     const newJobScheduleId = showTrivial && unoptData ? `${unoptData.schedule_id}_trivial` : result.schedule_id
     const otherVariantScheduleId = showTrivial && unoptData ? result.schedule_id : `${unoptData?.schedule_id}_trivial`
     const realBlocks = dcBlocks.filter((b: any) => b.schedule_id !== otherVariantScheduleId)
 
-    const selectedBackendLocation = DATA_CENTERS.find(d => d.id === selectedDC)?.backendLocation
+    const selectedBackendLocation = datacenters.find((d) => d.id === selectedDC)?.backendLocation
     const dcForecastTimeseries = forecasts.find(f => f.location === selectedBackendLocation)?.timeseries || []
 
     const intervals = convertBlocksToWorkload(realBlocks, start, end, newJobScheduleId)
@@ -249,7 +322,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         }
       })
     setWorkloadData(intervals)
-  }, [selectedDC, allBlocks, result.schedule_id, showTrivial, unoptData, forecasts])
+  }, [selectedDC, allBlocks, result.schedule_id, showTrivial, unoptData, forecasts, datacenters, locationToDcId])
 
   const handleCancel = async () => {
     setCancelling(true)
@@ -373,9 +446,9 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs value={selectedDC} onValueChange={setSelectedDC}>
-            <TabsList className="grid w-full grid-cols-5">
-              {DATA_CENTERS.map((dc) => (
-                <TabsTrigger key={dc.id} value={dc.id} className="text-xs sm:text-sm">DC {dc.id.slice(-1)}</TabsTrigger>
+            <TabsList className="w-full flex flex-nowrap overflow-x-auto justify-start gap-1">
+              {datacenters.map((dc) => (
+                <TabsTrigger key={dc.id} value={dc.id} className="text-xs sm:text-sm whitespace-nowrap">{formatDatacenterId(dc.id)}</TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
