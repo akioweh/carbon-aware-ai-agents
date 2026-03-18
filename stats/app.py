@@ -102,6 +102,13 @@ class ErrorResponse(BaseModel):
     error: str
 
 
+class PredictionWindowModel(BaseModel):
+    windowLengthHours: int
+
+
+PREDICTION_WINDOW_HOURS = 7 * 24
+
+
 def prediction_loop():
     """Background loop to update predictions every 5 minutes."""
     consecutive_failures: dict[str, int] = {}
@@ -344,6 +351,16 @@ def get_carbon_forecast(location: str):
     except Exception as e:
         print(f'Error processing request: {e}')
         return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@app.get(
+    '/predictionWindow',
+    response_model=PredictionWindowModel,
+    tags=['PredictionWindowLength'],
+    summary='Returns prediction window length in hours to the future.',
+)
+def handle_get_prediction_window() -> PredictionWindowModel:
+    return PredictionWindowModel(windowLengthHours=PREDICTION_WINDOW_HOURS)
 
 
 @app.get(

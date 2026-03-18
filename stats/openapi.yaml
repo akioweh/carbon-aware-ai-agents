@@ -84,6 +84,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /predictionWindow:
+    get:
+      tags:
+      - PredictionWindowLength
+      summary: Returns prediction window length in hours to the future.
+      operationId: handle_get_prediction_window_predictionWindow_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionWindowModel'
   /locations:
     get:
       tags:
@@ -349,6 +362,15 @@ components:
       - id
       - name
       title: Location
+    PredictionWindowModel:
+      properties:
+        windowLengthHours:
+          type: integer
+          title: Windowlengthhours
+      type: object
+      required:
+      - windowLengthHours
+      title: PredictionWindowModel
     ValidationError:
       properties:
         loc:
@@ -364,6 +386,11 @@ components:
         type:
           type: string
           title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
       type: object
       required:
       - loc

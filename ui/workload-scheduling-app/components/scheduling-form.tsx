@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -29,6 +29,8 @@ export function SchedulingForm({ onScheduleComplete, onConfigure }: SchedulingFo
   const [modelSize, setModelSize] = useState<number | "">(50)
   const [length, setLength] = useState<number | "">(120)
   const [preferredDatacenter, setPreferredDatacenter] = useState<string>("none")
+  const [windowLength, setWindowLength] = useState<number | null>(null)
+
   const { options: activeDatacenterOptions, loading: datacentersLoading } = useActiveDatacenters()
   
   // Set default dates
@@ -47,6 +49,18 @@ export function SchedulingForm({ onScheduleComplete, onConfigure }: SchedulingFo
   const [latestFinish, setLatestFinish] = useState("")
 
   useEffect(() => {
+    async function fetchPredictionWindow() {
+      try {
+        const res = await fetch("/api/prediction-window")
+        const data = await res.json()
+        if (data.windowLengthHours) {
+          setWindowLength(data.windowLengthHours)
+        }
+      } catch (err) {
+        console.error("Error fetching prediction window:", err)
+      }
+    }
+    fetchPredictionWindow()
     if (
       preferredDatacenter !== "none" &&
       activeDatacenterOptions.length > 0 &&
@@ -110,6 +124,21 @@ export function SchedulingForm({ onScheduleComplete, onConfigure }: SchedulingFo
         message: "Please specify both earliest start and latest finish times.",
       })
       return
+    }
+
+    if (windowLength) {
+      const maxAllowed = new Date()
+      maxAllowed.setHours(maxAllowed.getHours() + windowLength)
+      const selectedEnd = new Date(latestFinish)
+
+      if (selectedEnd > maxAllowed) {
+        setError({
+          title: "Outside Forecast Range",
+          message: `Carbon intensity data is only available for the next ${windowLength} hours. Please select a finish time before ${maxAllowed.toLocaleString()}.`,
+        })
+        setLoading(false)
+        return
+      }
     }
 
     setLoading(true)
@@ -277,8 +306,16 @@ export function SchedulingForm({ onScheduleComplete, onConfigure }: SchedulingFo
             </div>
           </div>
 
-          <div className="space-y-4 pt-4 border-t mt-4">
-            <h3 className="text-sm font-medium pb-2">Scheduling Window</h3>
+            <div className="space-y-4 pt-4 border-t mt-4">
+            <div className="flex items-center justify-between pb-2">
+              <h3 className="text-sm font-medium">Scheduling Window</h3>
+              {windowLength && (
+                <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  {windowLength}h Forecast
+                </span>
+              )}
+            </div>
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2 relative">
                 <Label htmlFor="earliestStart" className="text-sm">Earliest Start</Label>
