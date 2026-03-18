@@ -102,7 +102,7 @@ paths:
       tags:
       - Locations
       summary: Get available locations
-      description: Returns a list of available locations.
+      description: Returns active locations for scheduler consumption.
       operationId: get_locations_locations_get
       responses:
         '200':
@@ -125,6 +125,62 @@ paths:
               parameters:
                 location: $response.body#/0/id
               description: Get carbon intensity forecast for a location from the list
+  /datacenters:
+    get:
+      tags:
+      - Datacenters
+      summary: Get all datacenters and active state
+      description: Returns all known datacenters and active state for UI management.
+      operationId: get_datacenters_datacenters_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Datacenter'
+                type: array
+                title: Response Get Datacenters Datacenters Get
+  /datacenters/{location_id}:
+    patch:
+      tags:
+      - Datacenters
+      summary: Update datacenter active state
+      description: Updates whether a datacenter is active for scheduler-visible locations.
+      operationId: patch_datacenter_datacenters__location_id__patch
+      parameters:
+      - name: location_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Location Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatacenterPatchRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datacenter'
+        '404':
+          description: Datacenter not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
     BaseForecastDataPoint:
@@ -174,6 +230,53 @@ components:
       - unit
       - data
       title: CarbonIntensityForecastResponse
+    Datacenter:
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Location identifier
+        region_id:
+          type: integer
+          title: Region Id
+          description: UK Carbon Intensity API region ID
+        name:
+          type: string
+          title: Name
+          description: Human-readable region/location name
+        active:
+          type: boolean
+          title: Active
+          description: Whether scheduler-visible location is enabled
+        latitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Latitude
+          description: Latitude used for weather and map display
+        longitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Longitude
+          description: Longitude used for weather and map display
+      type: object
+      required:
+      - id
+      - region_id
+      - name
+      - active
+      title: Datacenter
+    DatacenterPatchRequest:
+      properties:
+        active:
+          type: boolean
+          title: Active
+          description: New active state for this datacenter
+      type: object
+      required:
+      - active
+      title: DatacenterPatchRequest
     ErrorResponse:
       properties:
         error:
@@ -283,11 +386,6 @@ components:
         type:
           type: string
           title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
       type: object
       required:
       - loc

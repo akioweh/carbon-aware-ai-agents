@@ -5,6 +5,7 @@ import { SchedulingForm } from "@/components/scheduling-form"
 import { ScheduleResult } from "@/components/schedule-result"
 import { WorkloadCalendar } from "@/components/workload-calendar"
 import { PreviousJobs } from "@/components/previous-jobs"
+import { DataCentreConfig } from "@/components/datacenter-config"
 import { Button } from "@/components/ui/button"
 import { History, Globe } from "lucide-react"
 
@@ -14,6 +15,7 @@ export default function Home() {
   const [timeRange, setTimeRange] = useState<{ earliestStart: string; latestFinish: string } | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
   const [showPreviousJobs, setShowPreviousJobs] = useState(false)
+  const [showConfig, setShowConfig] = useState(false)
   const [source, setSource] = useState<"form" | "history">("form")
 
   const handleScheduleComplete = (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => {
@@ -22,6 +24,7 @@ export default function Home() {
     setTimeRange({ earliestStart, latestFinish })
     setShowCalendar(false)
     setShowPreviousJobs(false)
+    setShowConfig(false)
     setSource("form")
   }
 
@@ -46,11 +49,12 @@ export default function Home() {
   const handleSelectJob = (job: any) => {
     // Check if the backend gave us unoptimizedResult via job.unoptimizedResult (from summary)
     const unopt = job.unoptimizedResult || null;
-    
+
     setScheduleResult(job)
     setUnoptimizedResult(unopt) // Pass it directly
     setTimeRange({ earliestStart: job.start_time, latestFinish: job.end_time })
     setShowPreviousJobs(false)
+    setShowConfig(false)
     setSource("history")
   }
 
@@ -73,6 +77,8 @@ export default function Home() {
             <WorkloadCalendar onClose={() => setShowCalendar(false)} scheduleId={scheduleResult?.schedule_id} />
           ) : showPreviousJobs ? (
             <PreviousJobs onClose={() => setShowPreviousJobs(false)} onSelectJob={handleSelectJob} />
+          ) : showConfig ? (
+            <DataCentreConfig onClose={() => setShowConfig(false)} />
           ) : scheduleResult ? (
             <ScheduleResult
               result={scheduleResult}
@@ -104,6 +110,7 @@ export default function Home() {
               </div>
               <SchedulingForm
                 onScheduleComplete={handleScheduleComplete}
+                onConfigure={() => setShowConfig(true)}
               />
             </div>
           )}

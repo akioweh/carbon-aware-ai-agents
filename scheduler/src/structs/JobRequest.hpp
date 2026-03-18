@@ -47,6 +47,7 @@ struct JobRequest {
     double startup_overhead; // same unit as workload_amount
     double max_load;         // parallelization limit: max FLO-per-5-minutes
     std::optional<std::string> preferred_datacenter;
+    double kwh_per_flo;
     // API: ignore the additional_constraints field (for forwards compatibility)
 };
 } // namespace scheduler
@@ -114,7 +115,7 @@ inline auto fromRequest(const HttpRequest &req) -> scheduler::JobRequest {
             .startup_overhead = jobHardwareSpecific.startup_overhead,
             .max_load = jobHardwareSpecific.max_load,
             .preferred_datacenter = std::move(pref_dc),
-        };
+            .kwh_per_flo = jobHardwareSpecific.kwh_per_flo};
     } catch (const std::exception &e) {
         throw scheduler::exceptions::ValidationException("Invalid body");
     }

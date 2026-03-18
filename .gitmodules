@@ -1,0 +1,3 @@
+[submodule "comparison/Carbon-Aware-SDK-Comparison"]
+	path = comparison/Carbon-Aware-SDK-Comparison
+	url = git@github.com:Maksymilian-Sieklinski/Carbon-Aware-SDK-Comparison.git

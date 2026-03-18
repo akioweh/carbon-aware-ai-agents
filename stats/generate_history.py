@@ -5,13 +5,18 @@ from datetime import datetime, timedelta
 import db_utils
 
 MAX_CAPACITY = 50
-DATA_CENTRES = [
-    'Data-Center-1',
-    'Data-Center-2',
-    'Data-Center-3',
-    'Data-Center-4',
-    'Data-Center-5',
-]
+
+
+def _get_datacenter_ids():
+    """Resolve datacenter IDs from db_utils in a backward-compatible way."""
+    if hasattr(db_utils, 'get_all_datacenter_ids'):
+        return db_utils.get_all_datacenter_ids(include_inactive=True)
+
+    if hasattr(db_utils, 'get_datacenters'):
+        dcs = db_utils.get_datacenters(include_inactive=True)
+        return [dc['id'] for dc in dcs]
+
+    raise RuntimeError('No datacenter lookup function found in db_utils.')
 
 
 def generate_load(timestamp, dc_index):
@@ -65,16 +70,19 @@ def generate_history():
     start = now - timedelta(days=30)
     current = start
 
+    datacenters = _get_datacenter_ids()
+
+    # Prepare bulk data for efficient insertion
     bulk_data = []
 
     while current <= now:
-        for i, dc in enumerate(DATA_CENTRES):
+        for i, dc in enumerate(datacenters):
             bulk_data.append(
                 {
                     'location': dc,
                     'timestamp': current,
                     'load': generate_load(current, i),
-                    'carbon_intensity': 250.0,
+                    'carbon_intensity': 250.0, # Placeholder value, can be made dynamic if needed
                 }
             )
         current += timedelta(minutes=5)

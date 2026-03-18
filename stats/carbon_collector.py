@@ -26,11 +26,20 @@ from typing import Optional
 # Configuration
 API_BASE_URL = 'https://api.carbonintensity.org.uk'
 REGIONS = {
-    3: 'North West England',
-    4: 'North East England',
-    5: 'South Yorkshire',
-    13: 'London',
-    14: 'South East England',
+    1: "North Scotland",
+    2: "South Scotland",
+    3: "North West England",
+    4: "North East England",
+    5: "South Yorkshire",
+    6: "North Wales, Merseyside and Cheshire",
+    7: "South Wales",
+    8: "West Midlands",
+    9: "East Midlands",
+    10: "East England",
+    11: "South West England",
+    12: "South England",
+    13: "London",
+    14: "South East England",
 }
 DB_PATH = Path(
     os.environ.get('CARBON_DB_PATH', Path(__file__).parent / 'carbon_intensity.db')
