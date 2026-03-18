@@ -1,6 +1,7 @@
 #ifndef SCHEDULER_STATS_API_CLIENT_HPP
 #define SCHEDULER_STATS_API_CLIENT_HPP
 #include "structs/TimeIntervalParams.hpp"
+#include "utils/Utils.hpp"
 #pragma once
 
 #include "structs/Datacenter.hpp"
@@ -66,8 +67,7 @@ class StatsAPIClient {
 
   private:
     std::string host;
-    std::chrono::system_clock::time_point start_time;
-    std::chrono::system_clock::time_point end_time;
+    TimeIntervalParams time_interval;
 
     static auto getDefaultHost() -> const std::string & {
         static const auto res = []() -> std::string {
@@ -76,15 +76,21 @@ class StatsAPIClient {
         }();
         return res;
     }
-    static auto getLoadPath(const std::string &locationId) -> std::string {
-        return "/locations/" + locationId + "/metrics/forecast_load";
-    }
-    static auto getCarbonIntensityPath(const std::string &locationId)
-        -> std::string {
-        return "/locations/" + locationId +
-               "/metrics/forecast_carbon_intensity";
-    }
     static auto getLocationsPath() -> std::string { return "/locations"; }
+
+    [[nodiscard]] auto addTimeIntervalPathParams() const -> std::string;
+
+    [[nodiscard]] auto getLoadPath(const std::string &locationId) const
+        -> std::string {
+        return "/locations/" + locationId + "/metrics/forecast_load" +
+               addTimeIntervalPathParams();
+    }
+    [[nodiscard]] auto
+    getCarbonIntensityPath(const std::string &locationId) const -> std::string {
+        return "/locations/" + locationId +
+               "/metrics/forecast_carbon_intensity" +
+               addTimeIntervalPathParams();
+    }
 
   public:
     StatsAPIClient();

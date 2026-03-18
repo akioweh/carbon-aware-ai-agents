@@ -19,15 +19,22 @@ namespace scheduler {
 using namespace std;
 using namespace drogon;
 
-StatsAPIClient::StatsAPIClient()
-    : host(getDefaultHost()), start_time(utils::MIN_TIME),
-      end_time(utils::MAX_TIME) {}
+StatsAPIClient::StatsAPIClient() : host(getDefaultHost()) {}
 StatsAPIClient::StatsAPIClient(TimeIntervalParams time_interval, string host)
-    : host(std::move(host)),
-      start_time(time_interval.start ? time_interval.start.value()
-                                     : utils::MIN_TIME),
-      end_time(time_interval.end ? time_interval.end.value()
-                                 : utils::MAX_TIME) {}
+    : host(std::move(host)), time_interval(time_interval) {}
+
+auto StatsAPIClient::addTimeIntervalPathParams() const -> std::string {
+    std::string params = "?";
+    if (time_interval.start)
+        params +=
+            "start_time=" + utils::toIso8601(time_interval.start.value()) + '&';
+    if (time_interval.end)
+        params += "end_time=" + utils::toIso8601(time_interval.end.value());
+
+    if (params.back() == '?' || params.back() == '&')
+        params.pop_back();
+    return params;
+}
 
 auto StatsAPIClient::getLocations() const -> Task<vector<Location>> {
     auto jsonPtr = co_await utils::makeGetRequest(host, getLocationsPath());
