@@ -169,6 +169,9 @@ def carbon_sync_loop():
             if db_utils.has_carbon_data():
                 count = db_utils.sync_carbon_to_historical()
                 logger.info('Carbon sync: %d records updated', count)
+                activated = db_utils.activate_datacenters_with_data()
+                if activated:
+                    logger.info('Auto-activated %d datacenters with new carbon data', activated)
             if consecutive_failures:
                 logger.info(
                     'Carbon sync loop recovered after %d failure(s)',
@@ -246,6 +249,11 @@ async def lifespan(app: FastAPI):
             logger.info('Synced %d carbon readings to historical data', count)
         except Exception:
             logger.error('Failed to sync carbon data on startup', exc_info=True)
+
+    # Step 2.5: Activate all DCs that have carbon data so the scheduler can see them
+    activated = db_utils.activate_datacenters_with_data()
+    if activated:
+        logger.info('Auto-activated %d datacenters with carbon data', activated)
 
     # Step 3: Start background threads
     prediction_thread = threading.Thread(target=prediction_loop, daemon=True)

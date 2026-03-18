@@ -648,6 +648,40 @@ def get_carbon_reading_count() -> int:
         return 0
 
 
+def activate_datacenters_with_data() -> int:
+    """Activate all datacenters that have carbon intensity data in historical_data.
+
+    Called after carbon sync so the scheduler sees every DC that has real data.
+    Returns the number of datacenters activated.
+    """
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT DISTINCT location FROM historical_data
+                WHERE carbon_intensity IS NOT NULL AND carbon_intensity != 0
+                """
+            )
+            locations_with_data = {row[0] for row in cursor.fetchall()}
+
+            activated = 0
+            for loc in locations_with_data:
+                result = conn.execute(
+                    """
+                    UPDATE datacenters
+                    SET is_active = 1, updated_at = ?
+                    WHERE location_id = ? AND is_active = 0
+                    """,
+                    (time.time(), loc),
+                )
+                activated += result.rowcount
+
+            return activated
+    except sqlite3.Error as e:
+        print(f'Error activating datacenters with data: {e}')
+        return 0
+
+
 def has_carbon_data() -> bool:
     """Check if carbon intensity database exists and has data."""
     if not CARBON_DB_FILE.exists():
