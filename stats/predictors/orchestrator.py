@@ -3,8 +3,8 @@ import json
 import pandas as pd
 
 import db_utils
-from predictor_direct_ridge import get_next_week_carbon_intensity
-from predictor_load import get_next_week_load
+from .ridge import get_next_week_carbon_intensity
+from .load import get_next_week_load
 
 # Number of GPUs per data center (uniform across all locations)
 GPUS_PER_DATACENTER = 200
