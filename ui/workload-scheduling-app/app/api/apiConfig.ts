@@ -1,0 +1,2 @@
+const DEFAULT_STATS_API_HOST = 'http://140.238.79.139:5000';
+export const STATS_API_HOST = process.env.STATS_API_HOST || DEFAULT_STATS_API_HOST;
