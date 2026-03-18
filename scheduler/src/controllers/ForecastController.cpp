@@ -16,7 +16,8 @@ auto ForecastController::
         const DatacenterIdentifierParam datacenter) const
     -> Task<HttpResponsePtr> {
 
-    StatsAPIClient stats;
+    // StatsAPIClient stats(TimeIntervalParams);
+    const auto stats = StatsAPIClient(interval);
     Json::Value ret;
     if (datacenter.name == scheduler::calendar::ANY_DATACENTER) {
         ret = toJson(co_await stats.getAllDatacenters());

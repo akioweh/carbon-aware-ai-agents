@@ -29,7 +29,7 @@ StatsAPIClient::StatsAPIClient(TimeIntervalParams time_interval, string host)
       end_time(time_interval.end ? time_interval.end.value()
                                  : utils::MAX_TIME) {}
 
-auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
+auto StatsAPIClient::getLocations() const -> Task<vector<Location>> {
     auto jsonPtr = co_await utils::makeGetRequest(host, getLocationsPath());
 
     const auto &json = *jsonPtr;
@@ -40,7 +40,7 @@ auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
     co_return locations;
 }
 
-auto StatsAPIClient::getLoadForecast(const string &location)
+auto StatsAPIClient::getLoadForecast(const string &location) const
     -> Task<optional<LoadTimeSeries>> {
     auto jsonPtr = co_await utils::makeGetRequest(host, getLoadPath(location));
     assert(jsonPtr);
@@ -75,7 +75,7 @@ auto StatsAPIClient::getLoadForecast(const string &location)
                              .data = std::move(data)};
 }
 
-auto StatsAPIClient::getCarbonIntensityForecast(const string &location)
+auto StatsAPIClient::getCarbonIntensityForecast(const string &location) const
     -> Task<optional<CarbonIntensityTimeSeries>> {
     auto jsonPtr =
         co_await utils::makeGetRequest(host, getCarbonIntensityPath(location));
@@ -112,7 +112,7 @@ auto StatsAPIClient::getCarbonIntensityForecast(const string &location)
         .data = std::move(data)};
 }
 
-auto StatsAPIClient::getDatacenter(const string &datacenterName)
+auto StatsAPIClient::getDatacenter(const string &datacenterName) const
     -> Task<Datacenter> {
     auto [loadOpt, carbon_intensityOpt] =
         co_await coro::when_all(getLoadForecast(datacenterName),
@@ -169,7 +169,7 @@ auto StatsAPIClient::getDatacenter(const string &datacenterName)
     };
 }
 
-auto StatsAPIClient::getAllDatacenters() -> Task<vector<Datacenter>> {
+auto StatsAPIClient::getAllDatacenters() const -> Task<vector<Datacenter>> {
     auto locations = co_await getLocations();
     if (locations.empty()) {
         LOG_ERROR << "No locations found";

@@ -88,19 +88,23 @@ class StatsAPIClient {
 
   public:
     StatsAPIClient();
-    explicit StatsAPIClient(TimeIntervalParams time_interval, std::string host);
+    explicit StatsAPIClient(TimeIntervalParams time_interval,
+                            std::string host = DEFAULT_STATS_API_HOST);
 
-    auto getLocations() -> drogon::Task<std::vector<Location>>;
+    [[nodiscard]] auto getLocations() const
+        -> drogon::Task<std::vector<Location>>;
     // TODO: why do the following two return optional?
     // TODO: rename: these don't _only_ get forecasts (but also historical?)
-    auto getLoadForecast(const std::string &location)
+    [[nodiscard]] auto getLoadForecast(const std::string &location) const
         -> drogon::Task<std::optional<LoadTimeSeries>>;
-    auto getCarbonIntensityForecast(const std::string &location)
+    [[nodiscard]] auto
+    getCarbonIntensityForecast(const std::string &location) const
         -> drogon::Task<std::optional<CarbonIntensityTimeSeries>>;
 
-    auto getDatacenter(const std::string &datacenterName)
+    [[nodiscard]] auto getDatacenter(const std::string &datacenterName) const
         -> drogon::Task<Datacenter>;
-    auto getAllDatacenters() -> drogon::Task<std::vector<Datacenter>>;
+    [[nodiscard]] auto getAllDatacenters() const
+        -> drogon::Task<std::vector<Datacenter>>;
 };
 
 } // namespace scheduler
