@@ -187,15 +187,37 @@ def get_latest_reading_timestamp(conn: sqlite3.Connection) -> datetime | None:
     return None
 
 
+def _get_regions_with_data(conn: sqlite3.Connection) -> set[int]:
+    """Get the set of region IDs that have at least one actual reading."""
+    cursor = conn.execute(
+        'SELECT DISTINCT region_id FROM carbon_readings WHERE actual IS NOT NULL'
+    )
+    return {row[0] for row in cursor.fetchall()}
+
+
 def backfill(conn: sqlite3.Connection, days: int = BACKFILL_DAYS) -> None:
-    """Backfill missing data since the last reading, or the last N days if empty."""
+    """Backfill missing data since the last reading, or the last N days if empty.
+
+    Also detects regions missing from the database (e.g. newly added to REGIONS)
+    and performs a full backfill for those even if existing regions are up to date.
+    """
     latest_ts = get_latest_reading_timestamp(conn)
     end = datetime.now(timezone.utc)
 
+    # Check for regions missing entirely from the database
+    existing_regions = _get_regions_with_data(conn)
+    expected_regions = set(REGIONS.keys())
+    missing_regions = expected_regions - existing_regions
+
+    if missing_regions and latest_ts:
+        print(
+            f'Detected {len(missing_regions)} regions with no data '
+            f'(regions {sorted(missing_regions)}). Running full backfill...'
+        )
+        # Force a full backfill so the API returns data for all regions
+        latest_ts = None
+
     if latest_ts:
-        # Latest TS might be in the future (forecasts), but we want actuals.
-        # The query above filters for actual IS NOT NULL.
-        # Ensure we start from the latest TS we have.
         start = latest_ts
         if (
             end - start
