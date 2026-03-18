@@ -1,5 +1,6 @@
 #include "StatsAPIClient.hpp"
 #include "structs/Datacenter.hpp"
+#include "structs/TimeIntervalParams.hpp"
 #include "utils/Coro.hpp"
 #include "utils/TimeGridder.hpp"
 #include "utils/Utils.hpp"
@@ -18,8 +19,15 @@ namespace scheduler {
 using namespace std;
 using namespace drogon;
 
-StatsAPIClient::StatsAPIClient() : host(getDefaultHost()) {}
-StatsAPIClient::StatsAPIClient(string host) : host(std::move(host)) {}
+StatsAPIClient::StatsAPIClient()
+    : host(getDefaultHost()), start_time(utils::MIN_TIME),
+      end_time(utils::MAX_TIME) {}
+StatsAPIClient::StatsAPIClient(TimeIntervalParams time_interval, string host)
+    : host(std::move(host)),
+      start_time(time_interval.start ? time_interval.start.value()
+                                     : utils::MIN_TIME),
+      end_time(time_interval.end ? time_interval.end.value()
+                                 : utils::MAX_TIME) {}
 
 auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
     auto jsonPtr = co_await utils::makeGetRequest(host, getLocationsPath());

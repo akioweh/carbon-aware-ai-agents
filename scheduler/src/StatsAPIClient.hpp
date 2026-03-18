@@ -1,5 +1,6 @@
 #ifndef SCHEDULER_STATS_API_CLIENT_HPP
 #define SCHEDULER_STATS_API_CLIENT_HPP
+#include "structs/TimeIntervalParams.hpp"
 #pragma once
 
 #include "structs/Datacenter.hpp"
@@ -65,6 +66,8 @@ class StatsAPIClient {
 
   private:
     std::string host;
+    std::chrono::system_clock::time_point start_time;
+    std::chrono::system_clock::time_point end_time;
 
     static auto getDefaultHost() -> const std::string & {
         static const auto res = []() -> std::string {
@@ -85,7 +88,7 @@ class StatsAPIClient {
 
   public:
     StatsAPIClient();
-    explicit StatsAPIClient(std::string host);
+    explicit StatsAPIClient(TimeIntervalParams time_interval, std::string host);
 
     auto getLocations() -> drogon::Task<std::vector<Location>>;
     // TODO: why do the following two return optional?
