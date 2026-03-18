@@ -5,11 +5,17 @@ import time
 
 import db_utils
 from carbon_collector import (
-    init_database as init_carbon_db,
+    DB_PATH as CARBON_DB_PATH,
+)
+from carbon_collector import (
+    INTERVAL_MINUTES as CARBON_INTERVAL_MINUTES,
+)
+from carbon_collector import (
     collect_current,
     get_reading_count,
-    DB_PATH as CARBON_DB_PATH,
-    INTERVAL_MINUTES as CARBON_INTERVAL_MINUTES,
+)
+from carbon_collector import (
+    init_database as init_carbon_db,
 )
 from config import CARBON_SYNC_INTERVAL, FAILURE_ALERT_THRESHOLD
 from predictors import (
@@ -26,9 +32,11 @@ def prediction_loop():
     while True:
         logger.info('Updating predictions cache...')
 
-        active_datacenters = db_utils.get_active_datacenter_ids()
+        active_datacenters = db_utils.get_all_datacenter_ids()
         if not active_datacenters:
-            logger.warning('No active datacenters configured; skipping prediction refresh')
+            logger.warning(
+                'No active datacenters configured; skipping prediction refresh'
+            )
             time.sleep(300)
             continue
 

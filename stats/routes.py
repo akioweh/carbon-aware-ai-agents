@@ -32,11 +32,15 @@ router = APIRouter()
     summary='Load forecast for a location',
     description='Returns a 7-day load forecast at 5-minute resolution (2016 data points). Each point includes the predicted load and the datacenter capacity in FLOs. Results are cached for 5 minutes.',
     responses={
-        404: {'model': ErrorResponse, 'description': 'No historical data for this location'},
+        404: {
+            'model': ErrorResponse,
+            'description': 'No historical data for this location',
+        },
         500: {'model': ErrorResponse, 'description': 'Prediction generation failed'},
     },
 )
 def get_load_forecast(location: str):
+    print(f'load_forecast_{location}')
     cache_key = f'load_forecast_{location}'
     cached_result = db_utils.get_cached_prediction(cache_key)
     if cached_result:
@@ -47,7 +51,9 @@ def get_load_forecast(location: str):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error('Error generating load forecast for %s: %s', location, e, exc_info=True)
+        logger.error(
+            'Error generating load forecast for %s: %s', location, e, exc_info=True
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
     db_utils.save_prediction(cache_key, data)
@@ -61,7 +67,10 @@ def get_load_forecast(location: str):
     summary='Carbon intensity forecast for a location',
     description='Returns a 7-day carbon intensity forecast at 5-minute resolution (2016 data points) in gCO2/kWh. Uses Ridge regression trained on UK Carbon Intensity API data with weather exogenous features. Results are cached for 5 minutes.',
     responses={
-        404: {'model': ErrorResponse, 'description': 'No carbon intensity data for this location'},
+        404: {
+            'model': ErrorResponse,
+            'description': 'No carbon intensity data for this location',
+        },
         500: {'model': ErrorResponse, 'description': 'Prediction generation failed'},
     },
 )
@@ -76,7 +85,9 @@ def get_carbon_forecast(location: str):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error('Error generating CI forecast for %s: %s', location, e, exc_info=True)
+        logger.error(
+            'Error generating CI forecast for %s: %s', location, e, exc_info=True
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
     db_utils.save_prediction(cache_key, data)
@@ -155,18 +166,25 @@ def get_datacenters() -> list[Datacenter]:
     description='Activates or deactivates a datacenter. Active datacenters appear in /locations and receive scheduled forecasts.',
     responses={
         404: {'model': ErrorResponse, 'description': 'Datacenter not found'},
-        500: {'model': ErrorResponse, 'description': 'Failed to reload datacenter after update'},
+        500: {
+            'model': ErrorResponse,
+            'description': 'Failed to reload datacenter after update',
+        },
     },
 )
 def patch_datacenter(location_id: str, payload: DatacenterPatchRequest):
     """Updates whether a datacenter is active for scheduler-visible locations."""
     updated = db_utils.set_datacenter_active(location_id, payload.active)
     if not updated:
-        raise HTTPException(status_code=404, detail=f'Datacenter not found: {location_id}')
+        raise HTTPException(
+            status_code=404, detail=f'Datacenter not found: {location_id}'
+        )
 
     datacenter = db_utils.get_datacenter(location_id)
     if not datacenter:
-        raise HTTPException(status_code=500, detail=f'Failed to load updated datacenter: {location_id}')
+        raise HTTPException(
+            status_code=500, detail=f'Failed to load updated datacenter: {location_id}'
+        )
 
     return Datacenter(
         id=datacenter['id'],
