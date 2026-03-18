@@ -97,7 +97,8 @@ class StatsAPIClient {
 
     auto getDatacenter(const std::string &datacenterName)
         -> drogon::Task<Datacenter>;
-    auto getAllDatacenters() -> drogon::Task<std::vector<Datacenter>>;
+    auto getAllDatacenters(std::optional<std::string> = {})
+        -> drogon::Task<std::vector<Datacenter>>;
 };
 
 } // namespace scheduler

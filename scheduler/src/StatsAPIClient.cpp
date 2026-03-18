@@ -161,7 +161,13 @@ auto StatsAPIClient::getDatacenter(const string &datacenterName)
     };
 }
 
-auto StatsAPIClient::getAllDatacenters() -> Task<vector<Datacenter>> {
+auto StatsAPIClient::getAllDatacenters(
+    std::optional<std::string> preferred_datacenter)
+    -> Task<vector<Datacenter>> {
+    if (preferred_datacenter) {
+        const auto &datacenterName = preferred_datacenter.value();
+        co_return vector(1, co_await getDatacenter(datacenterName));
+    }
     auto locations = co_await getLocations();
     if (locations.empty()) {
         LOG_ERROR << "No locations found";
