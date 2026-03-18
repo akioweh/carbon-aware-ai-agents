@@ -45,7 +45,7 @@ DB_PATH = Path(
     os.environ.get('CARBON_DB_PATH', Path(__file__).parent / 'carbon_intensity.db')
 )
 INTERVAL_MINUTES = int(os.environ.get('CARBON_INTERVAL_MINUTES', 30))
-BACKFILL_DAYS = int(os.environ.get('BACKFILL_DAYS', 30))
+BACKFILL_DAYS = int(os.environ.get('BACKFILL_DAYS', 365))
 
 # Graceful shutdown flag
 _shutdown_requested = False

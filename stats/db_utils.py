@@ -428,14 +428,6 @@ def get_historical_data(
                        ORDER BY timestamp ASC""",
                     (location, start_time.timestamp()),
                 )
-
-                cursor = conn.execute(
-                    f"""SELECT {select_cols}
-                       FROM historical_data
-                       WHERE location = ? AND timestamp >= ?
-                       ORDER BY timestamp ASC""",
-                    (location, start_time.timestamp()),
-                )
             elif end_time:
                 cursor = conn.execute(
                     f"""SELECT {select_cols}
@@ -562,11 +554,12 @@ def get_carbon_readings(
         return []
 
 
-def sync_carbon_to_historical(days_back: int = 30) -> int:
+def sync_carbon_to_historical(days_back: int = 365) -> int:
     """Sync carbon intensity data to historical_data table.
 
-    Reads from carbon_intensity.db, converts intensity to carbon_intensity,
-    maps UK regions to Data Center locations, and inserts into cache.db.
+    Reads from carbon_intensity.db, maps UK regions to Data Center locations,
+    and upserts into cache.db. Only updates the carbon_intensity column for
+    existing rows, preserving any existing load data.
 
     Args:
         days_back: How many days of data to sync
@@ -575,13 +568,12 @@ def sync_carbon_to_historical(days_back: int = 30) -> int:
         Number of records synced
     """
     since = datetime.now() - timedelta(days=days_back)
-    readings = get_carbon_readings(since=since, limit=50000)
+    readings = get_carbon_readings(since=since, limit=500000)
 
     if not readings:
         print('No carbon readings found to sync')
         return 0
 
-    # Convert readings to historical data format
     bulk_data = []
     for reading in readings:
         region_id = reading.get('region_id')
@@ -594,10 +586,8 @@ def sync_carbon_to_historical(days_back: int = 30) -> int:
         if carbon_intensity is None:
             continue
 
-        # Parse timestamp
         ts_str = reading.get('timestamp_from', '')
         try:
-            # Handle ISO format with or without Z suffix
             ts_str = ts_str.replace('Z', '+00:00')
             timestamp = datetime.fromisoformat(ts_str)
         except ValueError:
@@ -607,16 +597,44 @@ def sync_carbon_to_historical(days_back: int = 30) -> int:
             {
                 'location': location,
                 'timestamp': timestamp,
-                'load': 15 * 1e15,  # TODO: stop hardcode dumb value
                 'carbon_intensity': carbon_intensity,
             }
         )
 
     if bulk_data:
-        insert_historical_data_bulk(bulk_data)
+        _upsert_carbon_intensity_bulk(bulk_data)
         print(f'Synced {len(bulk_data)} carbon readings to historical data')
 
     return len(bulk_data)
+
+
+def _upsert_carbon_intensity_bulk(data: List[Dict]):
+    """Upsert carbon intensity into historical_data without overwriting load.
+
+    For existing rows (matching location + timestamp), only carbon_intensity
+    is updated. For new rows, load is set to 0 (the load predictor generates
+    synthetic forecasts independently of historical load values).
+    """
+    try:
+        with get_connection() as conn:
+            conn.executemany(
+                """INSERT INTO historical_data
+                   (location, timestamp, load, carbon_intensity)
+                   VALUES (?, ?, 0, ?)
+                   ON CONFLICT(location, timestamp)
+                   DO UPDATE SET carbon_intensity = excluded.carbon_intensity""",
+                [
+                    (
+                        d['location'],
+                        d['timestamp'].timestamp(),
+                        d['carbon_intensity'],
+                    )
+                    for d in data
+                ],
+            )
+    except sqlite3.Error as e:
+        print(f'Error upserting carbon intensity data: {e}')
+        raise
 
 
 def get_carbon_reading_count() -> int:

@@ -5,12 +5,10 @@ import time
 from contextlib import asynccontextmanager
 
 import yaml
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 import db_utils
-from generate_history import generate_history
 from predictor import (
     generate_next_week_carbon_intensity_prediction,
     generate_next_week_load_prediction,
@@ -50,60 +48,53 @@ CARBON_COLLECTION_ENABLED = os.environ.get('CARBON_COLLECTION_ENABLED', '1') == 
 
 
 class Location(BaseModel):
-    id: str = Field(..., description='Location identifier')
-    name: str = Field(..., description='Human-readable name')
+    id: str = Field(..., description='Location identifier', examples=['Data-Center-1'])
+    name: str = Field(..., description='Human-readable region name', examples=['London'])
 
 
 class Datacenter(BaseModel):
-    id: str = Field(..., description='Location identifier')
-    region_id: int = Field(..., description='UK Carbon Intensity API region ID')
-    name: str = Field(..., description='Human-readable region/location name')
-    active: bool = Field(..., description='Whether scheduler-visible location is enabled')
-    latitude: float | None = Field(None, description='Latitude used for weather and map display')
-    longitude: float | None = Field(None, description='Longitude used for weather and map display')
+    id: str = Field(..., description='Location identifier', examples=['Data-Center-1'])
+    region_id: int = Field(..., description='UK Carbon Intensity API region ID', examples=[13])
+    name: str = Field(..., description='Human-readable region name', examples=['London'])
+    active: bool = Field(..., description='Whether this datacenter is visible to the scheduler')
+    latitude: float | None = Field(None, description='Latitude for weather lookups and map display', examples=[51.51])
+    longitude: float | None = Field(None, description='Longitude for weather lookups and map display', examples=[-0.13])
 
 
 class DatacenterPatchRequest(BaseModel):
     active: bool = Field(..., description='New active state for this datacenter')
 
 
-class Capacity(BaseModel):
-    max_load: float = Field(..., description='Maximum load capacity')
-    total_gpus: int = Field(..., description='Total number of GPUs')
-
-
 class BaseForecastDataPoint(BaseModel):
-    timestamp: str = Field(..., description='ISO format timestamp')
+    timestamp: str = Field(..., description='ISO 8601 timestamp', examples=['2026-03-18T12:00:00'])
     value: float = Field(..., description='Forecasted value')
-    is_forecast: bool = Field(..., description='Indicates if this is a forecast')
+    is_forecast: bool = Field(..., description='Always true for forecast endpoints')
 
 
 class BaseForecastResponse(BaseModel):
-    location_id: str = Field(..., description='Datacenter identifier')
-    metric: str = Field(
-        ..., description='Metric name (e.g. forecast_load, forecast_carbon_intensity)'
-    )
-    unit: str = Field(..., description='Unit of measurement')
+    location_id: str = Field(..., description='Datacenter identifier', examples=['Data-Center-1'])
+    metric: str = Field(..., description='Metric name', examples=['forecast_load', 'forecast_carbon_intensity'])
+    unit: str = Field(..., description='Unit of measurement', examples=['FLOs', 'gCO2/kWh'])
 
 
 class LoadForecastDataPoint(BaseForecastDataPoint):
-    capacity: float = Field(..., description='Capacity in FLOs')
+    capacity: float = Field(..., description='Max computational capacity at this interval (FLOs)', examples=[9.84e17])
 
 
 class LoadForecastResponse(BaseForecastResponse):
-    data: list[LoadForecastDataPoint] = Field(..., description='Time series data')
+    data: list[LoadForecastDataPoint] = Field(..., description='2016-point time series (7 days at 5-min intervals)')
 
 
 class CarbonIntensityForecastResponse(BaseForecastResponse):
-    data: list[BaseForecastDataPoint] = Field(..., description='Time series data')
+    data: list[BaseForecastDataPoint] = Field(..., description='2016-point time series (7 days at 5-min intervals)')
 
 
 class ErrorResponse(BaseModel):
-    error: str
+    detail: str = Field(..., description='Error description')
 
 
 class PredictionWindowModel(BaseModel):
-    windowLengthHours: int
+    windowLengthHours: int = Field(..., description='Forecast window length in hours', examples=[168])
 
 
 PREDICTION_WINDOW_HOURS = 7 * 24
@@ -176,7 +167,7 @@ def carbon_sync_loop():
     while True:
         try:
             if db_utils.has_carbon_data():
-                count = db_utils.sync_carbon_to_historical(days_back=7)
+                count = db_utils.sync_carbon_to_historical()
                 logger.info('Carbon sync: %d records updated', count)
             if consecutive_failures:
                 logger.info(
@@ -251,17 +242,12 @@ async def lifespan(app: FastAPI):
     if db_utils.has_carbon_data():
         logger.info('Syncing carbon data to historical_data...')
         try:
-            count = db_utils.sync_carbon_to_historical(days_back=30)
+            count = db_utils.sync_carbon_to_historical()
             logger.info('Synced %d carbon readings to historical data', count)
         except Exception:
             logger.error('Failed to sync carbon data on startup', exc_info=True)
 
-    # Step 3: Fall back to synthetic data only if no historical data at all
-    if db_utils.count_historical_data() == 0:
-        print('No historical data found, generating initial data...')
-        generate_history()
-
-    # Step 4: Start background threads
+    # Step 3: Start background threads
     prediction_thread = threading.Thread(target=prediction_loop, daemon=True)
     prediction_thread.start()
 
@@ -287,8 +273,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title='Stats API',
-    description='Statistics provider for carbon-aware scheduling predictions.',
+    title='Carbon-Aware Forecasting Service',
+    description=(
+        'Provides load and carbon intensity forecasts for data center locations. '
+        'Forecasts are generated using Ridge regression models trained on historical '
+        'UK Carbon Intensity API data and weather features from Open-Meteo. '
+        'All forecasts cover a 7-day window at 5-minute resolution (2016 data points).'
+    ),
     version='1.0.0',
     lifespan=lifespan,
 )
@@ -298,66 +289,66 @@ app = FastAPI(
     '/locations/{location}/metrics/forecast_load',
     response_model=LoadForecastResponse,
     tags=['Forecasts'],
-    summary='Get load forecast for next week',
+    summary='Load forecast for a location',
+    description='Returns a 7-day load forecast at 5-minute resolution (2016 data points). Each point includes the predicted load and the datacenter capacity in FLOs. Results are cached for 5 minutes.',
     responses={
-        500: {'model': ErrorResponse},
-        404: {'model': ErrorResponse, 'description': 'Location not found'},
+        404: {'model': ErrorResponse, 'description': 'No historical data for this location'},
+        500: {'model': ErrorResponse, 'description': 'Prediction generation failed'},
     },
 )
 def get_load_forecast(location: str):
-    try:
-        cache_key = f'load_forecast_{location}'
-        cached_result = db_utils.get_cached_prediction(cache_key)
-        if cached_result:
-            return cached_result
-        else:
-            data = generate_next_week_load_prediction(location)
-            db_utils.save_prediction(cache_key, data)
-            return data
+    cache_key = f'load_forecast_{location}'
+    cached_result = db_utils.get_cached_prediction(cache_key)
+    if cached_result:
+        return cached_result
 
+    try:
+        data = generate_next_week_load_prediction(location)
     except ValueError as e:
-        return JSONResponse(status_code=404, content={'error': str(e)})
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(f'Error processing request: {e}')
-        return JSONResponse(status_code=500, content={'error': str(e)})
+        logger.error('Error generating load forecast for %s: %s', location, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    db_utils.save_prediction(cache_key, data)
+    return data
 
 
 @app.get(
     '/locations/{location}/metrics/forecast_carbon_intensity',
     response_model=CarbonIntensityForecastResponse,
     tags=['Forecasts'],
-    summary='Get carbon intensity forecast for next week',
+    summary='Carbon intensity forecast for a location',
+    description='Returns a 7-day carbon intensity forecast at 5-minute resolution (2016 data points) in gCO2/kWh. Uses Ridge regression trained on UK Carbon Intensity API data with weather exogenous features. Results are cached for 5 minutes.',
     responses={
-        500: {'model': ErrorResponse},
-        404: {'model': ErrorResponse, 'description': 'Location not found'},
+        404: {'model': ErrorResponse, 'description': 'No carbon intensity data for this location'},
+        500: {'model': ErrorResponse, 'description': 'Prediction generation failed'},
     },
 )
 def get_carbon_forecast(location: str):
-    """
-    Returns ML-generated carbon intensity predictions for the next week.
-    Results are cached for 5 minutes.
-    """
+    cache_key = f'carbon_intensity_forecast_{location}'
+    cached_result = db_utils.get_cached_prediction(cache_key)
+    if cached_result:
+        return cached_result
+
     try:
-        cache_key = f'carbon_intensity_forecast_{location}'
-        cached_result = db_utils.get_cached_prediction(cache_key)
-        if cached_result:
-            return cached_result
-        else:
-            data = generate_next_week_carbon_intensity_prediction(location)
-            db_utils.save_prediction(cache_key, data)
-            return data
+        data = generate_next_week_carbon_intensity_prediction(location)
     except ValueError as e:
-        return JSONResponse(status_code=404, content={'error': str(e)})
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(f'Error processing request: {e}')
-        return JSONResponse(status_code=500, content={'error': str(e)})
+        logger.error('Error generating CI forecast for %s: %s', location, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    db_utils.save_prediction(cache_key, data)
+    return data
 
 
 @app.get(
     '/predictionWindow',
     response_model=PredictionWindowModel,
-    tags=['PredictionWindowLength'],
-    summary='Returns prediction window length in hours to the future.',
+    tags=['Configuration'],
+    summary='Prediction window length',
+    description='Returns the forecast window length in hours. Currently fixed at 168 hours (7 days).',
 )
 def handle_get_prediction_window() -> PredictionWindowModel:
     return PredictionWindowModel(windowLengthHours=PREDICTION_WINDOW_HOURS)
@@ -367,10 +358,11 @@ def handle_get_prediction_window() -> PredictionWindowModel:
     '/locations',
     response_model=list[Location],
     tags=['Locations'],
-    summary='Get available locations',
+    summary='Active locations',
+    description='Returns locations that are currently active and visible to the scheduler. Use a location ID from this list to query forecast endpoints.',
     responses={
         200: {
-            'description': 'Successful Response',
+            'description': 'List of active locations',
             'links': {
                 'GetLoadForecast': {
                     'operationId': 'get_load_forecast_locations__location__metrics_forecast_load_get',
@@ -396,7 +388,8 @@ def get_locations() -> list[Location]:
     '/datacenters',
     response_model=list[Datacenter],
     tags=['Datacenters'],
-    summary='Get all datacenters and active state',
+    summary='All datacenters',
+    description='Returns all known datacenters (active and inactive) with their region metadata and coordinates. Used by the UI for datacenter management.',
 )
 def get_datacenters() -> list[Datacenter]:
     """Returns all known datacenters and active state for UI management."""
@@ -418,26 +411,22 @@ def get_datacenters() -> list[Datacenter]:
     '/datacenters/{location_id}',
     response_model=Datacenter,
     tags=['Datacenters'],
-    summary='Update datacenter active state',
+    summary='Toggle datacenter active state',
+    description='Activates or deactivates a datacenter. Active datacenters appear in /locations and receive scheduled forecasts.',
     responses={
         404: {'model': ErrorResponse, 'description': 'Datacenter not found'},
+        500: {'model': ErrorResponse, 'description': 'Failed to reload datacenter after update'},
     },
 )
 def patch_datacenter(location_id: str, payload: DatacenterPatchRequest):
     """Updates whether a datacenter is active for scheduler-visible locations."""
     updated = db_utils.set_datacenter_active(location_id, payload.active)
     if not updated:
-        return JSONResponse(
-            status_code=404,
-            content={'error': f'Datacenter not found: {location_id}'},
-        )
+        raise HTTPException(status_code=404, detail=f'Datacenter not found: {location_id}')
 
     datacenter = db_utils.get_datacenter(location_id)
     if not datacenter:
-        return JSONResponse(
-            status_code=500,
-            content={'error': f'Failed to load updated datacenter: {location_id}'},
-        )
+        raise HTTPException(status_code=500, detail=f'Failed to load updated datacenter: {location_id}')
 
     return Datacenter(
         id=datacenter['id'],
