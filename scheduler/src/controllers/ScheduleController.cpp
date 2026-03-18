@@ -1,7 +1,6 @@
 #include "controllers/ScheduleController.hpp"
 #include "Calendar.hpp"
 #include "SchedulingQueue.hpp"
-#include "StatsAPIClient.hpp"
 #include "TrivialScheduler.hpp"
 #include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"

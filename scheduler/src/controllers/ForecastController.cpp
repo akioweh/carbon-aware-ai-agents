@@ -1,5 +1,6 @@
 #include "controllers/ForecastController.hpp"
 #include "StatsAPIClient.hpp"
+#include "structs/TimeIntervalParams.hpp"
 #include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
 #include <drogon/HttpTypes.h>
@@ -11,7 +12,7 @@ using namespace drogon;
 
 auto ForecastController::
     getForecast( // NOLINT(readability-convert-member-functions-to-static)
-        HttpRequestPtr /*req*/,
+        HttpRequestPtr /*req*/, const TimeIntervalParams interval,
         const DatacenterIdentifierParam datacenter) const
     -> Task<HttpResponsePtr> {
 

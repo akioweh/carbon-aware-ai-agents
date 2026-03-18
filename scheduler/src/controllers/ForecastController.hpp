@@ -3,6 +3,7 @@
 #include <drogon/HttpController.h>
 #pragma once
 
+#include "structs/TimeIntervalParams.hpp"
 #include <structs/DatacenterIdentifierParam.hpp>
 
 namespace scheduler::controllers {
@@ -14,7 +15,7 @@ class ForecastController : public drogon::HttpController<ForecastController> {
                   drogon::Get);
     METHOD_LIST_END
 
-    [[nodiscard]] auto getForecast(drogon::HttpRequestPtr,
+    [[nodiscard]] auto getForecast(drogon::HttpRequestPtr, TimeIntervalParams,
                                    DatacenterIdentifierParam) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
