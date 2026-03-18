@@ -207,6 +207,8 @@ paths:
         whether datacenter location is provided.
       parameters:
         - $ref: "#/components/parameters/DatacenterLocationParam"
+        - $ref: "#/components/parameters/StartTimeParam"
+        - $ref: "#/components/parameters/EndTimeParam"
       responses:
         "200":
           description: Successfull response with requested datacenter
@@ -246,7 +248,7 @@ components:
     StartTimeParam:
       name: start_time
       in: query
-      description: Only include blocks starting after this time
+      description: Only include blocks/forecast starting after this time
       required: false
       schema:
         type: string
@@ -257,7 +259,7 @@ components:
     EndTimeParam:
       name: end_time
       in: query
-      description: Only include blocks ending before this time
+      description: Only include blocks/forecast ending before this time
       required: false
       schema:
         type: string
