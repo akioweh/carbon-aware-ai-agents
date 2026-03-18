@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import db_utils
 
-MAX_CAPACITY = 50
+MAX_CAPACITY = 200
 
 
 def _get_datacenter_ids():
@@ -62,7 +62,7 @@ def generate_load(timestamp, dc_index):
     # DC specific variance
     value += (dc_index % 3) * 2  # Slight offset per DC
 
-    return max(0, min(MAX_CAPACITY, value)) * 1e12
+    return max(0, min(MAX_CAPACITY, value)) * 4.92e15
 
 
 def generate_history():
@@ -82,7 +82,7 @@ def generate_history():
                     'location': dc,
                     'timestamp': current,
                     'load': generate_load(current, i),
-                    'carbon_intensity': 250.0, # Placeholder value, can be made dynamic if needed
+                    'carbon_intensity': 250.0,  # Placeholder value, can be made dynamic if needed
                 }
             )
         current += timedelta(minutes=5)

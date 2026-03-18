@@ -18,127 +18,123 @@ CARBON_DB_FILE = Path(
 # Coordinates added for weather API integration (Open-Meteo).
 DEFAULT_DATACENTERS = [
     {
-        "region_id": 13,
-        "location_id": "Data-Center-1",
-        "name": "London",
-        "latitude": 51.51,
-        "longitude": -0.13,
-        "default_active": True,
+        'region_id': 13,
+        'location_id': 'Data-Center-1',
+        'name': 'London',
+        'latitude': 51.51,
+        'longitude': -0.13,
+        'default_active': True,
     },
     {
-        "region_id": 1,
-        "location_id": "Data-Center-2",
-        "name": "North Scotland",
-        "latitude": 57.47,
-        "longitude": -4.04,
-        "default_active": True,
+        'region_id': 1,
+        'location_id': 'Data-Center-2',
+        'name': 'North Scotland',
+        'latitude': 57.47,
+        'longitude': -4.04,
+        'default_active': True,
     },
     {
-        "region_id": 2,
-        "location_id": "Data-Center-3",
-        "name": "South Scotland",
-        "latitude": 55.31,
-        "longitude": -3.54,
-        "default_active": True,
+        'region_id': 2,
+        'location_id': 'Data-Center-3',
+        'name': 'South Scotland',
+        'latitude': 55.31,
+        'longitude': -3.54,
+        'default_active': True,
     },
     {
-        "region_id": 3,
-        "location_id": "Data-Center-4",
-        "name": "North West England",
-        "latitude": 54.05,
-        "longitude": -2.80,
-        "default_active": True,
+        'region_id': 3,
+        'location_id': 'Data-Center-4',
+        'name': 'North West England',
+        'latitude': 54.05,
+        'longitude': -2.80,
+        'default_active': True,
     },
     {
-        "region_id": 4,
-        "location_id": "Data-Center-5",
-        "name": "North East England",
-        "latitude": 54.97,
-        "longitude": -1.61,
-        "default_active": True,
+        'region_id': 4,
+        'location_id': 'Data-Center-5',
+        'name': 'North East England',
+        'latitude': 54.97,
+        'longitude': -1.61,
+        'default_active': True,
     },
     {
-        "region_id": 5,
-        "location_id": "Data-Center-6",
-        "name": "South Yorkshire",
-        "latitude": 53.79,
-        "longitude": -1.54,
-        "default_active": False,
+        'region_id': 5,
+        'location_id': 'Data-Center-6',
+        'name': 'South Yorkshire',
+        'latitude': 53.79,
+        'longitude': -1.54,
+        'default_active': False,
     },
     {
-        "region_id": 6,
-        "location_id": "Data-Center-7",
-        "name": "North Wales, Merseyside and Cheshire",
-        "latitude": 52.95,
-        "longitude": -3.61,
-        "default_active": False,
+        'region_id': 6,
+        'location_id': 'Data-Center-7',
+        'name': 'North Wales, Merseyside and Cheshire',
+        'latitude': 52.95,
+        'longitude': -3.61,
+        'default_active': False,
     },
     {
-        "region_id": 7,
-        "location_id": "Data-Center-8",
-        "name": "South Wales",
-        "latitude": 51.82,
-        "longitude": -3.59,
-        "default_active": False,
+        'region_id': 7,
+        'location_id': 'Data-Center-8',
+        'name': 'South Wales',
+        'latitude': 51.82,
+        'longitude': -3.59,
+        'default_active': False,
     },
     {
-        "region_id": 8,
-        "location_id": "Data-Center-9",
-        "name": "West Midlands",
-        "latitude": 52.51,
-        "longitude": -2.01,
-        "default_active": False,
+        'region_id': 8,
+        'location_id': 'Data-Center-9',
+        'name': 'West Midlands',
+        'latitude': 52.51,
+        'longitude': -2.01,
+        'default_active': False,
     },
     {
-        "region_id": 9,
-        "location_id": "Data-Center-10",
-        "name": "East Midlands",
-        "latitude": 52.95,
-        "longitude": -1.13,
-        "default_active": False,
+        'region_id': 9,
+        'location_id': 'Data-Center-10',
+        'name': 'East Midlands',
+        'latitude': 52.95,
+        'longitude': -1.13,
+        'default_active': False,
     },
     {
-        "region_id": 10,
-        "location_id": "Data-Center-11",
-        "name": "East England",
-        "latitude": 52.61,
-        "longitude": 1.28,
-        "default_active": False,
+        'region_id': 10,
+        'location_id': 'Data-Center-11',
+        'name': 'East England',
+        'latitude': 52.61,
+        'longitude': 1.28,
+        'default_active': False,
     },
     {
-        "region_id": 11,
-        "location_id": "Data-Center-12",
-        "name": "South West England",
-        "latitude": 50.71,
-        "longitude": -3.53,
-        "default_active": False,
+        'region_id': 11,
+        'location_id': 'Data-Center-12',
+        'name': 'South West England',
+        'latitude': 50.71,
+        'longitude': -3.53,
+        'default_active': False,
     },
     {
-        "region_id": 12,
-        "location_id": "Data-Center-13",
-        "name": "South England",
-        "latitude": 50.93,
-        "longitude": -1.44,
-        "default_active": False,
+        'region_id': 12,
+        'location_id': 'Data-Center-13',
+        'name': 'South England',
+        'latitude': 50.93,
+        'longitude': -1.44,
+        'default_active': False,
     },
     {
-        "region_id": 14,
-        "location_id": "Data-Center-14",
-        "name": "South East England",
-        "latitude": 51.27,
-        "longitude": 0.52,
-        "default_active": False,
+        'region_id': 14,
+        'location_id': 'Data-Center-14',
+        'name': 'South East England',
+        'latitude': 51.27,
+        'longitude': 0.52,
+        'default_active': False,
     },
 ]
 
 # Map UK regions to Data Center locations for carbon sync.
-UK_REGION_TO_DC = {
-    row["region_id"]: row["location_id"] for row in DEFAULT_DATACENTERS
-}
+UK_REGION_TO_DC = {row['region_id']: row['location_id'] for row in DEFAULT_DATACENTERS}
 
-DATACENTER_METADATA_BY_ID = {
-    row["location_id"]: row for row in DEFAULT_DATACENTERS
-}
+DATACENTER_METADATA_BY_ID = {row['location_id']: row for row in DEFAULT_DATACENTERS}
 
 
 def get_connection():
@@ -208,10 +204,10 @@ def initialize_db():
             """,
             [
                 (
-                    dc["location_id"],
-                    dc["region_id"],
-                    dc["name"],
-                    int(dc["default_active"]),
+                    dc['location_id'],
+                    dc['region_id'],
+                    dc['name'],
+                    int(dc['default_active']),
                     now,
                     now,
                 )
@@ -227,7 +223,7 @@ def initialize_db():
             WHERE location_id = ?
             """,
             [
-                (dc["region_id"], dc["name"], now, dc["location_id"])
+                (dc['region_id'], dc['name'], now, dc['location_id'])
                 for dc in DEFAULT_DATACENTERS
             ],
         )
@@ -236,12 +232,12 @@ def initialize_db():
 def _datacenter_row_to_dict(row: tuple) -> Dict:
     metadata = DATACENTER_METADATA_BY_ID.get(row[0], {})
     return {
-        "id": row[0],
-        "region_id": row[1],
-        "name": row[2],
-        "active": bool(row[3]),
-        "latitude": metadata.get("latitude"),
-        "longitude": metadata.get("longitude"),
+        'id': row[0],
+        'region_id': row[1],
+        'name': row[2],
+        'active': bool(row[3]),
+        'latitude': metadata.get('latitude'),
+        'longitude': metadata.get('longitude'),
     }
 
 
@@ -611,7 +607,7 @@ def sync_carbon_to_historical(days_back: int = 30) -> int:
             {
                 'location': location,
                 'timestamp': timestamp,
-                'load': 50 * 1e12,  # TODO: stop hardcode dumb value
+                'load': 15 * 1e15,  # TODO: stop hardcode dumb value
                 'carbon_intensity': carbon_intensity,
             }
         )
