@@ -4,11 +4,10 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 import db_utils
-from predictor_load import get_next_week_load
 from predictor_direct_ridge import get_next_week_carbon_intensity
+from predictor_load import get_next_week_load
 
-
-DEFAULT_CAPACITY = 50.0 * 1e12
+DEFAULT_CAPACITY = 200 * 4.92e15
 
 
 def generate_next_week_load_prediction(location):
@@ -95,7 +94,6 @@ def generate_next_week_carbon_intensity_prediction(location):
     }
 
 
-
 def generate_next_week_carbon_intensity_prediction(location):
     """Generate carbon intensity predictions for the next week at a specific location."""
     start_time = datetime.now() - timedelta(days=60)
@@ -151,7 +149,9 @@ if __name__ == '__main__':
 
         try:
             ci_pred = generate_next_week_carbon_intensity_prediction(dc)
-            print(f'Generated {len(ci_pred["data"])} carbon intensity predictions for {dc}')
+            print(
+                f'Generated {len(ci_pred["data"])} carbon intensity predictions for {dc}'
+            )
         except ValueError as exc:
             ci_pred = {'error': str(exc)}
             print(f'Skipping carbon intensity for {dc}: {exc}')

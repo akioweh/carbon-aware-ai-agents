@@ -63,6 +63,10 @@ function formatDatacenterId(id: string): string {
   return `Data Center ${match[1]}`
 }
 
+export function scaleDataByConstantToPFLOP(value: number): number {
+  return value / 1e15
+}
+
 function convertBlocksToWorkload(blocks: any[], start: Date, end: Date, newScheduleId?: string) {
   const intervalMs = 5 * 60 * 1000
   const intervals: WorkloadInterval[] = []
@@ -130,7 +134,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     })
     if (min === Infinity || max === -Infinity) return [0, 1]
     const padding = (max - min) * 0.05
-    return [min - padding, max + padding]
+    return [Math.max(0, min - padding), max + padding]
   }, [forecasts])
 
   const optData = fetchedOptData || result
@@ -316,8 +320,10 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           return prev
         }, null)
 
-        const capacity = closestForecast ? closestForecast.capacity : null;
-        const loadAmount = closestForecast ? closestForecast.load : null;
+        const capacity = closestForecast ? scaleDataByConstantToPFLOP(closestForecast.capacity) : null;
+        const loadAmount = closestForecast ? scaleDataByConstantToPFLOP(closestForecast.load) : null;
+        const existingPFLO = scaleDataByConstantToPFLOP(interval.existing);
+        const newJobPFLO = scaleDataByConstantToPFLOP(interval.newJob);
 
         // Explicitly cast this as a tuple to satisfy the interface
         const outsideLoadRange: [number, number] | null = (capacity !== null && loadAmount !== null)
@@ -326,6 +332,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
         return {
           ...interval,
+          existing: existingPFLO,
+          newJob: newJobPFLO,
           carbon_intensity: closestForecast ? closestForecast.carbon_intensity : null,
           load: loadAmount,
           capacity,
@@ -522,8 +530,8 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                           <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border">
                             <p className="font-medium mb-1 border-b pb-1">{formatTime(label)}</p>
                             {data?.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
-                            {data?.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} kWh</p>}
-                            {data?.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} kWh</p>}
+                            {data?.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} PFLO</p>}
+                            {data?.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} PFLO</p>}
                             {payload.map((entry, index) => {
                               if (entry.value === 0 || entry.dataKey === "carbon_intensity" || entry.dataKey === "outsideLoadRange" || entry.dataKey === "capacity") return null
                               return (
@@ -532,7 +540,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
                                     <span className="text-muted-foreground">{entry.dataKey === "newJob" ? (showTrivial ? "Unoptimised" : "Optimised") : "Existing"}</span>
                                   </span>
-                                  <span className="font-medium">{Number(entry.value).toFixed(1)} kWh</span>
+                                  <span className="font-medium">{Number(entry.value).toFixed(1)} PFLO</span>
                                 </div>
                               )
                             })}
