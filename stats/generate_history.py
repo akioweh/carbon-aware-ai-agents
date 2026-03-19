@@ -7,7 +7,7 @@ import db_utils
 MAX_CAPACITY = 200
 
 
-def _get_datacenter_ids():
+def _get_all_datacenter_ids():
     """Resolve datacenter IDs from db_utils in a backward-compatible way."""
     if hasattr(db_utils, 'get_all_datacenter_ids'):
         return db_utils.get_all_datacenter_ids(include_inactive=True)
@@ -70,7 +70,7 @@ def generate_history():
     start = now - timedelta(days=30)
     current = start
 
-    datacenters = _get_datacenter_ids()
+    datacenters = _get_all_datacenter_ids()
 
     # Prepare bulk data for efficient insertion
     bulk_data = []
