@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
-from predictor_linreg import get_next_week_load  # load stays on Ridge
+from .linreg import get_next_week_load  # load stays on Ridge
 
 warnings.filterwarnings('ignore', module='statsmodels')
 

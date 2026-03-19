@@ -1,28 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-
-const CANDIDATE_STATS_BASE_URLS = [
-  process.env.STATS_API_BASE_URL,
-  "http://140.238.79.139:5000",
-  "http://localhost:5000",
-].filter(Boolean) as string[]
+import { STATS_API_HOST } from "@/app/api/apiConfig";
 
 async function fetchFromStats(path: string, init?: RequestInit): Promise<Response> {
   let lastError: unknown
   let lastResponse: Response | null = null
 
-  for (const baseUrl of CANDIDATE_STATS_BASE_URLS) {
-    try {
-      const response = await fetch(`${baseUrl}${path}`, init)
+  try {
+    const response = await fetch(`${STATS_API_HOST}${path}`, init)
 
-      if (response.ok) {
-        return response
-      }
-
-      lastResponse = response
-      console.warn(`Stats host ${baseUrl} returned ${response.status} for ${path}; trying next host`)
-    } catch (err) {
-      lastError = err
+    if (response.ok) {
+      return response
     }
+
+    lastResponse = response
+    console.warn(`Stats host ${STATS_API_HOST} returned ${response.status} for ${path}; trying next host`)
+  } catch (err) {
+    lastError = err
   }
 
   if (lastResponse) {
