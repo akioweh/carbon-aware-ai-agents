@@ -13,7 +13,12 @@ using namespace scheduler::exceptions;
 auto SchedulerBase::fetch_data(const JobRequest &job)
     -> drogon::Task<SchedulerData> {
     assert(job.workload_amount >= 0.);
-    assert(job.earliest_start <= job.latest_finish);
+    // assert(job.earliest_start <= job.latest_finish);
+    std::cout << "THIS SHOULD THROW!" << std::endl;
+    if (job.earliest_start > job.latest_finish) {
+        std::cout << "IT DID THROW!" << std::endl;
+        throw exceptions::SchedulingException("Time window too narrow");
+    }
 
     const auto time_index_offset = TIME_GRIDDER.toIndex(job.earliest_start);
 

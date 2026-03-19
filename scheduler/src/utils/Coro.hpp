@@ -118,7 +118,7 @@ void wrap_task(drogon::Task<T> task, auto ctx, auto assign) {
     drogon::async_run(
         [task = std::move(task), ctx,
          assign = std::move(assign)]() mutable -> drogon::Task<void> {
-            ScopeGuard on_exit{[=] -> auto { ctx->complete_one(); }};
+            ScopeGuard on_exit{[&] -> auto { ctx->complete_one(); }};
 
             try {
                 if constexpr (std::is_void_v<T>) {

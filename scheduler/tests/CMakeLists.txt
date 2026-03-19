@@ -22,14 +22,6 @@ add_executable(coro_test CoroTests.cpp)
 target_link_libraries(coro_test PRIVATE scheduler_core Boost::unit_test_framework)
 add_test(NAME coro_test COMMAND coro_test)
 
-add_executable(queue_test SchedulingQueueTests.cpp)
-target_link_libraries(queue_test PRIVATE scheduler_core Boost::unit_test_framework)
-add_test(NAME queue_test COMMAND queue_test)
-
-add_executable(calendar_test CalendarTests.cpp)
-target_link_libraries(calendar_test PRIVATE scheduler_core Boost::unit_test_framework)
-add_test(NAME calendar_test COMMAND calendar_test)
-
 # Integration test with Mock Calendar
 # We cannot link scheduler_core because we want to replace Calendar.cpp
 # So we glob sources from src/ and exclude Calendar.cpp
@@ -38,6 +30,19 @@ file(GLOB_RECURSE SCHEDULER_SRC_FILES
     "${CMAKE_SOURCE_DIR}/src/*.cc"
 )
 list(FILTER SCHEDULER_SRC_FILES EXCLUDE REGEX ".*/Calendar.cpp$")
+
+add_executable(queue_test 
+    SchedulingQueueTests.cpp 
+    mocks/MockCalendar.cpp
+    ${SCHEDULER_SRC_FILES}
+)
+target_include_directories(queue_test PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(queue_test PRIVATE 
+    Drogon::Drogon 
+    Boost::unit_test_framework 
+    stdc++exp
+)
+add_test(NAME queue_test COMMAND queue_test)
 
 add_executable(scheduler_integration_test
     SchedulerIntegrationTest.cpp

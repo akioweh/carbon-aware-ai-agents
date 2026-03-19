@@ -28,8 +28,10 @@ class SchedulerTask {
     }
 
     auto await_resume() -> SchedulerOutput {
-        if (except_ptr)
+        if (except_ptr) {
+            std::cout << "AND WE SERVE IT BACK TO THE USER!" << std::endl;
             std::rethrow_exception(except_ptr);
+        }
         return std::move(value);
     }
 
