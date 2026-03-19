@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from generate_history import generate_load
+from data.generate_history import generate_load
 
 
 def get_next_week_load(historical_df, now=None) -> pd.DataFrame:
