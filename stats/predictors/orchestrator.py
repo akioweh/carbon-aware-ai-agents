@@ -3,15 +3,9 @@ import json
 import pandas as pd
 
 import db_utils
+from config import DEFAULT_CAPACITY
 from .ridge import get_next_week_carbon_intensity
 from .load import get_next_week_load
-
-# Number of GPUs per data center (uniform across all locations)
-GPUS_PER_DATACENTER = 200
-# FLOs per GPU per 5-minute interval (derived from hardware specs)
-FLOS_PER_GPU = 4.92e15
-# Maximum computational capacity per data center per interval (in FLOs)
-DEFAULT_CAPACITY = GPUS_PER_DATACENTER * FLOS_PER_GPU
 
 
 def generate_next_week_load_prediction(location):

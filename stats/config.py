@@ -23,5 +23,10 @@ CARBON_COLLECTION_ENABLED = os.environ.get('CARBON_COLLECTION_ENABLED', '1') == 
 
 PREDICTION_WINDOW_HOURS = 7 * 24
 
+# Datacenter capacity constants
+GPUS_PER_DATACENTER = 200
+FLOS_PER_GPU = 4.92e15  # FLOs per GPU per 5-minute interval
+DEFAULT_CAPACITY = GPUS_PER_DATACENTER * FLOS_PER_GPU
+
 # Threshold: log a CRITICAL alert after this many consecutive failures in a loop
 FAILURE_ALERT_THRESHOLD = int(os.environ.get('FAILURE_ALERT_THRESHOLD', 5))
