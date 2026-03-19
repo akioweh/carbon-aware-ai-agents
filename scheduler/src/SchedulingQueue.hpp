@@ -13,6 +13,8 @@ namespace scheduler {
 
 class SchedulerTask {
     std::atomic<std::coroutine_handle<>> taskHandle{nullptr};
+    enum class State { Pending, Suspended, Done };
+    std::atomic<State> state{State::Pending};
     SchedulerOutput value;
     std::exception_ptr except_ptr{nullptr};
 
@@ -20,11 +22,15 @@ class SchedulerTask {
     JobRequest jobRequest;
     SchedulerTask(JobRequest jobRequest) : jobRequest(std::move(jobRequest)) {};
 
-    auto await_ready() -> bool { return false; }
+    auto await_ready() -> bool {
+        return state.load(std::memory_order_acquire) == State::Done;
+    }
 
     auto await_suspend(std::coroutine_handle<> handle) {
         taskHandle.store(handle, std::memory_order_release);
-        taskHandle.notify_one();
+        auto expected = State::Pending;
+        return state.compare_exchange_strong(expected, State::Suspended,
+                                             std::memory_order_acq_rel);
     }
 
     auto await_resume() -> SchedulerOutput {
@@ -36,7 +42,12 @@ class SchedulerTask {
     auto setValue(SchedulerOutput result) { value = std::move(result); }
 
     auto resume() {
-        taskHandle.wait(nullptr, std::memory_order_acquire);
+
+        auto expected = State::Pending;
+        if (state.compare_exchange_strong(expected, State::Done,
+                                          std::memory_order_acq_rel))
+            return;
+
         auto handle = taskHandle.load(std::memory_order_acquire);
         handle.resume();
     }

@@ -4,6 +4,7 @@
 #include <atomic>
 #include <drogon/utils/coroutine.h>
 #include <exception>
+#include <trantor/utils/Logger.h>
 
 namespace scheduler {
 
@@ -33,7 +34,6 @@ start:;
     SchedulerTask *task;
     while (Q.pop(task)) {
         (void)queueSize.fetch_sub(1, std::memory_order_release);
-
         try {
             Scheduler scheduler;
             auto res = co_await scheduler.scheduleJob(task->jobRequest);
@@ -41,6 +41,7 @@ start:;
         } catch (...) {
             task->setException(std::current_exception());
         }
+
         task->resume();
     }
 
