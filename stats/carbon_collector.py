@@ -17,14 +17,18 @@ import time
 import shutil
 import schedule
 import signal
-import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
 
-# Configuration
-API_BASE_URL = 'https://api.carbonintensity.org.uk'
+from config import (
+    API_BASE_URL,
+    BACKFILL_DAYS,
+    CARBON_DB_FILE as DB_PATH,
+    CARBON_INTERVAL_MINUTES as INTERVAL_MINUTES,
+)
+
 REGIONS = {
     1: "North Scotland",
     2: "South Scotland",
@@ -41,11 +45,6 @@ REGIONS = {
     13: "London",
     14: "South East England",
 }
-DB_PATH = Path(
-    os.environ.get('CARBON_DB_PATH', Path(__file__).parent / 'carbon_intensity.db')
-)
-INTERVAL_MINUTES = int(os.environ.get('CARBON_INTERVAL_MINUTES', 30))
-BACKFILL_DAYS = int(os.environ.get('BACKFILL_DAYS', 365))
 
 # Graceful shutdown flag
 _shutdown_requested = False

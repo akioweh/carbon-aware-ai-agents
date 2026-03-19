@@ -1,17 +1,12 @@
 """Database utilities for managing historical time-series data."""
 
 import json
-import os
 import sqlite3
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, List, Optional
 
-DB_FILE = Path(__file__).parent / 'cache.db'
-CARBON_DB_FILE = Path(
-    os.environ.get('CARBON_DB_PATH', Path(__file__).parent / 'carbon_intensity.db')
-)
+from config import CARBON_DB_FILE, DB_FILE
 
 # Canonical set of datacenters seeded into cache.db.
 # Keep Data-Center-1..5 mappings stable for scheduler compatibility.

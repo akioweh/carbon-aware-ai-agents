@@ -2,8 +2,17 @@
 
 import logging
 import os
+from pathlib import Path
+
+_STATS_DIR = Path(__file__).parent
 
 LOG_FILE = os.environ.get('STATS_LOG_FILE', 'app.log')
+
+# Database paths
+DB_FILE = _STATS_DIR / 'cache.db'
+CARBON_DB_FILE = Path(
+    os.environ.get('CARBON_DB_PATH', _STATS_DIR / 'carbon_intensity.db')
+)
 
 # Logging setup — writes to both stdout and a persistent log file
 _log_fmt = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
@@ -22,6 +31,11 @@ CARBON_SYNC_INTERVAL = int(os.environ.get('CARBON_SYNC_INTERVAL', 1800))  # 30 m
 CARBON_COLLECTION_ENABLED = os.environ.get('CARBON_COLLECTION_ENABLED', '1') == '1'
 
 PREDICTION_WINDOW_HOURS = 7 * 24
+
+# Carbon collector settings
+CARBON_INTERVAL_MINUTES = int(os.environ.get('CARBON_INTERVAL_MINUTES', 30))
+BACKFILL_DAYS = int(os.environ.get('BACKFILL_DAYS', 365))
+API_BASE_URL = 'https://api.carbonintensity.org.uk'
 
 # Datacenter capacity constants
 GPUS_PER_DATACENTER = 200
