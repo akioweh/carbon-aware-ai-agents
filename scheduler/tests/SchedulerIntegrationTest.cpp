@@ -339,4 +339,114 @@ BOOST_AUTO_TEST_CASE(test_schedule_summaries_aggregation) {
     }());
 }
 
+BOOST_AUTO_TEST_CASE(test_get_gpu_types) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(drogon::Get);
+    req->setPath("/api/hardwareSpecs/gpus");
+
+    auto respPair = client->sendRequest(req);
+    BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+    auto response = respPair.second;
+
+    // Verify 200 OK and JSON array structure[cite: 5]
+    BOOST_CHECK_EQUAL(response->getStatusCode(), k200OK);
+    auto json = response->getJsonObject();
+    BOOST_REQUIRE(json && json->isArray());
+
+    // Verify it contains at least the default hardware types[cite: 8]
+    bool foundV100 = false;
+    bool foundA100 = false;
+    for (const auto &type : *json) {
+        if (type.asString() == "V100_PCIE")
+            foundV100 = true;
+        if (type.asString() == "A100_SXM4")
+            foundA100 = true;
+    }
+    BOOST_CHECK(foundV100);
+    BOOST_CHECK(foundA100);
+}
+
+BOOST_AUTO_TEST_CASE(test_forecast_specific_datacenter) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(drogon::Get);
+    req->setPath("/api/forecast");
+    // "datacenter" key is required by the custom fromRequest template
+    req->setParameter("datacenter", "Data-Center-1");
+
+    auto respPair = client->sendRequest(req);
+    BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+    auto response = respPair.second;
+
+    BOOST_CHECK_EQUAL(response->getStatusCode(), k200OK);
+    auto json = response->getJsonObject();
+    BOOST_REQUIRE(json && json->isArray());
+
+    // Controller wraps the result in a vector
+    if (json->size() > 0) {
+        const auto &dc = (*json)[0];
+        // The Datacenter DTO serializes 'id' as "location"[cite: 11]
+        BOOST_CHECK_EQUAL(dc["location"].asString(), "Data-Center-1");
+        BOOST_CHECK(dc.isMember("timeseries"));
+        BOOST_CHECK(dc["timeseries"].isArray());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_forecast_any_datacenter_explicit) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(drogon::Get);
+    req->setPath("/api/forecast");
+    req->setParameter("datacenter", scheduler::calendar::ANY_DATACENTER);
+
+    auto respPair = client->sendRequest(req);
+    BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+
+    auto response = respPair.second;
+    BOOST_CHECK_EQUAL(response->getStatusCode(), k200OK);
+
+    auto json = response->getJsonObject();
+    BOOST_REQUIRE(json && json->isArray());
+
+    // Should return all datacenters from the StatsAPIClient[cite: 3, 9]
+    BOOST_CHECK(json->size() >= 1);
+    if (json->size() > 0) {
+        BOOST_CHECK((*json)[0].isMember("location"));
+        BOOST_CHECK((*json)[0].isMember("timeseries"));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_forecast_any_datacenter_implicit) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(drogon::Get);
+    req->setPath("/api/forecast");
+    // No parameters set—tests the 'defaultName' logic in fromRequest
+
+    auto respPair = client->sendRequest(req);
+    BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+
+    auto response = respPair.second;
+    BOOST_CHECK_EQUAL(response->getStatusCode(), k200OK);
+
+    auto json = response->getJsonObject();
+    BOOST_REQUIRE(json && json->isArray());
+
+    // Should match the 'explicit' any behavior[cite: 3]
+    BOOST_CHECK(json->size() >= 1);
+    if (json->size() > 0) {
+        // Verify TimeSlot serialization within the timeseries[cite: 11]
+        const auto &firstSeries = (*json)[0]["timeseries"];
+        if (firstSeries.size() > 0) {
+            BOOST_CHECK(firstSeries[0].isMember("timestamp"));
+            BOOST_CHECK(firstSeries[0].isMember("carbon_intensity"));
+        }
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
