@@ -1,10 +1,12 @@
 #ifndef SCHEDULER_SCHEDULER_BASE_HPP
 #define SCHEDULER_SCHEDULER_BASE_HPP
+#include "Calendar.hpp"
 #pragma once
 
 #include "SchedulerAlgo.hpp"
 #include "StatsAPIClient.hpp"
 #include "structs/JobRequest.hpp"
+#include "structs/TimeIntervalParams.hpp"
 #include <string>
 #include <vector>
 
@@ -36,6 +38,12 @@ class SchedulerBase {
 
   public:
     virtual ~SchedulerBase() = default;
+    SchedulerBase(scheduler::calendar::time_point start_time,
+                  scheduler::calendar::time_point end_time) {
+        const auto interval =
+            TimeIntervalParams{.start = start_time, .end = end_time};
+        stats_api = StatsAPIClient(interval);
+    }
 
   protected:
     auto fetch_data(const JobRequest &job) -> drogon::Task<SchedulerData>;

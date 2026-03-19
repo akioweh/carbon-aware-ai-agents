@@ -77,7 +77,8 @@ auto ScheduleController::
     auto trivialResult = optional<ScheduleResult>{};
     // Also compute trivial and persist
     try {
-        auto tSched = TrivialScheduler{};
+        auto tSched = TrivialScheduler(job_request.earliest_start,
+                                       job_request.latest_finish);
         auto tOutput = co_await tSched.scheduleJob(job_request);
         co_await calendar::addTrivial(tOutput, schedule_id);
 

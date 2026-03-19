@@ -14,6 +14,7 @@ namespace scheduler {
  */
 class TrivialScheduler : public SchedulerBase {
   public:
+    using SchedulerBase::SchedulerBase;
     auto scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput>;
 };
 

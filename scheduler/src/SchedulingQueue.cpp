@@ -1,9 +1,12 @@
 #include "SchedulingQueue.hpp"
+#include "Calendar.hpp"
 #include "Scheduler.hpp"
 #include "structs/JobRequest.hpp"
+#include "structs/TimeIntervalParams.hpp"
 #include <atomic>
 #include <drogon/utils/coroutine.h>
 #include <exception>
+#include <optional>
 
 namespace scheduler {
 
@@ -35,7 +38,8 @@ start:;
         (void)queueSize.fetch_sub(1, std::memory_order_release);
 
         try {
-            Scheduler scheduler;
+            Scheduler scheduler(task->jobRequest.earliest_start,
+                                task->jobRequest.latest_finish);
             auto res = co_await scheduler.scheduleJob(task->jobRequest);
             task->setValue(std::move(res));
         } catch (...) {
