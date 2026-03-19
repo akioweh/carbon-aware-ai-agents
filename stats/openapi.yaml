@@ -1,14 +1,20 @@
 openapi: 3.1.0
 info:
-  title: Stats API
-  description: Statistics provider for carbon-aware scheduling predictions.
+  title: Carbon-Aware Forecasting Service
+  description: Provides load and carbon intensity forecasts for data center locations.
+    Forecasts are generated using Ridge regression models trained on historical UK
+    Carbon Intensity API data and weather features from Open-Meteo. All forecasts
+    cover a 7-day window at 5-minute resolution (2016 data points).
   version: 1.0.0
 paths:
   /locations/{location}/metrics/forecast_load:
     get:
       tags:
       - Forecasts
-      summary: Get load forecast for next week
+      summary: Load forecast for a location
+      description: Returns a 7-day load forecast at 5-minute resolution (2016 data
+        points). Each point includes the predicted load and the datacenter capacity
+        in FLOs. Results are cached and refreshed every 30 minutes.
       operationId: get_load_forecast_locations__location__metrics_forecast_load_get
       parameters:
       - name: location
@@ -24,14 +30,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoadForecastResponse'
-        '500':
+        '404':
+          description: No historical data for this location
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Internal Server Error
-        '404':
-          description: Location not found
+        '500':
+          description: Prediction generation failed
           content:
             application/json:
               schema:
@@ -46,11 +52,11 @@ paths:
     get:
       tags:
       - Forecasts
-      summary: Get carbon intensity forecast for next week
-      description: 'Returns ML-generated carbon intensity predictions for the next
-        week.
-
-        Results are cached for 5 minutes.'
+      summary: Carbon intensity forecast for a location
+      description: Returns a 7-day carbon intensity forecast at 5-minute resolution
+        (2016 data points) in gCO2/kWh. Uses Ridge regression trained on UK Carbon
+        Intensity API data with weather exogenous features. Results are cached and
+        refreshed every 30 minutes.
       operationId: get_carbon_forecast_locations__location__metrics_forecast_carbon_intensity_get
       parameters:
       - name: location
@@ -66,14 +72,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CarbonIntensityForecastResponse'
-        '500':
+        '404':
+          description: No carbon intensity data for this location
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Internal Server Error
-        '404':
-          description: Location not found
+        '500':
+          description: Prediction generation failed
           content:
             application/json:
               schema:
@@ -87,8 +93,10 @@ paths:
   /predictionWindow:
     get:
       tags:
-      - PredictionWindowLength
-      summary: Returns prediction window length in hours to the future.
+      - Configuration
+      summary: Prediction window length
+      description: Returns the forecast window length in hours. Currently fixed at
+        168 hours (7 days).
       operationId: handle_get_prediction_window_predictionWindow_get
       responses:
         '200':
@@ -101,12 +109,13 @@ paths:
     get:
       tags:
       - Locations
-      summary: Get available locations
-      description: Returns active locations for scheduler consumption.
+      summary: Active locations
+      description: Returns locations that are currently active and visible to the
+        scheduler. Use a location ID from this list to query forecast endpoints.
       operationId: get_locations_locations_get
       responses:
         '200':
-          description: Successful Response
+          description: List of active locations
           content:
             application/json:
               schema:
@@ -129,8 +138,9 @@ paths:
     get:
       tags:
       - Datacenters
-      summary: Get all datacenters and active state
-      description: Returns all known datacenters and active state for UI management.
+      summary: All datacenters
+      description: Returns all known datacenters (active and inactive) with their
+        region metadata and coordinates. Used by the UI for datacenter management.
       operationId: get_datacenters_datacenters_get
       responses:
         '200':
@@ -146,8 +156,9 @@ paths:
     patch:
       tags:
       - Datacenters
-      summary: Update datacenter active state
-      description: Updates whether a datacenter is active for scheduler-visible locations.
+      summary: Toggle datacenter active state
+      description: Activates or deactivates a datacenter. Active datacenters appear
+        in /locations and receive scheduled forecasts.
       operationId: patch_datacenter_datacenters__location_id__patch
       parameters:
       - name: location_id
@@ -175,6 +186,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to reload datacenter after update
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -188,7 +205,9 @@ components:
         timestamp:
           type: string
           title: Timestamp
-          description: ISO format timestamp
+          description: ISO 8601 timestamp
+          examples:
+          - '2026-03-18T12:00:00'
         value:
           type: number
           title: Value
@@ -196,7 +215,7 @@ components:
         is_forecast:
           type: boolean
           title: Is Forecast
-          description: Indicates if this is a forecast
+          description: Always true for forecast endpoints
       type: object
       required:
       - timestamp
@@ -209,20 +228,28 @@ components:
           type: string
           title: Location Id
           description: Datacenter identifier
+          examples:
+          - Data-Center-1
         metric:
           type: string
           title: Metric
-          description: Metric name (e.g. forecast_load, forecast_carbon_intensity)
+          description: Metric name
+          examples:
+          - forecast_load
+          - forecast_carbon_intensity
         unit:
           type: string
           title: Unit
           description: Unit of measurement
+          examples:
+          - FLOs
+          - gCO2/kWh
         data:
           items:
             $ref: '#/components/schemas/BaseForecastDataPoint'
           type: array
           title: Data
-          description: Time series data
+          description: 2016-point time series (7 days at 5-min intervals)
       type: object
       required:
       - location_id
@@ -236,30 +263,40 @@ components:
           type: string
           title: Id
           description: Location identifier
+          examples:
+          - Data-Center-1
         region_id:
           type: integer
           title: Region Id
           description: UK Carbon Intensity API region ID
+          examples:
+          - 13
         name:
           type: string
           title: Name
-          description: Human-readable region/location name
+          description: Human-readable region name
+          examples:
+          - London
         active:
           type: boolean
           title: Active
-          description: Whether scheduler-visible location is enabled
+          description: Whether this datacenter is visible to the scheduler
         latitude:
           anyOf:
           - type: number
           - type: 'null'
           title: Latitude
-          description: Latitude used for weather and map display
+          description: Latitude for weather lookups and map display
+          examples:
+          - 51.51
         longitude:
           anyOf:
           - type: number
           - type: 'null'
           title: Longitude
-          description: Longitude used for weather and map display
+          description: Longitude for weather lookups and map display
+          examples:
+          - -0.13
       type: object
       required:
       - id
@@ -279,12 +316,13 @@ components:
       title: DatacenterPatchRequest
     ErrorResponse:
       properties:
-        error:
+        detail:
           type: string
-          title: Error
+          title: Detail
+          description: Error description
       type: object
       required:
-      - error
+      - detail
       title: ErrorResponse
     HTTPValidationError:
       properties:
@@ -300,7 +338,9 @@ components:
         timestamp:
           type: string
           title: Timestamp
-          description: ISO format timestamp
+          description: ISO 8601 timestamp
+          examples:
+          - '2026-03-18T12:00:00'
         value:
           type: number
           title: Value
@@ -308,11 +348,13 @@ components:
         is_forecast:
           type: boolean
           title: Is Forecast
-          description: Indicates if this is a forecast
+          description: Always true for forecast endpoints
         capacity:
           type: number
           title: Capacity
-          description: Capacity in FLOs
+          description: Max computational capacity at this interval (FLOs)
+          examples:
+          - 9.84e+17
       type: object
       required:
       - timestamp
@@ -326,20 +368,28 @@ components:
           type: string
           title: Location Id
           description: Datacenter identifier
+          examples:
+          - Data-Center-1
         metric:
           type: string
           title: Metric
-          description: Metric name (e.g. forecast_load, forecast_carbon_intensity)
+          description: Metric name
+          examples:
+          - forecast_load
+          - forecast_carbon_intensity
         unit:
           type: string
           title: Unit
           description: Unit of measurement
+          examples:
+          - FLOs
+          - gCO2/kWh
         data:
           items:
             $ref: '#/components/schemas/LoadForecastDataPoint'
           type: array
           title: Data
-          description: Time series data
+          description: 2016-point time series (7 days at 5-min intervals)
       type: object
       required:
       - location_id
@@ -353,10 +403,14 @@ components:
           type: string
           title: Id
           description: Location identifier
+          examples:
+          - Data-Center-1
         name:
           type: string
           title: Name
-          description: Human-readable name
+          description: Human-readable region name
+          examples:
+          - London
       type: object
       required:
       - id
@@ -367,6 +421,9 @@ components:
         windowLengthHours:
           type: integer
           title: Windowlengthhours
+          description: Forecast window length in hours
+          examples:
+          - 168
       type: object
       required:
       - windowLengthHours

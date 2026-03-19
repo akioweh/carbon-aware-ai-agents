@@ -279,9 +279,8 @@ export function DataCentreConfig({ onClose }: DataCentreConfigProps) {
                     <li
                       key={dc.id}
                       onClick={() => handleSelect(dc.id)}
-                      className={`grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-4 transition-colors ${
-                        isHighlighted ? "bg-muted/60" : "hover:bg-muted/30"
-                      }`}
+                      className={`grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-4 transition-colors ${isHighlighted ? "bg-muted/60" : "hover:bg-muted/30"
+                        }`}
                     >
                       <div className="min-w-0">
                         <p className="truncate font-medium text-sm">{formatDatacenterId(dc.id)}</p>
@@ -320,8 +319,18 @@ export function DataCentreConfig({ onClose }: DataCentreConfigProps) {
         </p>
 
         <div className="flex items-center gap-3">
+          {!loading && enabledCount === 0 && (
+            <span className="text-sm font-medium text-destructive animate-pulse">
+              At least one data centre must be active
+            </span>
+          )}
+
           {savedBanner && <span className="text-sm text-emerald-600 font-medium">Configuration saved</span>}
-          <Button onClick={handleSave} disabled={saving || loading || !hasChanges}>
+
+          <Button
+            onClick={handleSave}
+            disabled={saving || loading || !hasChanges || enabledCount === 0}
+          >
             {saving ? "Saving..." : "Save Configuration"}
           </Button>
         </div>
