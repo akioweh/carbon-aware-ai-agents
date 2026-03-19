@@ -19,7 +19,7 @@ namespace scheduler {
 using namespace std;
 using namespace drogon;
 
-StatsAPIClient::StatsAPIClient() : host(getDefaultHost()) {}
+StatsAPIClient::StatsAPIClient(std::string host) : host(std::move(host)) {}
 StatsAPIClient::StatsAPIClient(TimeIntervalParams time_interval, string host)
     : host(std::move(host)), time_interval(time_interval) {}
 

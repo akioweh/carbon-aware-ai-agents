@@ -93,9 +93,9 @@ class StatsAPIClient {
     }
 
   public:
-    StatsAPIClient();
+    StatsAPIClient(std::string host = getDefaultHost());
     explicit StatsAPIClient(TimeIntervalParams time_interval,
-                            std::string host = DEFAULT_STATS_API_HOST);
+                            std::string host = getDefaultHost());
 
     [[nodiscard]] auto getLocations() const
         -> drogon::Task<std::vector<Location>>;
