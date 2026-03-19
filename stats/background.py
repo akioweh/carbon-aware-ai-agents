@@ -4,7 +4,7 @@ import logging
 import time
 
 import db_utils
-from config import CARBON_SYNC_INTERVAL, FAILURE_ALERT_THRESHOLD
+from config import CARBON_SYNC_INTERVAL, FAILURE_ALERT_THRESHOLD, PREDICTION_INTERVAL
 from predictors import (
     generate_next_week_carbon_intensity_prediction,
     generate_next_week_load_prediction,
@@ -14,7 +14,7 @@ logger = logging.getLogger('stats.background')
 
 
 def prediction_loop():
-    """Background loop to update predictions every 5 minutes."""
+    """Background loop to update predictions at a configurable interval (default 30 min)."""
     consecutive_failures: dict[str, int] = {}
     while True:
         logger.info('Updating predictions cache...')
@@ -24,7 +24,7 @@ def prediction_loop():
             logger.warning(
                 'No datacenters configured; skipping prediction refresh'
             )
-            time.sleep(300)
+            time.sleep(PREDICTION_INTERVAL)
             continue
 
         for dc in list(consecutive_failures):
@@ -73,7 +73,7 @@ def prediction_loop():
                         consecutive_failures[dc],
                     )
 
-        time.sleep(300)
+        time.sleep(PREDICTION_INTERVAL)
 
 
 def carbon_sync_loop():

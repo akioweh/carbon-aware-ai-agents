@@ -30,7 +30,7 @@ router = APIRouter()
     response_model=LoadForecastResponse,
     tags=['Forecasts'],
     summary='Load forecast for a location',
-    description='Returns a 7-day load forecast at 5-minute resolution (2016 data points). Each point includes the predicted load and the datacenter capacity in FLOs. Results are cached for 5 minutes.',
+    description='Returns a 7-day load forecast at 5-minute resolution (2016 data points). Each point includes the predicted load and the datacenter capacity in FLOs. Results are cached and refreshed every 30 minutes.',
     responses={
         404: {
             'model': ErrorResponse,
@@ -65,7 +65,7 @@ def get_load_forecast(location: str):
     response_model=CarbonIntensityForecastResponse,
     tags=['Forecasts'],
     summary='Carbon intensity forecast for a location',
-    description='Returns a 7-day carbon intensity forecast at 5-minute resolution (2016 data points) in gCO2/kWh. Uses Ridge regression trained on UK Carbon Intensity API data with weather exogenous features. Results are cached for 5 minutes.',
+    description='Returns a 7-day carbon intensity forecast at 5-minute resolution (2016 data points) in gCO2/kWh. Uses Ridge regression trained on UK Carbon Intensity API data with weather exogenous features. Results are cached and refreshed every 30 minutes.',
     responses={
         404: {
             'model': ErrorResponse,

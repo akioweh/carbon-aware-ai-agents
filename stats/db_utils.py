@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-from config import CARBON_DB_FILE, DB_FILE
+from config import CARBON_DB_FILE, DB_FILE, PREDICTION_CACHE_TTL
 
 # Canonical set of datacenters seeded into cache.db.
 # Keep Data-Center-1..5 mappings stable for scheduler compatibility.
@@ -313,7 +313,7 @@ def get_active_datacenter_ids() -> List[str]:
 
 
 def get_cached_prediction(key: str) -> Optional[dict]:
-    """Get cached prediction if it exists and is less than 5 minutes old."""
+    """Get cached prediction if it exists and is within the configured TTL."""
     try:
         with get_connection() as conn:
             cursor = conn.execute(
@@ -323,8 +323,7 @@ def get_cached_prediction(key: str) -> Optional[dict]:
 
             if row:
                 data_json, timestamp = row
-                # Check if cache is fresh (less than 5 minutes old)
-                if time.time() - timestamp < 300:  # 300 seconds = 5 minutes
+                if time.time() - timestamp < PREDICTION_CACHE_TTL:
                     return json.loads(data_json)
     except sqlite3.Error as e:
         print(f'Cache read error: {e}')

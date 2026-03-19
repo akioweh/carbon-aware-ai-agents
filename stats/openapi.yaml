@@ -14,7 +14,7 @@ paths:
       summary: Load forecast for a location
       description: Returns a 7-day load forecast at 5-minute resolution (2016 data
         points). Each point includes the predicted load and the datacenter capacity
-        in FLOs. Results are cached for 5 minutes.
+        in FLOs. Results are cached and refreshed every 30 minutes.
       operationId: get_load_forecast_locations__location__metrics_forecast_load_get
       parameters:
       - name: location
@@ -55,8 +55,8 @@ paths:
       summary: Carbon intensity forecast for a location
       description: Returns a 7-day carbon intensity forecast at 5-minute resolution
         (2016 data points) in gCO2/kWh. Uses Ridge regression trained on UK Carbon
-        Intensity API data with weather exogenous features. Results are cached for
-        5 minutes.
+        Intensity API data with weather exogenous features. Results are cached and
+        refreshed every 30 minutes.
       operationId: get_carbon_forecast_locations__location__metrics_forecast_carbon_intensity_get
       parameters:
       - name: location
