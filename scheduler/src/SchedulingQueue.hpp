@@ -11,20 +11,28 @@
 
 namespace scheduler {
 
+template <std::invocable Func> struct ScopeGuard {
+    Func func;
+    ~ScopeGuard() { func(); }
+};
+
 class SchedulerTask {
     std::atomic<std::coroutine_handle<>> taskHandle{nullptr};
     SchedulerOutput value;
     std::exception_ptr except_ptr{nullptr};
+    std::atomic<bool> isDone{false};
 
   public:
     JobRequest jobRequest;
     SchedulerTask(JobRequest jobRequest) : jobRequest(std::move(jobRequest)) {};
 
-    auto await_ready() -> bool { return false; }
+    auto await_ready() -> bool {
+        return isDone.load(std::memory_order_acquire);
+    }
 
     auto await_suspend(std::coroutine_handle<> handle) {
+        ScopeGuard onExitNotify{[&]() -> auto { taskHandle.notify_one(); }};
         taskHandle.store(handle, std::memory_order_release);
-        taskHandle.notify_one();
     }
 
     auto await_resume() -> SchedulerOutput {
@@ -35,7 +43,10 @@ class SchedulerTask {
         return std::move(value);
     }
 
-    auto setValue(SchedulerOutput result) { value = std::move(result); }
+    auto setValue(SchedulerOutput result) {
+        value = std::move(result);
+        isDone.store(true, std::memory_order_release);
+    }
 
     auto resume() {
         taskHandle.wait(nullptr, std::memory_order_acquire);
@@ -43,7 +54,10 @@ class SchedulerTask {
         handle.resume();
     }
 
-    auto setException(auto &&e) { except_ptr = e; }
+    auto setException(auto &&e) {
+        except_ptr = e;
+        isDone.store(true, std::memory_order_release);
+    }
 };
 
 class SchedulingQueue {

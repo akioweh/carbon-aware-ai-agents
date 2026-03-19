@@ -1,5 +1,6 @@
 #include "Calendar.hpp"
 #include "structs/SchedulerOutput.hpp"
+#include <boost/test/tools/old/interface.hpp>
 #define BOOST_TEST_MODULE SchedulerIntegrationTest
 
 #include "exceptions/ExceptionHandler.hpp"
@@ -334,10 +335,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_summaries_aggregation) {
     drogon::sync_wait([]() -> drogon::Task<void> {
         // scheduleSummaries executes complex SQL joins for IDs, times, and
         // loads[cite: 1]
-        auto summaries = co_await scheduler::calendar::scheduleSummaries();
-
-        // Even if empty, it should return a valid vector, not throw
-        BOOST_CHECK(summaries.size() >= 0);
+        BOOST_CHECK_NO_THROW(co_await scheduler::calendar::scheduleSummaries());
     }());
 }
 
