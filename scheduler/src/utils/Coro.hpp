@@ -126,7 +126,7 @@ void wrap_task(drogon::Task<T> task, auto ctx, auto assign) {
                     if (return_exceptions ||
                         ctx->exceptionState.load(std::memory_order::acquire) ==
                             NO_EXCEPTION)
-                        assign({});
+                        assign(std::monostate{});
                 } else {
                     decltype(auto) result = co_await task;
                     if (return_exceptions ||
@@ -149,7 +149,7 @@ void wrap_task(drogon::Task<T> task, auto ctx, auto assign) {
 // Rets must be void or default_constructible if return_exceptions is true.
 // for any void in Rets (and return_exceptions is false), the corresponding
 // result will be std::monostate
-template <typename... Rets, bool return_exceptions = false,
+template <bool return_exceptions = false, typename... Rets,
           size_t N = sizeof...(Rets)>
     requires(N > 0)
 auto when_all(drogon::Task<Rets>... coros) -> auto {
@@ -174,7 +174,7 @@ auto when_all(drogon::Task<Rets>... coros) -> auto {
 // T must be default_constructible (and movable).
 // if T is void (and return_exceptions is false), the result vector will hold
 // std::monostate elements
-template <typename T, bool return_exceptions = false>
+template <bool return_exceptions = false, typename T>
 auto when_all(std::vector<drogon::Task<T>> coros) -> auto {
     const auto sz_ = coros.size();
     using ResultsContainer =

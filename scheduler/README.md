@@ -64,7 +64,7 @@ To run the tests:
 2. Run via CTest:
 
    ```bash
-   ctest --test-dir buld/<preset name> --output-on-failure
+   ctest --test-dir bulid/<preset name> --output-on-failure
    ```
 
    > [!TIP]  
