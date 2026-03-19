@@ -1,3 +1,5 @@
+#include "Calendar.hpp"
+#include "structs/SchedulerOutput.hpp"
 #define BOOST_TEST_MODULE SchedulerIntegrationTest
 
 #include "exceptions/ExceptionHandler.hpp"
@@ -89,7 +91,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     std::string jobId = (*json)["schedule_id"].asString();
     BOOST_CHECK(!jobId.empty());
 
-    // 2. Retrieve the specific schedule to check its fields (GET /api/schedules/{id})
+    // 2. Retrieve the specific schedule to check its fields (GET
+    // /api/schedules/{id})
     auto getSpecificReq = HttpRequest::newHttpRequest();
     getSpecificReq->setMethod(drogon::Get);
     getSpecificReq->setPath("/api/schedules/" + jobId);
@@ -300,6 +303,30 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     BOOST_CHECK((*getJson).isMember("scheduled_blocks"));
     BOOST_CHECK((*getJson)["scheduled_blocks"].isArray());
     BOOST_CHECK((*getJson).isMember("impact"));
+}
+
+BOOST_AUTO_TEST_CASE(test_calendar_trivial_operations) {
+    drogon::sync_wait([]() -> drogon::Task<void> {
+        scheduler::SchedulerOutput mockOutput;
+        mockOutput.impact.carbon_intensity = 50.5;
+        mockOutput.impact.total_emissions = 100.0;
+        mockOutput.impact.sci = 10.0;
+
+        std::string mockScheduleId = "999999";
+
+        // 1. Test Insertion
+        BOOST_REQUIRE_NO_THROW(co_await scheduler::calendar::addTrivial(
+            mockOutput, mockScheduleId));
+
+        // 2. Test Retrieval
+        auto result = co_await scheduler::calendar::getTrivial(mockScheduleId);
+        BOOST_CHECK_EQUAL(result.scheduleId, mockScheduleId);
+        BOOST_CHECK_CLOSE(result.impact.carbon_intensity, 50.5, 0.01);
+
+        // 3. Test Retrieval Failure (Should throw SchedulingException)
+        BOOST_CHECK_THROW(co_await scheduler::calendar::getTrivial("888888"),
+                          scheduler::exceptions::SchedulingException);
+    }());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

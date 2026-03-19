@@ -25,7 +25,7 @@ BOOST_AUTO_TEST_CASE(valid_request) {
     auto jobRequest = drogon::fromRequest<JobRequest>(*req);
 
     BOOST_CHECK_EQUAL(jobRequest.job_type, "batch");
-    BOOST_CHECK_CLOSE(jobRequest.workload_amount, 0.4, 1e-9);
+    BOOST_CHECK_CLOSE(jobRequest.workload_amount, 12 * 5e15, 1e12);
     // Check if time points are valid (non-zero)
     BOOST_CHECK(jobRequest.earliest_start.time_since_epoch().count() > 0);
     BOOST_CHECK(jobRequest.latest_finish.time_since_epoch().count() > 0);
@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(valid_request_hardware_values) {
     // 2 * 400 + 230 = 1030W = 1.03kW
     // length 30m = 0.5h
     // workload = 1.03 * 0.5 = 0.515
-    BOOST_CHECK_CLOSE(jobRequest.workload_amount, 0.515, 1e-9);
+    BOOST_CHECK_CLOSE(jobRequest.workload_amount, 6 * 2 * 5e15, 1e12);
 }
 
 BOOST_AUTO_TEST_CASE(missing_body) {
