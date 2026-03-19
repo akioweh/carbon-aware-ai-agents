@@ -109,7 +109,7 @@ class StatsAPIClient {
 
     [[nodiscard]] auto getDatacenter(const std::string &datacenterName) const
         -> drogon::Task<Datacenter>;
-    [[nodiscard]] auto getAllDatacenters() const
+    [[nodiscard]] auto getAllDatacenters(std::optional<std::string> = {}) const
         -> drogon::Task<std::vector<Datacenter>>;
 };
 
