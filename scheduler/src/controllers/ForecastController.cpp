@@ -12,11 +12,8 @@ using namespace drogon;
 
 auto ForecastController::
     getForecast( // NOLINT(readability-convert-member-functions-to-static)
-        HttpRequestPtr /*req*/, const TimeIntervalParams interval,
-        const DatacenterIdentifierParam datacenter) const
-    -> Task<HttpResponsePtr> {
-
-    // StatsAPIClient stats(TimeIntervalParams);
+        HttpRequestPtr /*req*/, const DatacenterIdentifierParam datacenter,
+        const TimeIntervalParams interval) const -> Task<HttpResponsePtr> {
     const auto stats = StatsAPIClient(interval);
     Json::Value ret;
     if (datacenter.name == scheduler::calendar::ANY_DATACENTER) {

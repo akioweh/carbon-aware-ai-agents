@@ -15,8 +15,9 @@ class ForecastController : public drogon::HttpController<ForecastController> {
                   drogon::Get);
     METHOD_LIST_END
 
-    [[nodiscard]] auto getForecast(drogon::HttpRequestPtr, TimeIntervalParams,
-                                   DatacenterIdentifierParam) const
+    [[nodiscard]] auto getForecast(drogon::HttpRequestPtr,
+                                   DatacenterIdentifierParam,
+                                   TimeIntervalParams) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
 
