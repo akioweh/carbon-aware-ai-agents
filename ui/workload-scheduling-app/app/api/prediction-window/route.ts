@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-
+import { STATS_API_HOST } from '@/app/api/apiConfig'
 export async function GET() {
     try {
-        const response = await fetch('http://127.0.0.1:5000/predictionWindow', {
+        const response = await fetch(`${STATS_API_HOST}/predictionWindow`, {
             cache: 'no-store'
         });
 
