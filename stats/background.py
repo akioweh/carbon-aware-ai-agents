@@ -1,22 +1,9 @@
-"""Background loops for prediction updates, carbon sync, and carbon collection."""
+"""Background loops for prediction updates and carbon sync."""
 
 import logging
 import time
 
 import db_utils
-from carbon_collector import (
-    DB_PATH as CARBON_DB_PATH,
-)
-from carbon_collector import (
-    INTERVAL_MINUTES as CARBON_INTERVAL_MINUTES,
-)
-from carbon_collector import (
-    collect_current,
-    get_reading_count,
-)
-from carbon_collector import (
-    init_database as init_carbon_db,
-)
 from config import CARBON_SYNC_INTERVAL, FAILURE_ALERT_THRESHOLD
 from predictors import (
     generate_next_week_carbon_intensity_prediction,
@@ -32,19 +19,19 @@ def prediction_loop():
     while True:
         logger.info('Updating predictions cache...')
 
-        active_datacenters = db_utils.get_all_datacenter_ids()
-        if not active_datacenters:
+        all_datacenters = db_utils.get_all_datacenter_ids()
+        if not all_datacenters:
             logger.warning(
-                'No active datacenters configured; skipping prediction refresh'
+                'No datacenters configured; skipping prediction refresh'
             )
             time.sleep(300)
             continue
 
         for dc in list(consecutive_failures):
-            if dc not in active_datacenters:
+            if dc not in all_datacenters:
                 del consecutive_failures[dc]
 
-        for dc in active_datacenters:
+        for dc in all_datacenters:
             consecutive_failures.setdefault(dc, 0)
             try:
                 # Update Load Predictions
@@ -116,36 +103,3 @@ def carbon_sync_loop():
                     consecutive_failures,
                 )
         time.sleep(CARBON_SYNC_INTERVAL)
-
-
-def carbon_collector_loop():
-    """Background loop to collect carbon intensity data from UK API."""
-    logger.info('Carbon collector starting (interval: %d min)', CARBON_INTERVAL_MINUTES)
-    logger.info('Database: %s', CARBON_DB_PATH)
-
-    conn = init_carbon_db(CARBON_DB_PATH)
-
-    consecutive_failures = 0
-    while True:
-        try:
-            collect_current(conn)
-            logger.info('Carbon readings total: %d', get_reading_count(conn))
-            if consecutive_failures:
-                logger.info(
-                    'Carbon collector loop recovered after %d failure(s)',
-                    consecutive_failures,
-                )
-            consecutive_failures = 0
-        except Exception:
-            consecutive_failures += 1
-            logger.error(
-                'Error collecting carbon data (consecutive failures: %d)',
-                consecutive_failures,
-                exc_info=True,
-            )
-            if consecutive_failures >= FAILURE_ALERT_THRESHOLD:
-                logger.critical(
-                    'ALERT: carbon collector has failed %d times in a row — no new carbon readings are being stored',
-                    consecutive_failures,
-                )
-        time.sleep(CARBON_INTERVAL_MINUTES * 60)

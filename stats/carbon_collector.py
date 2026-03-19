@@ -11,6 +11,7 @@ before entering the regular collection loop.
 Designed to run indefinitely on a server (e.g., Oracle Cloud VM).
 """
 
+import logging
 import sqlite3
 import requests
 import time
@@ -27,6 +28,7 @@ from config import (
     BACKFILL_DAYS,
     CARBON_DB_FILE as DB_PATH,
     CARBON_INTERVAL_MINUTES as INTERVAL_MINUTES,
+    FAILURE_ALERT_THRESHOLD,
 )
 
 REGIONS = {
@@ -346,6 +348,40 @@ def run_collector():
     print(f'\nTotal readings collected: {get_reading_count(conn)}')
     conn.close()
     print('Database connection closed. Goodbye!')
+
+
+def carbon_collector_loop():
+    """Background loop to collect carbon intensity data from UK API."""
+    logger = logging.getLogger('stats.background')
+    logger.info('Carbon collector starting (interval: %d min)', INTERVAL_MINUTES)
+    logger.info('Database: %s', DB_PATH)
+
+    conn = init_database(DB_PATH)
+
+    consecutive_failures = 0
+    while True:
+        try:
+            collect_current(conn)
+            logger.info('Carbon readings total: %d', get_reading_count(conn))
+            if consecutive_failures:
+                logger.info(
+                    'Carbon collector loop recovered after %d failure(s)',
+                    consecutive_failures,
+                )
+            consecutive_failures = 0
+        except Exception:
+            consecutive_failures += 1
+            logger.error(
+                'Error collecting carbon data (consecutive failures: %d)',
+                consecutive_failures,
+                exc_info=True,
+            )
+            if consecutive_failures >= FAILURE_ALERT_THRESHOLD:
+                logger.critical(
+                    'ALERT: carbon collector has failed %d times in a row — no new carbon readings are being stored',
+                    consecutive_failures,
+                )
+        time.sleep(INTERVAL_MINUTES * 60)
 
 
 if __name__ == '__main__':

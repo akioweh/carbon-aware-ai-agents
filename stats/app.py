@@ -7,9 +7,10 @@ from fastapi import FastAPI
 
 import config  # triggers logging setup
 import db_utils
-from background import carbon_collector_loop, carbon_sync_loop, prediction_loop
+from background import carbon_sync_loop, prediction_loop
 from carbon_collector import (
     backfill,
+    carbon_collector_loop,
     init_database as init_carbon_db,
     DB_PATH as CARBON_DB_PATH,
 )
