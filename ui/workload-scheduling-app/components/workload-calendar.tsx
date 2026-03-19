@@ -44,20 +44,43 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (!loading && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth
+    }
+  }, [loading, blocks, forecasts])
+
+  useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const [schedulesRes, forecastsRes] = await Promise.all([
-          fetch(`/api/schedules`),
-          fetch(`/api/forecast`)
-        ])
+        const schedulesRes = await fetch(`/api/schedules`)
+        let scheduleData: any[] = []
+
         if (schedulesRes.ok) {
-          const scheduleData = await schedulesRes.json()
+          scheduleData = await schedulesRes.json()
           setBlocks(Array.isArray(scheduleData) ? scheduleData : [])
         }
-        if (forecastsRes.ok) {
-          const forecastData = await forecastsRes.json()
-          setForecasts(Array.isArray(forecastData) ? forecastData : [])
+
+        if (scheduleData.length > 0) {
+          const allTimestamps = scheduleData.map((b: any) => new Date(b.timestamp).getTime())
+          const start = new Date(Math.min(...allTimestamps))
+          start.setMinutes(0, 0, 0)
+
+          const end = new Date(Math.max(...allTimestamps) + BLOCK_DURATION_MS)
+          end.setMinutes(0, 0, 0)
+          end.setHours(end.getHours() + 1)
+
+          const forecastsRes = await fetch(`/api/forecast?start_time=${encodeURIComponent(start.toISOString())}&end_time=${encodeURIComponent(end.toISOString())}`)
+          if (forecastsRes.ok) {
+            const forecastData = await forecastsRes.json()
+            setForecasts(Array.isArray(forecastData) ? forecastData : [])
+          }
+        } else {
+          const forecastsRes = await fetch(`/api/forecast`)
+          if (forecastsRes.ok) {
+            const forecastData = await forecastsRes.json()
+            setForecasts(Array.isArray(forecastData) ? forecastData : [])
+          }
         }
       } catch (err) {
         console.error("Error fetching data:", err)

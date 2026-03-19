@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -111,6 +111,13 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
   const [fetchedOptData, setFetchedOptData] = useState<any>(null)
   const [fetchedUnoptData, setFetchedUnoptData] = useState<ScheduleData | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!loading && workloadData.length > 0 && scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
+    }
+  }, [loading, workloadData])
 
   const locationToDcId = useMemo(() => {
     const map = new Map<string, string>()
@@ -203,10 +210,9 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
         let newJobBlocks: any[] = [];
         let unoptJobBlocks: any[] = [];
-        const [scheduleRes, trivialRes, forecastRes] = await Promise.all([
+        const [scheduleRes, trivialRes] = await Promise.all([
           fetch(`/api/schedules/${result.schedule_id}`),
-          fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null),
-          fetch(`/api/forecast`)
+          fetch(`/api/schedules/${result.schedule_id}/trivial`).catch(() => null)
         ])
 
         if (!scheduleRes.ok) throw new Error(`Failed to fetch schedule: ${scheduleRes.status}`)
@@ -223,7 +229,12 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         }
 
         const { start, end } = getTimeRange([...newJobBlocks, ...unoptJobBlocks])
-        const allRes = await fetch(`/api/schedules?start_time=${encodeURIComponent(start.toISOString())}&end_time=${encodeURIComponent(end.toISOString())}`)
+
+        const [allRes, forecastRes] = await Promise.all([
+          fetch(`/api/schedules?start_time=${encodeURIComponent(start.toISOString())}&end_time=${encodeURIComponent(end.toISOString())}`),
+          fetch(`/api/forecast?start_time=${encodeURIComponent(start.toISOString())}&end_time=${encodeURIComponent(end.toISOString())}`)
+        ])
+
         if (!allRes.ok) throw new Error(`Failed to fetch window schedules: ${allRes.status}`)
         const allData = await allRes.json()
         const allBlocksRaw = Array.isArray(allData) ? allData : []
@@ -501,62 +512,64 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           {loading ? (
             <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
-            <div className="h-[250px] w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={workloadData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorExisting" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#9ca3af" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#9ca3af" stopOpacity={0.1} />
-                    </linearGradient>
-                    <linearGradient id="colorNew" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.8} />
-                      <stop offset="95%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.1} />
-                    </linearGradient>
-                    <linearGradient id="colorOutside" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                  <XAxis dataKey="time" tickFormatter={(time) => formatTime(time)} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} minTickGap={30} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" domain={[0, maxValue]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={30} />
-                  <YAxis yAxisId="right" orientation="right" hide={true} domain={globalSCIDomain} />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0]?.payload
-                        return (
-                          <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border">
-                            <p className="font-medium mb-1 border-b pb-1">{formatTime(label)}</p>
-                            {data?.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
-                            {data?.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} PFLO</p>}
-                            {data?.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} PFLO</p>}
-                            {payload.map((entry, index) => {
-                              if (entry.value === 0 || entry.dataKey === "carbon_intensity" || entry.dataKey === "outsideLoadRange" || entry.dataKey === "capacity") return null
-                              return (
-                                <div key={index} className="flex justify-between gap-4">
-                                  <span className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                                    <span className="text-muted-foreground">{entry.dataKey === "newJob" ? (showTrivial ? "Unoptimised" : "Optimised") : "Existing"}</span>
-                                  </span>
-                                  <span className="font-medium">{Number(entry.value).toFixed(1)} PFLO</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )
-                      }
-                      return null
-                    }}
-                  />
-                  <Area yAxisId="left" type="monotone" dataKey="outsideLoadRange" stroke="#3b82f6" fill="url(#colorOutside)" fillOpacity={1} isAnimationActive={false} />
-                  <Area yAxisId="left" type="monotone" dataKey="existing" stackId="1" stroke="#9ca3af" fill="url(#colorExisting)" isAnimationActive={false} />
-                  <Area yAxisId="left" type="monotone" dataKey="newJob" stackId="1" stroke={showTrivial ? "#ea580c" : "#059669"} fill="url(#colorNew)" isAnimationActive={false} />
-                  <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
-                  <Line yAxisId="left" type="monotone" dataKey="capacity" stroke="#a855f7" strokeWidth={2} dot={false} isAnimationActive={false} />
-                </ComposedChart>
-              </ResponsiveContainer>
+            <div ref={scrollRef} className="h-[250px] w-full mt-4 overflow-x-auto custom-scrollbar" style={{ scrollBehavior: 'smooth' }}>
+              <div style={{ width: `${Math.max(workloadData.length * 10, 800)}px`, height: "100%" }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={workloadData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorExisting" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#9ca3af" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#9ca3af" stopOpacity={0.1} />
+                      </linearGradient>
+                      <linearGradient id="colorNew" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.8} />
+                        <stop offset="95%" stopColor={showTrivial ? "#f97316" : "#10b981"} stopOpacity={0.1} />
+                      </linearGradient>
+                      <linearGradient id="colorOutside" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                    <XAxis dataKey="time" tickFormatter={(time) => formatTime(time)} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} minTickGap={30} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="left" domain={[0, maxValue]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={30} />
+                    <YAxis yAxisId="right" orientation="right" hide={true} domain={globalSCIDomain} />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0]?.payload
+                          return (
+                            <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border">
+                              <p className="font-medium mb-1 border-b pb-1">{formatTime(label)}</p>
+                              {data?.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
+                              {data?.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} PFLO</p>}
+                              {data?.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} PFLO</p>}
+                              {payload.map((entry, index) => {
+                                if (entry.value === 0 || entry.dataKey === "carbon_intensity" || entry.dataKey === "outsideLoadRange" || entry.dataKey === "capacity") return null
+                                return (
+                                  <div key={index} className="flex justify-between gap-4">
+                                    <span className="flex items-center gap-1.5">
+                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                      <span className="text-muted-foreground">{entry.dataKey === "newJob" ? (showTrivial ? "Unoptimised" : "Optimised") : "Existing"}</span>
+                                    </span>
+                                    <span className="font-medium">{Number(entry.value).toFixed(1)} PFLO</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        }
+                        return null
+                      }}
+                    />
+                    <Area yAxisId="left" type="monotone" dataKey="outsideLoadRange" stroke="#3b82f6" fill="url(#colorOutside)" fillOpacity={1} isAnimationActive={false} />
+                    <Area yAxisId="left" type="monotone" dataKey="existing" stackId="1" stroke="#9ca3af" fill="url(#colorExisting)" isAnimationActive={false} />
+                    <Area yAxisId="left" type="monotone" dataKey="newJob" stackId="1" stroke={showTrivial ? "#ea580c" : "#059669"} fill="url(#colorNew)" isAnimationActive={false} />
+                    <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    <Line yAxisId="left" type="monotone" dataKey="capacity" stroke="#a855f7" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
         </CardContent>
