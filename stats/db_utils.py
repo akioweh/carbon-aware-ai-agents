@@ -3,7 +3,7 @@
 import json
 import sqlite3
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from config import CARBON_DB_FILE, DB_FILE, PREDICTION_CACHE_TTL
@@ -442,7 +442,7 @@ def get_historical_data(
             rows = cursor.fetchall()
             return [
                 {
-                    'timestamp': datetime.fromtimestamp(row[0]),
+                    'timestamp': datetime.fromtimestamp(row[0], tz=timezone.utc),
                     'load': row[1],
                     'carbon_intensity': row[2],
                 }
@@ -474,7 +474,7 @@ def get_latest_timestamp(location: str) -> Optional[datetime]:
             )
             result = cursor.fetchone()
             if result and result[0]:
-                return datetime.fromtimestamp(result[0])
+                return datetime.fromtimestamp(result[0], tz=timezone.utc)
             return None
     except sqlite3.Error as e:
         print(f'Error getting latest timestamp: {e}')

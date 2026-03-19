@@ -1,9 +1,10 @@
 import json
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
 import db_utils
-from config import DEFAULT_CAPACITY
+from config import DEFAULT_CAPACITY, PREDICTION_WINDOW_HOURS
 from .ridge import get_next_week_carbon_intensity
 from .load import get_next_week_load
 
@@ -79,6 +80,178 @@ def generate_next_week_carbon_intensity_prediction(location):
             }
             for i in range(len(next_week_ci_df))
         ],
+    }
+
+
+def _resolve_time_window(start_time, end_time, now):
+    """Compute effective start/end from optional params.
+
+    Returns (effective_start, effective_end) as UTC-aware datetimes.
+    """
+    effective_end = end_time if end_time else now + timedelta(hours=PREDICTION_WINDOW_HOURS)
+    effective_start = start_time  # None means "all available history"
+    return effective_start, effective_end
+
+
+def _slice_cached_data(data_points, start_time, end_time):
+    """Filter cached data points to those within [start_time, end_time]."""
+    result = []
+    for point in data_points:
+        ts = datetime.fromisoformat(point['timestamp'])
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if start_time and ts < start_time:
+            continue
+        if end_time and ts > end_time:
+            continue
+        result.append(point)
+    return result
+
+
+def _get_forecast_data(location, metric):
+    """Get forecast data from cache or generate fresh.
+
+    Args:
+        location: Datacenter location ID
+        metric: 'load' or 'carbon_intensity'
+
+    Returns:
+        List of data point dicts with timestamp, value, is_forecast, etc.
+    """
+    if metric == 'load':
+        cache_key = f'load_forecast_{location}'
+    else:
+        cache_key = f'carbon_intensity_forecast_{location}'
+
+    cached = db_utils.get_cached_prediction(cache_key)
+    if cached:
+        return cached['data']
+
+    if metric == 'load':
+        result = generate_next_week_load_prediction(location)
+    else:
+        result = generate_next_week_carbon_intensity_prediction(location)
+
+    db_utils.save_prediction(cache_key, result)
+    return result['data']
+
+
+def get_load_time_series(location, start_time=None, end_time=None):
+    """Get load time series stitching historical observations and forecasts.
+
+    Args:
+        location: Datacenter location ID
+        start_time: Optional UTC-aware start datetime
+        end_time: Optional UTC-aware end datetime
+
+    Returns:
+        Response dict with location_id, metric, unit, data
+    """
+    now = datetime.now(timezone.utc)
+    effective_start, effective_end = _resolve_time_window(start_time, end_time, now)
+
+    data_points = []
+
+    # Historical data (past)
+    if effective_start is None or effective_start < now:
+        hist_end = min(effective_end, now)
+        historical = db_utils.get_historical_data(location, effective_start, hist_end)
+        for entry in historical:
+            data_points.append({
+                'timestamp': entry['timestamp'].isoformat(),
+                'value': max(0.0, float(entry['load'])),
+                'is_forecast': False,
+                'capacity': DEFAULT_CAPACITY,
+            })
+
+    # Forecast data (future)
+    if effective_end > now:
+        forecast_data = _get_forecast_data(location, 'load')
+        forecast_start = max(effective_start, now) if effective_start else now
+        sliced = _slice_cached_data(forecast_data, forecast_start, effective_end)
+        for point in sliced:
+            point_copy = dict(point)
+            point_copy['is_forecast'] = True
+            data_points.append(point_copy)
+
+    # Deduplicate at boundary — prefer historical (is_forecast=False)
+    seen = {}
+    deduped = []
+    for point in data_points:
+        ts = point['timestamp']
+        if ts in seen:
+            # Prefer historical over forecast
+            if not point['is_forecast']:
+                # Replace the forecast entry
+                deduped[seen[ts]] = point
+        else:
+            seen[ts] = len(deduped)
+            deduped.append(point)
+
+    return {
+        'location_id': location,
+        'metric': 'forecast_load',
+        'unit': 'FLOs',
+        'data': deduped,
+    }
+
+
+def get_carbon_intensity_time_series(location, start_time=None, end_time=None):
+    """Get carbon intensity time series stitching historical observations and forecasts.
+
+    Args:
+        location: Datacenter location ID
+        start_time: Optional UTC-aware start datetime
+        end_time: Optional UTC-aware end datetime
+
+    Returns:
+        Response dict with location_id, metric, unit, data
+    """
+    now = datetime.now(timezone.utc)
+    effective_start, effective_end = _resolve_time_window(start_time, end_time, now)
+
+    data_points = []
+
+    # Historical data (past)
+    if effective_start is None or effective_start < now:
+        hist_end = min(effective_end, now)
+        historical = db_utils.get_historical_data(location, effective_start, hist_end)
+        for entry in historical:
+            ci = entry.get('carbon_intensity')
+            if ci is not None:
+                data_points.append({
+                    'timestamp': entry['timestamp'].isoformat(),
+                    'value': float(ci),
+                    'is_forecast': False,
+                })
+
+    # Forecast data (future)
+    if effective_end > now:
+        forecast_data = _get_forecast_data(location, 'carbon_intensity')
+        forecast_start = max(effective_start, now) if effective_start else now
+        sliced = _slice_cached_data(forecast_data, forecast_start, effective_end)
+        for point in sliced:
+            point_copy = dict(point)
+            point_copy['is_forecast'] = True
+            data_points.append(point_copy)
+
+    # Deduplicate at boundary — prefer historical (is_forecast=False)
+    seen = {}
+    deduped = []
+    for point in data_points:
+        ts = point['timestamp']
+        if ts in seen:
+            if not point['is_forecast']:
+                deduped[seen[ts]] = point
+        else:
+            seen[ts] = len(deduped)
+            deduped.append(point)
+
+    return {
+        'location_id': location,
+        'metric': 'forecast_carbon_intensity',
+        'unit': 'gCO2/kWh',
+        'data': deduped,
     }
 
 

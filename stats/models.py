@@ -24,7 +24,7 @@ class DatacenterPatchRequest(BaseModel):
 class BaseForecastDataPoint(BaseModel):
     timestamp: str = Field(..., description='ISO 8601 timestamp', examples=['2026-03-18T12:00:00'])
     value: float = Field(..., description='Forecasted value')
-    is_forecast: bool = Field(..., description='Always true for forecast endpoints')
+    is_forecast: bool = Field(..., description='True for predicted data, False for historical observations')
 
 
 class BaseForecastResponse(BaseModel):
@@ -38,11 +38,11 @@ class LoadForecastDataPoint(BaseForecastDataPoint):
 
 
 class LoadForecastResponse(BaseForecastResponse):
-    data: list[LoadForecastDataPoint] = Field(..., description='2016-point time series (7 days at 5-min intervals)')
+    data: list[LoadForecastDataPoint] = Field(..., description='Time series data points within the requested window')
 
 
 class CarbonIntensityForecastResponse(BaseForecastResponse):
-    data: list[BaseForecastDataPoint] = Field(..., description='2016-point time series (7 days at 5-min intervals)')
+    data: list[BaseForecastDataPoint] = Field(..., description='Time series data points within the requested window')
 
 
 class ErrorResponse(BaseModel):

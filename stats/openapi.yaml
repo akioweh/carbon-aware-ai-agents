@@ -12,9 +12,10 @@ paths:
       tags:
       - Forecasts
       summary: Load forecast for a location
-      description: Returns a 7-day load forecast at 5-minute resolution (2016 data
-        points). Each point includes the predicted load and the datacenter capacity
-        in FLOs. Results are cached and refreshed every 30 minutes.
+      description: Returns load data for the requested time window. Supports optional
+        start_time and end_time query params (ISO 8601). Historical observations have
+        is_forecast=false, predictions have is_forecast=true. Without params, returns
+        all available history plus a 7-day forecast.
       operationId: get_load_forecast_locations__location__metrics_forecast_load_get
       parameters:
       - name: location
@@ -23,6 +24,26 @@ paths:
         schema:
           type: string
           title: Location
+      - name: start_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Start of time window (ISO 8601, e.g. 2026-03-18T00:00:00Z)
+          title: Start Time
+        description: Start of time window (ISO 8601, e.g. 2026-03-18T00:00:00Z)
+      - name: end_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: End of time window (ISO 8601, e.g. 2026-03-25T00:00:00Z)
+          title: End Time
+        description: End of time window (ISO 8601, e.g. 2026-03-25T00:00:00Z)
       responses:
         '200':
           description: Successful Response
@@ -53,10 +74,10 @@ paths:
       tags:
       - Forecasts
       summary: Carbon intensity forecast for a location
-      description: Returns a 7-day carbon intensity forecast at 5-minute resolution
-        (2016 data points) in gCO2/kWh. Uses Ridge regression trained on UK Carbon
-        Intensity API data with weather exogenous features. Results are cached and
-        refreshed every 30 minutes.
+      description: Returns carbon intensity data for the requested time window. Supports
+        optional start_time and end_time query params (ISO 8601). Historical observations
+        have is_forecast=false, predictions have is_forecast=true. Without params,
+        returns all available history plus a 7-day forecast.
       operationId: get_carbon_forecast_locations__location__metrics_forecast_carbon_intensity_get
       parameters:
       - name: location
@@ -65,6 +86,26 @@ paths:
         schema:
           type: string
           title: Location
+      - name: start_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Start of time window (ISO 8601, e.g. 2026-03-18T00:00:00Z)
+          title: Start Time
+        description: Start of time window (ISO 8601, e.g. 2026-03-18T00:00:00Z)
+      - name: end_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: End of time window (ISO 8601, e.g. 2026-03-25T00:00:00Z)
+          title: End Time
+        description: End of time window (ISO 8601, e.g. 2026-03-25T00:00:00Z)
       responses:
         '200':
           description: Successful Response
@@ -180,6 +221,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Datacenter'
+        '400':
+          description: Malformed request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Datacenter not found
           content:
@@ -215,7 +262,7 @@ components:
         is_forecast:
           type: boolean
           title: Is Forecast
-          description: Always true for forecast endpoints
+          description: True for predicted data, False for historical observations
       type: object
       required:
       - timestamp
@@ -249,7 +296,7 @@ components:
             $ref: '#/components/schemas/BaseForecastDataPoint'
           type: array
           title: Data
-          description: 2016-point time series (7 days at 5-min intervals)
+          description: Time series data points within the requested window
       type: object
       required:
       - location_id
@@ -348,7 +395,7 @@ components:
         is_forecast:
           type: boolean
           title: Is Forecast
-          description: Always true for forecast endpoints
+          description: True for predicted data, False for historical observations
         capacity:
           type: number
           title: Capacity
@@ -389,7 +436,7 @@ components:
             $ref: '#/components/schemas/LoadForecastDataPoint'
           type: array
           title: Data
-          description: 2016-point time series (7 days at 5-min intervals)
+          description: Time series data points within the requested window
       type: object
       required:
       - location_id

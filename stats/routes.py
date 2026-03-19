@@ -1,8 +1,10 @@
 """API endpoint handlers."""
 
 import logging
+from datetime import datetime, timezone
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 import db_utils
 from config import PREDICTION_WINDOW_HOURS
@@ -18,6 +20,8 @@ from models import (
 from predictors import (
     generate_next_week_carbon_intensity_prediction,
     generate_next_week_load_prediction,
+    get_load_time_series,
+    get_carbon_intensity_time_series,
 )
 
 logger = logging.getLogger('stats.routes')
@@ -25,12 +29,30 @@ logger = logging.getLogger('stats.routes')
 router = APIRouter()
 
 
+def _parse_iso_timestamp(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO 8601 string to a UTC-aware datetime.
+
+    Returns None for absent, empty, or unparseable values so that
+    invalid query params are silently treated as "no filter".
+    """
+    if not value or value.lower() == 'null':
+        return None
+    try:
+        value = value.replace('Z', '+00:00')
+        dt = datetime.fromisoformat(value)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        return None
+
+
 @router.get(
     '/locations/{location}/metrics/forecast_load',
     response_model=LoadForecastResponse,
     tags=['Forecasts'],
     summary='Load forecast for a location',
-    description='Returns a 7-day load forecast at 5-minute resolution (2016 data points). Each point includes the predicted load and the datacenter capacity in FLOs. Results are cached and refreshed every 30 minutes.',
+    description='Returns load data for the requested time window. Supports optional start_time and end_time query params (ISO 8601). Historical observations have is_forecast=false, predictions have is_forecast=true. Without params, returns all available history plus a 7-day forecast.',
     responses={
         404: {
             'model': ErrorResponse,
@@ -39,15 +61,22 @@ router = APIRouter()
         500: {'model': ErrorResponse, 'description': 'Prediction generation failed'},
     },
 )
-def get_load_forecast(location: str):
-    print(f'load_forecast_{location}')
-    cache_key = f'load_forecast_{location}'
-    cached_result = db_utils.get_cached_prediction(cache_key)
-    if cached_result:
-        return cached_result
+def get_load_forecast(
+    location: str,
+    start_time: Optional[str] = Query(None, description='Start of time window (ISO 8601, e.g. 2026-03-18T00:00:00Z)'),
+    end_time: Optional[str] = Query(None, description='End of time window (ISO 8601, e.g. 2026-03-25T00:00:00Z)'),
+):
+    parsed_start = _parse_iso_timestamp(start_time)
+    parsed_end = _parse_iso_timestamp(end_time)
+
+    if parsed_start and parsed_end and parsed_start >= parsed_end:
+        raise HTTPException(
+            status_code=422,
+            detail='start_time must be before end_time',
+        )
 
     try:
-        data = generate_next_week_load_prediction(location)
+        data = get_load_time_series(location, parsed_start, parsed_end)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -56,7 +85,6 @@ def get_load_forecast(location: str):
         )
         raise HTTPException(status_code=500, detail=str(e))
 
-    db_utils.save_prediction(cache_key, data)
     return data
 
 
@@ -65,7 +93,7 @@ def get_load_forecast(location: str):
     response_model=CarbonIntensityForecastResponse,
     tags=['Forecasts'],
     summary='Carbon intensity forecast for a location',
-    description='Returns a 7-day carbon intensity forecast at 5-minute resolution (2016 data points) in gCO2/kWh. Uses Ridge regression trained on UK Carbon Intensity API data with weather exogenous features. Results are cached and refreshed every 30 minutes.',
+    description='Returns carbon intensity data for the requested time window. Supports optional start_time and end_time query params (ISO 8601). Historical observations have is_forecast=false, predictions have is_forecast=true. Without params, returns all available history plus a 7-day forecast.',
     responses={
         404: {
             'model': ErrorResponse,
@@ -74,14 +102,22 @@ def get_load_forecast(location: str):
         500: {'model': ErrorResponse, 'description': 'Prediction generation failed'},
     },
 )
-def get_carbon_forecast(location: str):
-    cache_key = f'carbon_intensity_forecast_{location}'
-    cached_result = db_utils.get_cached_prediction(cache_key)
-    if cached_result:
-        return cached_result
+def get_carbon_forecast(
+    location: str,
+    start_time: Optional[str] = Query(None, description='Start of time window (ISO 8601, e.g. 2026-03-18T00:00:00Z)'),
+    end_time: Optional[str] = Query(None, description='End of time window (ISO 8601, e.g. 2026-03-25T00:00:00Z)'),
+):
+    parsed_start = _parse_iso_timestamp(start_time)
+    parsed_end = _parse_iso_timestamp(end_time)
+
+    if parsed_start and parsed_end and parsed_start >= parsed_end:
+        raise HTTPException(
+            status_code=422,
+            detail='start_time must be before end_time',
+        )
 
     try:
-        data = generate_next_week_carbon_intensity_prediction(location)
+        data = get_carbon_intensity_time_series(location, parsed_start, parsed_end)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -90,7 +126,6 @@ def get_carbon_forecast(location: str):
         )
         raise HTTPException(status_code=500, detail=str(e))
 
-    db_utils.save_prediction(cache_key, data)
     return data
 
 
@@ -165,6 +200,7 @@ def get_datacenters() -> list[Datacenter]:
     summary='Toggle datacenter active state',
     description='Activates or deactivates a datacenter. Active datacenters appear in /locations and receive scheduled forecasts.',
     responses={
+        400: {'model': ErrorResponse, 'description': 'Malformed request body'},
         404: {'model': ErrorResponse, 'description': 'Datacenter not found'},
         500: {
             'model': ErrorResponse,
