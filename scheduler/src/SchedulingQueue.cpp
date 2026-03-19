@@ -36,13 +36,12 @@ start:;
         (void)queueSize.fetch_sub(1, std::memory_order_release);
         try {
             Scheduler scheduler;
-            std::cout << "GOT HERE" << std::endl;
             auto res = co_await scheduler.scheduleJob(task->jobRequest);
             task->setValue(std::move(res));
         } catch (...) {
-            std::cout << "WE CAUGHT IT!" << std::endl;
             task->setException(std::current_exception());
         }
+
         task->resume();
     }
 

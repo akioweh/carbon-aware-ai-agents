@@ -11,53 +11,48 @@
 
 namespace scheduler {
 
-template <std::invocable Func> struct ScopeGuard {
-    Func func;
-    ~ScopeGuard() { func(); }
-};
-
 class SchedulerTask {
     std::atomic<std::coroutine_handle<>> taskHandle{nullptr};
+    enum class State { Pending, Suspended, Done };
+    std::atomic<State> state{State::Pending};
     SchedulerOutput value;
     std::exception_ptr except_ptr{nullptr};
-    std::atomic<bool> isDone{false};
 
   public:
     JobRequest jobRequest;
     SchedulerTask(JobRequest jobRequest) : jobRequest(std::move(jobRequest)) {};
 
     auto await_ready() -> bool {
-        return isDone.load(std::memory_order_acquire);
+        return state.load(std::memory_order_acquire) == State::Done;
     }
 
     auto await_suspend(std::coroutine_handle<> handle) {
-        ScopeGuard onExitNotify{[&]() -> auto { taskHandle.notify_one(); }};
         taskHandle.store(handle, std::memory_order_release);
+        auto expected = State::Pending;
+        return state.compare_exchange_strong(expected, State::Suspended,
+                                             std::memory_order_acq_rel);
     }
 
     auto await_resume() -> SchedulerOutput {
-        if (except_ptr) {
-            std::cout << "AND WE SERVE IT BACK TO THE USER!" << std::endl;
+        if (except_ptr)
             std::rethrow_exception(except_ptr);
-        }
         return std::move(value);
     }
 
-    auto setValue(SchedulerOutput result) {
-        value = std::move(result);
-        isDone.store(true, std::memory_order_release);
-    }
+    auto setValue(SchedulerOutput result) { value = std::move(result); }
 
     auto resume() {
-        taskHandle.wait(nullptr, std::memory_order_acquire);
+
+        auto expected = State::Pending;
+        if (state.compare_exchange_strong(expected, State::Done,
+                                          std::memory_order_acq_rel))
+            return;
+
         auto handle = taskHandle.load(std::memory_order_acquire);
         handle.resume();
     }
 
-    auto setException(auto &&e) {
-        except_ptr = e;
-        isDone.store(true, std::memory_order_release);
-    }
+    auto setException(auto &&e) { except_ptr = e; }
 };
 
 class SchedulingQueue {

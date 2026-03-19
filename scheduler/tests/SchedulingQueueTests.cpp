@@ -1,4 +1,5 @@
 #include <boost/test/tools/old/interface.hpp>
+#include <drogon/utils/coroutine.h>
 #include <trantor/utils/Logger.h>
 #define BOOST_TEST_MODULE SchedulingQueueTest
 #include "SchedulingQueue.hpp"
@@ -93,38 +94,26 @@ BOOST_AUTO_TEST_CASE(test_queue_concurrency_exceptions) {
         // Logic error to trigger Scheduler exceptions
         invalidReq.earliest_start = now + std::chrono::minutes(20);
         invalidReq.latest_finish = now + std::chrono::minutes(2);
-        invalidReq.workload_amount = static_cast<double>(4);
 
-        BOOST_CHECK_THROW(
-            auto results =
-                co_await scheduler::schedulingQueue.computeSchedule(invalidReq),
-            scheduler::exceptions::SchedulingException);
-
-        /*
         std::vector<drogon::Task<scheduler::SchedulerOutput>> tasks;
-        for (auto i : std::views::iota(0, 5)) {
-
+        for (auto i : std::views::iota(0, 30000)) {
+            invalidReq.workload_amount = static_cast<double>(i + 1);
             tasks.push_back(
                 scheduler::schedulingQueue.computeSchedule(invalidReq));
         }
 
         // Use the 'return_exceptions' template parameter to capture errors
         // individually rather than rethrowing on the first failure.
-        auto results = co_await when_all(std::move(tasks));
-        */
+        auto results = co_await when_all<true>(std::move(tasks));
 
-        /*
-        BOOST_CHECK_EQUAL(results.size(), 5);
+        BOOST_CHECK_EQUAL(results.size(), 30000);
         int exception_count = 0;
         for (const auto &res : results) {
             if (!res.has_value()) {
                 exception_count++;
             }
         }
-            */
-
-        // Verify that all 300 failed gracefully and the worker thread survived
-        // BOOST_CHECK_EQUAL(exception_count, 5);
+        BOOST_CHECK_EQUAL(exception_count, 30000);
     }());
 }
 
