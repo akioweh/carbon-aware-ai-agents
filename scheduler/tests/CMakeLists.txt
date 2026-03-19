@@ -31,6 +31,7 @@ file(GLOB_RECURSE SCHEDULER_SRC_FILES
 )
 list(FILTER SCHEDULER_SRC_FILES EXCLUDE REGEX ".*/Calendar.cpp$")
 
+# Scheduling Queue tests
 add_executable(queue_test 
     SchedulingQueueTests.cpp 
     mocks/MockCalendar.cpp
@@ -43,6 +44,22 @@ target_link_libraries(queue_test PRIVATE
     stdc++exp
 )
 add_test(NAME queue_test COMMAND queue_test)
+# scheduling queue test end
+
+#time gridder tests
+add_executable(time_gridder 
+    TimeGridderTest.cpp 
+    mocks/MockCalendar.cpp
+    ${SCHEDULER_SRC_FILES}
+)
+target_include_directories(time_gridder PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(time_gridder PRIVATE 
+    Drogon::Drogon 
+    Boost::unit_test_framework 
+    stdc++exp
+)
+add_test(NAME time_gridder COMMAND time_gridder)
+# time gridder end
 
 add_executable(scheduler_integration_test
     SchedulerIntegrationTest.cpp
