@@ -18,8 +18,7 @@ namespace scheduler {
 using namespace std;
 using namespace drogon;
 
-StatsAPIClient::StatsAPIClient() : host(getDefaultHost()) {}
-StatsAPIClient::StatsAPIClient(string host) : host(std::move(host)) {}
+StatsAPIClient::StatsAPIClient() : host(getHost()) {}
 
 auto StatsAPIClient::getLocations() -> Task<vector<Location>> {
     auto jsonPtr = co_await utils::makeGetRequest(host, getLocationsPath());

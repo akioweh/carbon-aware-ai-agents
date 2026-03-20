@@ -5,6 +5,7 @@
 #include "SchedulerAlgo.hpp"
 #include "StatsAPIClient.hpp"
 #include "structs/JobRequest.hpp"
+#include "structs/SchedulerOutput.hpp"
 #include <string>
 #include <vector>
 
@@ -30,15 +31,25 @@ struct SchedulerData {
     }
 };
 
+/**
+ * @class SchedulerBase
+ * @brief Abstract base class for schedulers, providing common data fetching and
+ * preprocessing logic.
+ *
+ * Schedulers should inherit from this class and implement the scheduleJob
+ * method.
+ */
 class SchedulerBase {
   protected:
-    StatsAPIClient stats_api;
+    StatsAPIClient &stats_api = StatsAPIClient::getInstance();
+
+    auto fetch_data(const JobRequest &job) -> drogon::Task<SchedulerData>;
 
   public:
-    virtual ~SchedulerBase() = default;
+    virtual auto scheduleJob(JobRequest job)
+        -> drogon::Task<SchedulerOutput> = 0;
 
-  protected:
-    auto fetch_data(const JobRequest &job) -> drogon::Task<SchedulerData>;
+    virtual ~SchedulerBase() = default;
 };
 
 } // namespace scheduler
