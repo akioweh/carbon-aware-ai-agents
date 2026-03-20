@@ -8,6 +8,7 @@ from config import CARBON_SYNC_INTERVAL, FAILURE_ALERT_THRESHOLD, PREDICTION_INT
 from predictors import (
     generate_next_week_carbon_intensity_prediction,
     generate_next_week_load_prediction,
+    refresh_historical_cache,
 )
 
 logger = logging.getLogger('stats.background')
@@ -48,6 +49,14 @@ def prediction_loop():
                     )
                     logger.warning(
                         'No carbon intensity data for %s, skipping CI forecast', dc
+                    )
+
+                # Refresh pre-upsampled historical cache
+                try:
+                    refresh_historical_cache(dc)
+                except Exception as e:
+                    logger.warning(
+                        'Failed to refresh historical cache for %s: %s', dc, e
                     )
 
                 if consecutive_failures[dc]:

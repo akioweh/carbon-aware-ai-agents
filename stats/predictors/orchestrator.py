@@ -83,6 +83,108 @@ def generate_next_week_carbon_intensity_prediction(location):
     }
 
 
+def _upsample_historical(entries, fill_until=None):
+    """Upsample 30-min historical observations to 5-min intervals via forward-fill.
+
+    Args:
+        entries: List of dicts from db_utils.get_historical_data()
+        fill_until: Optional UTC-aware datetime — forward-fill the last
+                    observation up to this point (bridges gap to forecasts)
+
+    Returns:
+        List of dicts at 5-min intervals in the same format as the input.
+    """
+    if not entries:
+        return entries
+
+    df = pd.DataFrame(entries)
+    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+    df = df.set_index('timestamp').sort_index()
+
+    # Build a 5-min grid from the first observation to fill_until (or last obs)
+    end = df.index[-1]
+    if fill_until is not None:
+        fill_ts = pd.Timestamp(fill_until).tz_localize('UTC') if pd.Timestamp(fill_until).tzinfo is None else pd.Timestamp(fill_until)
+        fill_ts = fill_ts.ceil('5min')
+        end = max(end, fill_ts)
+
+    idx = pd.date_range(start=df.index[0], end=end, freq='5min')
+    df = df.reindex(df.index.union(idx)).ffill().reindex(idx)
+
+    result = []
+    for ts, row in df.iterrows():
+        entry = {
+            'timestamp': ts.to_pydatetime(),
+            'load': row['load'],
+        }
+        ci = row.get('carbon_intensity')
+        entry['carbon_intensity'] = None if (ci is None or pd.isna(ci)) else ci
+        result.append(entry)
+    return result
+
+
+def refresh_historical_cache(location):
+    """Pre-compute and cache upsampled 7-day historical data for a location."""
+    now = datetime.now(timezone.utc)
+    week_ago = now - timedelta(days=7)
+
+    raw_history = db_utils.get_historical_data(location, week_ago, None)
+    upsampled = _upsample_historical(raw_history, fill_until=now)
+
+    entries = []
+    for entry in upsampled:
+        e = {
+            'timestamp': entry['timestamp'].isoformat(),
+            'load': entry['load'],
+            'carbon_intensity': entry.get('carbon_intensity'),
+        }
+        entries.append(e)
+
+    cache_data = {
+        'start': week_ago.isoformat(),
+        'end': now.isoformat(),
+        'entries': entries,
+    }
+    db_utils.save_prediction(f'historical_upsampled_{location}', cache_data)
+
+
+def _get_cached_historical(location, start, end):
+    """Try to serve historical data from the pre-upsampled cache.
+
+    Returns a list of entry dicts on cache hit, or None on miss.
+    """
+    cached = db_utils.get_cached_prediction(f'historical_upsampled_{location}')
+    if not cached:
+        return None
+
+    cache_start = datetime.fromisoformat(cached['start'])
+    cache_end = datetime.fromisoformat(cached['end'])
+    if cache_start.tzinfo is None:
+        cache_start = cache_start.replace(tzinfo=timezone.utc)
+    if cache_end.tzinfo is None:
+        cache_end = cache_end.replace(tzinfo=timezone.utc)
+
+    req_start = start if start else cache_start
+    req_end = end
+
+    if req_start < cache_start or req_end > cache_end:
+        return None
+
+    result = []
+    for entry in cached['entries']:
+        ts = datetime.fromisoformat(entry['timestamp'])
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts < req_start or ts > req_end:
+            continue
+        result.append({
+            'timestamp': ts,
+            'load': entry['load'],
+            'carbon_intensity': entry.get('carbon_intensity'),
+        })
+    return result
+
+
 def _resolve_time_window(start_time, end_time, now):
     """Compute effective start/end from optional params.
 
@@ -152,10 +254,14 @@ def get_load_time_series(location, start_time=None, end_time=None):
 
     data_points = []
 
-    # Historical data (past)
+    # Historical data (past) — upsampled from 30-min to 5-min
     if effective_start is None or effective_start < now:
         hist_end = min(effective_end, now)
-        historical = db_utils.get_historical_data(location, effective_start, hist_end)
+        # Try cache first
+        historical = _get_cached_historical(location, effective_start, hist_end)
+        if historical is None:
+            raw_history = db_utils.get_historical_data(location, effective_start, hist_end)
+            historical = _upsample_historical(raw_history, fill_until=hist_end)
         for entry in historical:
             data_points.append({
                 'timestamp': entry['timestamp'].isoformat(),
@@ -212,10 +318,14 @@ def get_carbon_intensity_time_series(location, start_time=None, end_time=None):
 
     data_points = []
 
-    # Historical data (past)
+    # Historical data (past) — upsampled from 30-min to 5-min
     if effective_start is None or effective_start < now:
         hist_end = min(effective_end, now)
-        historical = db_utils.get_historical_data(location, effective_start, hist_end)
+        # Try cache first
+        historical = _get_cached_historical(location, effective_start, hist_end)
+        if historical is None:
+            raw_history = db_utils.get_historical_data(location, effective_start, hist_end)
+            historical = _upsample_historical(raw_history, fill_until=hist_end)
         for entry in historical:
             ci = entry.get('carbon_intensity')
             if ci is not None:
