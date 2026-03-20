@@ -131,58 +131,20 @@ def refresh_historical_cache(location):
     raw_history = db_utils.get_historical_data(location, week_ago, None)
     upsampled = _upsample_historical(raw_history, fill_until=now)
 
-    entries = []
-    for entry in upsampled:
-        e = {
-            'timestamp': entry['timestamp'].isoformat(),
-            'load': entry['load'],
-            'carbon_intensity': entry.get('carbon_intensity'),
-        }
-        entries.append(e)
-
-    cache_data = {
-        'start': week_ago.isoformat(),
-        'end': now.isoformat(),
-        'entries': entries,
-    }
-    db_utils.save_prediction(f'historical_upsampled_{location}', cache_data)
+    db_utils.save_historical_cache(location, upsampled)
 
 
 def _get_cached_historical(location, start, end):
     """Try to serve historical data from the pre-upsampled cache.
 
     Returns a list of entry dicts on cache hit, or None on miss.
+    The cache only covers the last 7 days — requests older than that
+    fall back to the raw historical_data table + upsample.
     """
-    cached = db_utils.get_cached_prediction(f'historical_upsampled_{location}')
-    if not cached:
+    if not start:
         return None
 
-    cache_start = datetime.fromisoformat(cached['start'])
-    cache_end = datetime.fromisoformat(cached['end'])
-    if cache_start.tzinfo is None:
-        cache_start = cache_start.replace(tzinfo=timezone.utc)
-    if cache_end.tzinfo is None:
-        cache_end = cache_end.replace(tzinfo=timezone.utc)
-
-    req_start = start if start else cache_start
-    req_end = end
-
-    if req_start < cache_start or req_end > cache_end:
-        return None
-
-    result = []
-    for entry in cached['entries']:
-        ts = datetime.fromisoformat(entry['timestamp'])
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        if ts < req_start or ts > req_end:
-            continue
-        result.append({
-            'timestamp': ts,
-            'load': entry['load'],
-            'carbon_intensity': entry.get('carbon_intensity'),
-        })
-    return result
+    return db_utils.get_historical_cache(location, start, end)
 
 
 def _resolve_time_window(start_time, end_time, now):

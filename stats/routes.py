@@ -1,7 +1,7 @@
 """API endpoint handlers."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -75,6 +75,13 @@ def get_load_forecast(
             detail='start_time must be before end_time',
         )
 
+    max_end = datetime.now(timezone.utc) + timedelta(hours=PREDICTION_WINDOW_HOURS)
+    if parsed_end and parsed_end > max_end:
+        raise HTTPException(
+            status_code=400,
+            detail=f'end_time cannot exceed the forecast window ({PREDICTION_WINDOW_HOURS}h from now)',
+        )
+
     try:
         data = get_load_time_series(location, parsed_start, parsed_end)
     except ValueError as e:
@@ -114,6 +121,13 @@ def get_carbon_forecast(
         raise HTTPException(
             status_code=422,
             detail='start_time must be before end_time',
+        )
+
+    max_end = datetime.now(timezone.utc) + timedelta(hours=PREDICTION_WINDOW_HOURS)
+    if parsed_end and parsed_end > max_end:
+        raise HTTPException(
+            status_code=400,
+            detail=f'end_time cannot exceed the forecast window ({PREDICTION_WINDOW_HOURS}h from now)',
         )
 
     try:

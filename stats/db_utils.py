@@ -175,8 +175,19 @@ def initialize_db():
 
         # Create indexes for efficient querying
         conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_historical_timestamp 
+            CREATE INDEX IF NOT EXISTS idx_historical_timestamp
             ON historical_data(timestamp)
+        """)
+
+        # Pre-upsampled (5-min) historical cache table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS historical_cache (
+                location TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                load REAL NOT NULL,
+                carbon_intensity REAL,
+                PRIMARY KEY (location, timestamp)
+            )
         """)
 
         conn.execute("""
@@ -340,6 +351,69 @@ def save_prediction(key: str, data: dict):
             )
     except sqlite3.Error as e:
         print(f'Cache write error: {e}')
+
+
+def save_historical_cache(location: str, entries: List[Dict]):
+    """Replace the upsampled historical cache for a location.
+
+    Args:
+        entries: List of dicts with keys: timestamp (datetime), load, carbon_intensity
+    """
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                'DELETE FROM historical_cache WHERE location = ?', (location,)
+            )
+            conn.executemany(
+                """INSERT INTO historical_cache
+                   (location, timestamp, load, carbon_intensity)
+                   VALUES (?, ?, ?, ?)""",
+                [
+                    (
+                        location,
+                        e['timestamp'].timestamp(),
+                        e['load'],
+                        e.get('carbon_intensity'),
+                    )
+                    for e in entries
+                ],
+            )
+    except sqlite3.Error as e:
+        print(f'Historical cache write error: {e}')
+
+
+def get_historical_cache(
+    location: str,
+    start_time: datetime,
+    end_time: datetime,
+) -> Optional[List[Dict]]:
+    """Get pre-upsampled 5-min historical data from cache.
+
+    Returns list of dicts on hit, None if the cache table is empty for this location.
+    """
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT timestamp, load, carbon_intensity
+                   FROM historical_cache
+                   WHERE location = ? AND timestamp >= ? AND timestamp <= ?
+                   ORDER BY timestamp ASC""",
+                (location, start_time.timestamp(), end_time.timestamp()),
+            )
+            rows = cursor.fetchall()
+            if not rows:
+                return None
+            return [
+                {
+                    'timestamp': datetime.fromtimestamp(row[0], tz=timezone.utc),
+                    'load': row[1],
+                    'carbon_intensity': row[2],
+                }
+                for row in rows
+            ]
+    except sqlite3.Error as e:
+        print(f'Historical cache read error: {e}')
+        return None
 
 
 def insert_historical_data(
