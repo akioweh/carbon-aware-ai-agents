@@ -1,5 +1,6 @@
 #define BOOST_TEST_MODULE SchedulingQueueTest
 
+#include "Scheduler.hpp"
 #include "SchedulingQueue.hpp"
 #include "exceptions/ExceptionHandler.hpp"
 #include "utils/Coro.hpp"
@@ -71,7 +72,8 @@ BOOST_AUTO_TEST_CASE(test_queue_concurrency_success) {
         // Prepare a vector of tasks without awaiting them yet
         std::vector<drogon::Task<scheduler::SchedulerOutput>> tasks;
         for (auto i : std::views::iota(0, 5)) {
-            tasks.push_back(scheduler::schedulingQueue.computeSchedule(req));
+            tasks.push_back(scheduler::schedulingQueue
+                                .computeSchedule<scheduler::Scheduler>(req));
         }
 
         // Fire all 300 requests into the queue and wait for the aggregate
@@ -100,7 +102,8 @@ BOOST_AUTO_TEST_CASE(test_queue_concurrency_exceptions) {
         for (auto i : std::views::iota(0, 30000)) {
             invalidReq.workload_amount = static_cast<double>(i + 1);
             tasks.push_back(
-                scheduler::schedulingQueue.computeSchedule(invalidReq));
+                scheduler::schedulingQueue
+                    .computeSchedule<scheduler::Scheduler>(invalidReq));
         }
 
         // Use the 'return_exceptions' template parameter to capture errors

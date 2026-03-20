@@ -59,16 +59,14 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     job["gpu_type"] = "V100_PCIE";
     job["gpu_count"] = 1;
     job["model_size"] = 10;
-    job["length"] = 60;
+    job["length"] = 5;
     // Use dates in the future to ensure we hit the "forecast" part of stats
-    // The stats service generates next week prediction.
-    // Let's pick a time tomorrow.
     auto now = std::chrono::system_clock::now();
-    auto tomorrow = now + std::chrono::hours(24);
-    auto day_after = tomorrow + std::chrono::hours(24);
+    auto start = now + std::chrono::hours(1);
+    auto end = start + std::chrono::hours(2);
 
-    job["earliest_start"] = scheduler::utils::toIso8601(tomorrow);
-    job["latest_finish"] = scheduler::utils::toIso8601(day_after);
+    job["earliest_start"] = scheduler::utils::toIso8601(start);
+    job["latest_finish"] = scheduler::utils::toIso8601(end);
 
     auto req = HttpRequest::newHttpJsonRequest(job);
     req->setMethod(drogon::Post);
@@ -115,8 +113,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
     getReq->setPath("/api/schedules");
-    getReq->setParameter("start_time", scheduler::utils::toIso8601(tomorrow));
-    getReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
+    getReq->setParameter("start_time", scheduler::utils::toIso8601(start));
+    getReq->setParameter("end_time", scheduler::utils::toIso8601(end));
 
     auto getRespPair = client->sendRequest(getReq);
     BOOST_REQUIRE_EQUAL(getRespPair.first, ReqResult::Ok);
@@ -147,9 +145,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     auto verifyReq = HttpRequest::newHttpRequest();
     verifyReq->setMethod(drogon::Get);
     verifyReq->setPath("/api/schedules");
-    verifyReq->setParameter("start_time",
-                            scheduler::utils::toIso8601(tomorrow));
-    verifyReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
+    verifyReq->setParameter("start_time", scheduler::utils::toIso8601(start));
+    verifyReq->setParameter("end_time", scheduler::utils::toIso8601(end));
 
     auto verifyRespPair = client->sendRequest(verifyReq);
     BOOST_REQUIRE_EQUAL(verifyRespPair.first, ReqResult::Ok);
@@ -231,10 +228,10 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
         job["gpu_type"] = "V100_PCIE";
         job["gpu_count"] = 1;
         job["model_size"] = 10;
-        job["length"] = 60;
+        job["length"] = 5;
         auto now = std::chrono::system_clock::now();
-        auto start = now + std::chrono::hours(24);
-        auto end = start + std::chrono::hours(24);
+        auto start = now + std::chrono::hours(2);
+        auto end = start + std::chrono::hours(1);
         job["earliest_start"] = scheduler::utils::toIso8601(start);
         job["latest_finish"] = scheduler::utils::toIso8601(end);
 
