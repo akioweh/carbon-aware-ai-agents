@@ -167,11 +167,36 @@ def initialize_db():
             CREATE TABLE IF NOT EXISTS historical_data (
                 location TEXT NOT NULL,
                 timestamp REAL NOT NULL,
-                load REAL NOT NULL,
+                load REAL,
                 carbon_intensity REAL NOT NULL,
                 PRIMARY KEY (location, timestamp)
             )
         """)
+
+        # Migrate: allow NULL load (carbon-only rows from carbon sync)
+        cursor = conn.execute("PRAGMA table_info(historical_data)")
+        for col in cursor.fetchall():
+            if col[1] == 'load' and col[3] == 1:  # col[3]=notnull flag
+                conn.execute("""
+                    CREATE TABLE historical_data_new (
+                        location TEXT NOT NULL,
+                        timestamp REAL NOT NULL,
+                        load REAL,
+                        carbon_intensity REAL NOT NULL,
+                        PRIMARY KEY (location, timestamp)
+                    )
+                """)
+                conn.execute("""
+                    INSERT INTO historical_data_new
+                    SELECT * FROM historical_data
+                """)
+                conn.execute("DROP TABLE historical_data")
+                conn.execute("ALTER TABLE historical_data_new RENAME TO historical_data")
+                # Clean up legacy load=0 rows from old carbon syncs
+                conn.execute("""
+                    UPDATE historical_data SET load = NULL WHERE load = 0
+                """)
+                break
 
         # Create indexes for efficient querying
         conn.execute("""
@@ -184,11 +209,29 @@ def initialize_db():
             CREATE TABLE IF NOT EXISTS historical_cache (
                 location TEXT NOT NULL,
                 timestamp REAL NOT NULL,
-                load REAL NOT NULL,
+                load REAL,
                 carbon_intensity REAL,
                 PRIMARY KEY (location, timestamp)
             )
         """)
+
+        # Migrate: allow NULL load in cache table too
+        cursor = conn.execute("PRAGMA table_info(historical_cache)")
+        for col in cursor.fetchall():
+            if col[1] == 'load' and col[3] == 1:  # col[3]=notnull flag
+                conn.execute("""
+                    CREATE TABLE historical_cache_new (
+                        location TEXT NOT NULL,
+                        timestamp REAL NOT NULL,
+                        load REAL,
+                        carbon_intensity REAL,
+                        PRIMARY KEY (location, timestamp)
+                    )
+                """)
+                conn.execute("INSERT INTO historical_cache_new SELECT * FROM historical_cache")
+                conn.execute("DROP TABLE historical_cache")
+                conn.execute("ALTER TABLE historical_cache_new RENAME TO historical_cache")
+                break
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS datacenters (
@@ -680,15 +723,15 @@ def _upsert_carbon_intensity_bulk(data: List[Dict]):
     """Upsert carbon intensity into historical_data without overwriting load.
 
     For existing rows (matching location + timestamp), only carbon_intensity
-    is updated. For new rows, load is set to 0 (the load predictor generates
-    synthetic forecasts independently of historical load values).
+    is updated. For new rows, load is set to NULL so that forward-fill in
+    upsampling propagates the previous valid load value instead of injecting 0.
     """
     try:
         with get_connection() as conn:
             conn.executemany(
                 """INSERT INTO historical_data
                    (location, timestamp, load, carbon_intensity)
-                   VALUES (?, ?, 0, ?)
+                   VALUES (?, ?, NULL, ?)
                    ON CONFLICT(location, timestamp)
                    DO UPDATE SET carbon_intensity = excluded.carbon_intensity""",
                 [

@@ -113,9 +113,10 @@ def _upsample_historical(entries, fill_until=None):
 
     result = []
     for ts, row in df.iterrows():
+        load = row['load']
         entry = {
             'timestamp': ts.to_pydatetime(),
-            'load': row['load'],
+            'load': None if (load is None or pd.isna(load)) else load,
         }
         ci = row.get('carbon_intensity')
         entry['carbon_intensity'] = None if (ci is None or pd.isna(ci)) else ci
@@ -224,10 +225,19 @@ def get_load_time_series(location, start_time=None, end_time=None):
         if historical is None:
             raw_history = db_utils.get_historical_data(location, effective_start, hist_end)
             historical = _upsample_historical(raw_history, fill_until=hist_end)
+        else:
+            # Cache may be stale (last refresh up to 30 min ago).
+            # Forward-fill the last cached point to hist_end so there's no
+            # gap between historical and forecast that the scheduler would
+            # fill with zeros.
+            historical = _upsample_historical(historical, fill_until=hist_end)
         for entry in historical:
+            load = entry['load']
+            if load is None or (isinstance(load, float) and pd.isna(load)):
+                continue
             data_points.append({
                 'timestamp': entry['timestamp'].isoformat(),
-                'value': max(0.0, float(entry['load'])),
+                'value': max(0.0, float(load)),
                 'is_forecast': False,
                 'capacity': DEFAULT_CAPACITY,
             })
@@ -288,6 +298,8 @@ def get_carbon_intensity_time_series(location, start_time=None, end_time=None):
         if historical is None:
             raw_history = db_utils.get_historical_data(location, effective_start, hist_end)
             historical = _upsample_historical(raw_history, fill_until=hist_end)
+        else:
+            historical = _upsample_historical(historical, fill_until=hist_end)
         for entry in historical:
             ci = entry.get('carbon_intensity')
             if ci is not None:
