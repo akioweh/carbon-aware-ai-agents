@@ -16,6 +16,9 @@ constexpr double EPSILON = 1e-6;
 constexpr double MIN_CAPACITY_THRESHOLD = 0.1;
 constexpr double TARGET_UTILIZATION = 0.5;
 
+/**
+ * Throws SchedulingException if the problem is infeasible.
+ */
 auto TrivialScheduler::doScheduleJob(JobRequest job)
     -> drogon::Task<SchedulerOutput> {
     auto data = co_await fetch_data(job);

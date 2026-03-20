@@ -12,6 +12,8 @@ using namespace scheduler::exceptions;
 
 /**
  * This method assumes already-validated job request parameters!
+ *
+ * Throws SchedulingException if there are no available data centers (sources).
  */
 auto SchedulerBase::fetch_data(const JobRequest &job)
     -> drogon::Task<SchedulerData> {

@@ -298,6 +298,8 @@ inline auto calc_single(const std::vector<double> &load_f,
  *
  * Currently uses std::async(std::launch::async, ...) for expressive
  * threading control.
+ *
+ * Throws SchedulingException if the problem is infeasible.
  */
 template <typename CostFunc>
     requires CostFunction<CostFunc, double>
