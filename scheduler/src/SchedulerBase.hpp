@@ -36,8 +36,8 @@ struct SchedulerData {
  * @brief Abstract base class for schedulers, providing common data fetching and
  * preprocessing logic.
  *
- * Schedulers should inherit from this class and implement the scheduleJob
- * method.
+ * Schedulers should inherit from this class and implement the doScheduleJob
+ * method following the Non-Virtual Interface pattern.
  */
 class SchedulerBase {
   protected:
@@ -45,9 +45,11 @@ class SchedulerBase {
 
     auto fetch_data(const JobRequest &job) -> drogon::Task<SchedulerData>;
 
-  public:
-    virtual auto scheduleJob(JobRequest job)
+    virtual auto doScheduleJob(JobRequest job)
         -> drogon::Task<SchedulerOutput> = 0;
+
+  public:
+    auto scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput>;
 
     virtual ~SchedulerBase() = default;
 };

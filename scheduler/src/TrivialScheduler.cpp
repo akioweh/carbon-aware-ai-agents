@@ -16,7 +16,7 @@ constexpr double EPSILON = 1e-6;
 constexpr double MIN_CAPACITY_THRESHOLD = 0.1;
 constexpr double TARGET_UTILIZATION = 0.5;
 
-auto TrivialScheduler::scheduleJob(JobRequest job)
+auto TrivialScheduler::doScheduleJob(JobRequest job)
     -> drogon::Task<SchedulerOutput> {
     auto data = co_await fetch_data(job);
     const auto n_locations = data.location_ids.size();
