@@ -5,7 +5,7 @@ import pandas as pd
 
 import db_utils
 from predictor_load import get_next_week_load
-from predictor_direct_ridge import get_next_week_carbon_intensity
+from predictor_ridge_v2 import get_next_week_carbon_intensity
 
 
 DEFAULT_CAPACITY = 50.0 * 1e12
@@ -53,10 +53,8 @@ def generate_next_week_load_prediction(location):
 def generate_next_week_carbon_intensity_prediction(location):
     """Generate carbon intensity predictions for the next week at a specific location."""
     now = pd.Timestamp.now().ceil('5min')
-    # Get history for specific location from database
-    # optimization: limit to 60 days of data
-    start_time = datetime.now() - timedelta(days=60)
-    location_history = db_utils.get_historical_data(location, start_time=start_time)
+    # Get full history — predictor_ridge_v2 benefits from more data
+    location_history = db_utils.get_historical_data(location)
 
     if not location_history:
         raise ValueError(f'No history found for location: {location}')

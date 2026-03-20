@@ -66,7 +66,7 @@ accurate forecasts to shift compute to low-carbon windows.
 
 ![Weekly Variance](./analysis/analysis_weekly_variance.png)
 
-## 3. Stage 1: Baseline Benchmark (18 Models)
+## 3. Phase 1: Baseline Benchmark (18 Models)
 
 Full 18-model comparison across statistical, tree-based, deep learning, and
 foundation model approaches.
@@ -151,7 +151,7 @@ origin summary (last_value, mean_48, std_48), 3 weather.
 | Random Forest | 50.67 | 47.27 | +3.40 |
 | LightGBM | 49.44 | 45.14 | +4.30 |
 
-### Stage 1 Key Findings
+### Phase 1 Key Findings
 
 1. **Direct-Ridge wins** at MAE 32.99 — simple Ridge with direct multi-step
    forecasting and weather features beats all 17 competitors.
@@ -166,7 +166,7 @@ origin summary (last_value, mean_48, std_48), 3 weather.
 5. **Foundation/deep models** (Chronos 43.26, Transformers ~42, N-BEATS 62.60,
    N-HiTS 76.36) don't justify their complexity on this dataset.
 
-## 4. Stage 2: Enhanced Features
+## 4. Phase 2: Enhanced Features
 
 ### What Changed
 
@@ -195,7 +195,7 @@ longer-range signals:
 
 ![Enhanced Features Predictions](./experiments/enhanced_features_predictions.png)
 
-### Stage 2 Key Findings
+### Phase 2 Key Findings
 
 1. **LightGBM improved most** (-20.9%), driven by a massive -30.61 drop in
    North East England — the weekly lag and extended rolling stats helped it
@@ -208,7 +208,7 @@ longer-range signals:
    features added noise rather than signal. Its direct approach already avoids
    recursive compounding, so weekly lags don't help as much.
 
-## 5. Stage 3: Residual Target
+## 5. Phase 3: Residual Target
 
 ### What Changed
 
@@ -231,7 +231,7 @@ identical to the enhanced set.
 
 ![Residual Predictions](./experiments/residual_predictions.png)
 
-### Stage 3 Key Findings
+### Phase 3 Key Findings
 
 1. **Residual target improved RF and CatBoost** substantially (RF -4.66 vs
    enhanced, CatBoost -3.40 vs enhanced). These models benefit from the
@@ -241,18 +241,18 @@ identical to the enhanced set.
    well with enhanced features.
 3. **Direct-XGBoost unaffected** (+0.37) — direct models don't compound
    errors recursively, so the residual trick provides no benefit.
-4. **Best variant selection** for Stage 4: RF → residual (46.61), XGBoost →
+4. **Best variant selection** for Phase 4: RF → residual (46.61), XGBoost →
    enhanced (35.44), CatBoost → residual (41.04), LightGBM → enhanced
    (39.12), Direct-XGBoost → baseline (33.50).
 
-## 6. Stage 4: Seasonal Data Expansion
+## 6. Phase 4: Seasonal Data Expansion
 
 ### What Changed
 
 Expanded training data from ~90 days to ~1 full year. Each model used its
-best-performing variant from Stages 2–3. Added seasonal features:
+best-performing variant from Phases 2–3. Added seasonal features:
 
-| Feature Group | Enhanced (Stage 2–3) | Seasonal (Stage 4) |
+| Feature Group | Enhanced (Phase 2–3) | Seasonal (Phase 4) |
 | --- | --- | --- |
 | Cyclical | 6: hour, dow, week sin/cos | 11: + **month**, **day-of-year** sin/cos, **daylight proxy** |
 | Lags | 19: 1–12, 24, 48, 72, 96, 144, 336 | 21: + **672** (2wk), **1344** (4wk) |
@@ -284,10 +284,10 @@ best-performing variant from Stages 2–3. Added seasonal features:
 
 ![Seasonal Predictions](./experiments/seasonal_predictions.png)
 
-### Stage 4 Key Findings
+### Phase 4 Key Findings
 
 1. **CatBoost achieves new best** at MAE 31.63, surpassing Direct-Ridge's
-   32.99 from Stage 1. Full-year seasonal data with residual target and
+   32.99 from Phase 1. Full-year seasonal data with residual target and
    extended features is the winning combination.
 2. **Random Forest massively improved** (-11.64) — its high-variance ensemble
    benefits most from additional training data.
@@ -296,7 +296,7 @@ best-performing variant from Stages 2–3. Added seasonal features:
 4. **LightGBM barely changed** (+1.67) — already performing well from enhanced
    features, additional data didn't help further.
 
-## 7. Stage 5: Weather Enrichment
+## 7. Phase 5: Weather Enrichment
 
 ### What Changed
 
@@ -305,7 +305,7 @@ solar radiation):
 
 | Variant | Weather Features | Count |
 | --- | --- | --- |
-| Baseline (Stage 4) | 3 original raw | 3 |
+| Baseline (Phase 4) | 3 original raw | 3 |
 | A: Extended raw | 11 raw (+ wind_100m, gusts, direction, cloud, humidity, pressure, diffuse/direct radiation) | 11 |
 | B: Extended + engineered | 11 raw + 4 engineered (wind_power_proxy, solar_effective, temp_demand_proxy) | 15 |
 | C: Engineered only | 3 original + 4 engineered | 7 |
@@ -342,7 +342,7 @@ solar radiation):
 | Random Forest | 33.16 |
 | XGBoost | 42.66 |
 
-### Comparison with Stage 4 Baseline
+### Comparison with Phase 4 Baseline
 
 | Model | Baseline | Best Variant | Best MAE | Best Delta |
 | --- | --- | --- | --- | --- |
@@ -370,12 +370,12 @@ features are stale but weather signals remain informative.
 
 ![Weather Horizon Analysis](./experiments/weather_horizon.png)
 
-### Stage 5 Key Findings
+### Phase 5 Key Findings
 
 1. **Direct-XGBoost with Variant A achieves overall best** at MAE 29.49 —
    10.6% better than the previous production model (Direct-Ridge, 32.99).
 2. **All models improved** with richer weather features. Every model's best
-   Stage 5 variant beats its Stage 4 result.
+   Phase 5 variant beats its Phase 4 result.
 3. **Variant A (11 raw features) wins** for most models — the tree models can
    learn their own transformations from raw data.
 4. **Biggest improvement at long horizons**: Day 7 MAE dropped from 32.82 to
@@ -387,7 +387,7 @@ features are stale but weather signals remain informative.
 All MAE values are cross-region averages (5 UK regions). Best result per model
 in **bold**.
 
-| Model | Stage 1 (7d) | Stage 1 (Full) | Stage 2 | Stage 3 | Stage 4 | Stage 5 | Best MAE |
+| Model | Phase 1 (7d) | Phase 1 (Full) | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Best MAE |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Direct-XGB | 40.66 | 33.50 | 34.10 | 34.47 | 37.74 | **29.49** | **29.49** |
 | CatBoost | 51.29 | 47.05 | 44.44 | 41.04 | 31.63 | **29.77** | **29.77** |
@@ -410,17 +410,17 @@ in **bold**.
 
 ### Final Ranking (Best MAE Achieved)
 
-| Rank | Model | Best MAE | Stage |
+| Rank | Model | Best MAE | Phase |
 | --- | --- | --- | --- |
-| 1 | **Direct-XGBoost (Weather A)** | **29.49** | Stage 5 |
-| 2 | CatBoost (Weather A) | 29.77 | Stage 5 |
-| 3 | LightGBM (Weather C) | 30.79 | Stage 5 |
-| 4 | XGBoost (Weather A) | 30.94 | Stage 5 |
-| 5 | LightGBM (Weather A) | 31.58 | Stage 5 |
-| 6 | CatBoost (seasonal) | 31.63 | Stage 4 |
-| 7 | Direct-Ridge | 32.99 | Stage 1 |
+| 1 | **Direct-XGBoost (Weather A)** | **29.49** | Phase 5 |
+| 2 | CatBoost (Weather A) | 29.77 | Phase 5 |
+| 3 | LightGBM (Weather C) | 30.79 | Phase 5 |
+| 4 | XGBoost (Weather A) | 30.94 | Phase 5 |
+| 5 | LightGBM (Weather A) | 31.58 | Phase 5 |
+| 6 | CatBoost (seasonal) | 31.63 | Phase 4 |
+| 7 | Direct-Ridge | 32.99 | Phase 1 |
 
-Stage 5 weather enrichment produced the top 5 results. The best
+Phase 5 weather enrichment produced the top 5 results. The best
 (Direct-XGBoost Weather A, 29.49) is **10.6% better** than production
 Direct-Ridge (32.99).
 
@@ -477,17 +477,102 @@ learning generalizable features.
   TimesFM, TimeGPT) may close the gap with fine-tuning on carbon intensity
   data.
 
-## 10. Conclusions
+## 10. Ensemble Experiments (Post-Phase 5)
+
+Following discussions with the client, further experimentation was
+conducted to push accuracy beyond MAE 29.49. The goal was to explore
+combinations of models -- including neural networks, gradient boosting,
+and ensembles -- to achieve better predictions.
+
+Evaluation switched from a simple train/test split to a
+**train/validation/test** split: training on all data up to 14 days
+before the latest reading, a 7-day validation window (used for ensemble
+weight selection), and a held-out 7-day test window.
+
+### Feature Engineering Overhaul
+
+The feature set was expanded from 14 to 65 features:
+
+| Feature Group | Old (14 features) | New (65 features) |
+| --- | --- | --- |
+| Temporal | 2 sin/cos pairs (hour, dow) | 22: 6 Fourier harmonics for hour, 2 for dow, 2 for doy, weekend flag, night flag |
+| Horizon | 1 (h/336) | 4: h, h², h³, log(h) |
+| Origin stats | 3 (last, mean, std) | 13: + median, min, max, 7-day stats, lag_24h, lag_7d, trend, same_hour_mean |
+| Weather | 3 raw | 16: 10 raw + 6 engineered (wind_power, wind_ramp, pressure_change, solar_clearness, temp_deviation, wind_dir sin/cos) |
+| Interactions | 0 | 10: last x horizon, weekend x hour, wind x hour, solar x hour, etc. |
+| Preprocessing | None | StandardScaler + RidgeCV (8 alpha candidates) |
+
+Training used the full historical record (~17,488 readings per region,
+~1 year) instead of the previous 60-day cap.
+
+### Individual Model Results
+
+| Model | AVG MAE | Time / Region | Notes |
+| --- | --- | --- | --- |
+| **RidgeFull** | **24.88** | < 1 sec | 65 features, full year, StandardScaler |
+| RidgeBase (no interactions) | 25.22 | < 1 sec | 55 features |
+| PyTorch MLP (2048,1024,512) | 27.30-28.20 | 3-5 min | Dropout+BatchNorm+GELU, inconsistent across runs |
+| LightGBM | 27.70-27.86 | 5-10 sec | 150K subsample, num_leaves=255 |
+| Conditioned MLP (all regions) | 30.45 | 5+ min | One-hot region encoding, did not help |
+
+### Ensemble Strategy Results
+
+| Ensemble Strategy | Models Combined | AVG MAE |
+| --- | --- | --- |
+| Median ensemble | RidgeF, RidgeBase, MLP, LightGBM | 24.85 |
+| Val-weighted | RidgeF, RidgeBase, MLP, LightGBM | 24.78-24.83 |
+| Trimmed mean | RidgeF, RidgeBase, MLP | 24.76-25.08 |
+
+The best ensemble (median, MAE 24.85) improved over RidgeFull (24.88)
+by only **0.03 MAE** (0.1%), which does not justify the added
+complexity of maintaining four models.
+
+### Actual vs Predicted
+
+![RidgeFull Actual vs Predicted](./analysis/ridgefull_actual_vs_predicted.png)
+
+### Updated Cross-Experiment Summary
+
+| Model | Phase 1 (7d) | Phase 1 (Full) | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Ensemble Exp. | Best MAE |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **RidgeFull** | — | — | — | — | — | — | **24.88** | **24.88** |
+| Direct-XGB | 40.66 | 33.50 | 34.10 | 34.47 | 37.74 | **29.49** | — | 29.49 |
+| CatBoost | 51.29 | 47.05 | 44.44 | 41.04 | 31.63 | **29.77** | — | 29.77 |
+| LightGBM | 65.41 | 49.44 | 39.12 | 39.70 | 40.79 | **30.79** | 27.70 | 27.70 |
+| XGBoost | 49.52 | 40.84 | 35.44 | 37.16 | 43.91 | **30.94** | — | 30.94 |
+| Random Forest | 66.28 | 50.67 | 51.26 | 46.61 | 34.97 | **32.66** | — | 32.66 |
+| Direct-Ridge | 47.01 | **32.99** | — | — | — | — | — | 32.99 |
+| PyTorch MLP | — | — | — | — | — | — | 27.30-28.20 | ~27.75 |
+
+### Updated Final Ranking
+
+| Rank | Model | Best MAE | Source |
+| --- | --- | --- | --- |
+| 1 | **RidgeFull (65 features, StandardScaler)** | **24.88** | Ensemble exp. |
+| 2 | Median ensemble (4 models) | 24.85 | Ensemble exp. |
+| 3 | PyTorch MLP (2048,1024,512) | ~27.75 | Ensemble exp. |
+| 4 | LightGBM (65 features) | 27.70 | Ensemble exp. |
+| 5 | Direct-XGBoost (Weather A) | 29.49 | Phase 5 |
+| 6 | CatBoost (Weather A) | 29.77 | Phase 5 |
+| 7 | Direct-Ridge (14 features) | 32.99 | Phase 1 |
+
+RidgeFull at 24.88 is now the overall best model -- a 24.6% improvement
+over the previous production model (Direct-Ridge, 32.99), achieved
+entirely through feature engineering and preprocessing rather than model
+complexity.
+
+## 11. Conclusions
 
 ### Key Takeaways
 
-1. **Direct-XGBoost with extended weather features wins** at MAE 29.49 — a
-   10.6% improvement over the previous best (Direct-Ridge, 32.99). Weather
-   enrichment (Stage 5) produced the top 5 results across all experiments.
+1. **RidgeFull wins** at MAE 24.88 — a 24.6% improvement over the
+   previous production model (Direct-Ridge, 32.99). The improvement came
+   entirely from feature engineering (14 → 65 features) and
+   StandardScaler preprocessing, not from switching model families.
 
-2. **Feature engineering > model complexity**: Across 5 stages, improving
+2. **Feature engineering > model complexity**: Across 5 phases, improving
    features and adding data delivered up to 37 MAE points of improvement (RF:
-   66.28 → 29.49 for best Stage 5), while switching to transformers or neural
+   66.28 → 29.49 for best Phase 5), while switching to transformers or neural
    architectures consistently underperformed.
 
 3. **Weather is the strongest predictor**: Extended weather features (11 raw
@@ -495,7 +580,7 @@ learning generalizable features.
    long horizons (Day 7 MAE: 32.82 → 19.01 for Direct-XGBoost).
 
 4. **More data helps ensemble models**: Random Forest (-11.64) and CatBoost
-   (-9.41) benefited most from full-year training in Stage 4. Boosting models
+   (-9.41) benefited most from full-year training in Phase 4. Boosting models
    showed mixed results, possibly overfitting to seasonal patterns.
 
 5. **Direct forecasting avoids error compounding**: Direct-XGBoost and
@@ -508,16 +593,14 @@ learning generalizable features.
 
 ### Production Considerations
 
-**Direct-Ridge** (MAE 32.99) is the current production model due to its
-simplicity, sub-second inference, and no hyperparameter tuning. **Direct-XGBoost
-with Weather A** (MAE 29.49) is the recommended upgrade path if the 10.6%
-accuracy improvement justifies the additional complexity of extended weather
-feature integration.
+**RidgeFull** (MAE 24.88) is the production model. It trains in under 1
+second per region, is fully deterministic, requires only scikit-learn,
+and has zero manual hyperparameters (RidgeCV auto-selects alpha). The
+best ensemble (median, 24.85) gains only 0.03 MAE but adds minutes of
+training time, PyTorch dependency, and non-determinism.
 
 ### Potential Next Steps
 
-- **Deploy Direct-XGBoost Weather A**: Integrate the 11-feature weather set
-  from Open-Meteo into the production pipeline.
 - **Weather forecast integration**: Using multi-day weather forecasts instead
   of lag-1 observations could improve all models, especially for the 3–7 day
   horizon.
@@ -525,5 +608,6 @@ feature integration.
   spatial correlations in wind patterns.
 - **Online learning**: Continuous model updates as new data arrives, rather
   than periodic retraining.
-- **Ensemble**: Blend Direct-XGBoost (best point accuracy) with CatBoost
-  (robust across regions) for a production forecast with lower variance.
+- **Additional exogenous features**: Gas prices, interconnector flows, or
+  day-ahead market data could provide leading indicators of generation mix
+  changes.
