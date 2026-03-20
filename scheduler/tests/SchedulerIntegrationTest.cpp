@@ -1,10 +1,10 @@
-#include "Calendar.hpp"
-#include "structs/SchedulerOutput.hpp"
-#include <boost/test/tools/old/interface.hpp>
 #define BOOST_TEST_MODULE SchedulerIntegrationTest
 
+#include "Calendar.hpp"
 #include "exceptions/ExceptionHandler.hpp"
+#include "structs/SchedulerOutput.hpp"
 #include "utils/Utils.hpp"
+#include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 #include <chrono>
 #include <drogon/HttpController.h>

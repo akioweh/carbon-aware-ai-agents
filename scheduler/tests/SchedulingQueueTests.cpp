@@ -1,17 +1,18 @@
-#include <boost/test/tools/old/interface.hpp>
-#include <drogon/utils/coroutine.h>
-#include <trantor/utils/Logger.h>
 #define BOOST_TEST_MODULE SchedulingQueueTest
+
 #include "SchedulingQueue.hpp"
 #include "exceptions/ExceptionHandler.hpp"
 #include "utils/Coro.hpp"
+#include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 #include <chrono>
 #include <drogon/HttpController.h>
 #include <drogon/drogon.h>
+#include <drogon/utils/coroutine.h>
 #include <filesystem>
 #include <ranges>
 #include <thread>
+#include <trantor/utils/Logger.h>
 #include <vector>
 
 using namespace scheduler::coro;
