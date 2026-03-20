@@ -18,7 +18,7 @@ if not os.path.exists(RESULTS_DIR):
 
 def get_current_branch():
     """Returns the current git branch name."""
-    return "First_Solution"
+    return "Cache_and_Vectorization_Optimization"
 
 
 def generate_test_batch(size=40):
@@ -67,25 +67,28 @@ def run_benchmark():
             flush=True,
         )
 
-        start_time = time.perf_counter()
         try:
-            resp = requests.post(f"{BASE_URL}/schedules", json=payload)
-            end_time = time.perf_counter()
-
-            duration = end_time - start_time
+            avg_time = 0
+            for p in range(5):
+                start_time = time.perf_counter()
+                resp = requests.post(f"{BASE_URL}/schedules", json=payload)
+                end_time = time.perf_counter()
+                duration = end_time - start_time
+                avg_time += duration
+                schedule_id = resp.json().get("schedule_id")
+                requests.delete(f"{BASE_URL}/schedules/{schedule_id}")
+            avg_time /= 5
 
             if resp.status_code == 200:
-                print(f" OK ({duration:.4f}s)")
-                schedule_id = resp.json().get("schedule_id")
+                print(f" OK ({avg_time:.4f}s)")
                 results.append(
                     {
                         "complexity": complexity,
-                        "duration": duration,
+                        "duration": avg_time,
                         "status": resp.status_code,
                         "schedule_id": schedule_id,
                     }
                 )
-                requests.delete(f"{BASE_URL}/schedules/{schedule_id}")
             else:
                 print(f" FAILED ({resp.status_code})")
                 print(resp.text)
@@ -141,10 +144,66 @@ def plot_comparison():
     plt.show()
 
 
+def plot_relative_speedup():
+    """Reads result files and plots relative speedup compared to First_Solution."""
+    baseline_path = os.path.join(RESULTS_DIR, "results_First_Solution.json")
+
+    if not os.path.exists(baseline_path):
+        print(f"⚠️ Baseline file not found: {baseline_path}. Cannot plot speedup.")
+        return
+
+    # Load baseline
+    with open(baseline_path, "r") as f:
+        baseline_res = json.load(f)
+        df_baseline = pd.DataFrame(baseline_res["data"])
+        if df_baseline.empty:
+            return
+        df_baseline = df_baseline.set_index("complexity")
+
+    plt.figure(figsize=(10, 6))
+
+    files = [
+        f
+        for f in os.listdir(RESULTS_DIR)
+        if f.endswith(".json") and f != "results_First_Solution.json"
+    ]
+
+    if not files:
+        print("No other result files found to compare against baseline.")
+        return
+
+    for file in files:
+        with open(os.path.join(RESULTS_DIR, file), "r") as f:
+            res = json.load(f)
+            df = pd.DataFrame(res["data"])
+            if not df.empty:
+                df = df.set_index("complexity")
+                # Calculate speedup (Baseline Time / New Time)
+                # Speedup > 1 means the new solution is faster
+                speedup = df_baseline["duration"] / df["duration"]
+
+                plt.plot(speedup.index, speedup.values, marker="s", label=res["branch"])
+
+    # Add a reference line for 1.0x (Baseline)
+    plt.axhline(y=1.0, color="r", linestyle="--", label="Baseline (1.0x)")
+
+    plt.title("Relative Speedup Compared to First_Solution")
+    plt.xlabel("Complexity (Work Load) with deadline=72h")
+    plt.ylabel("Speedup Factor (Baseline Time / Current Time)")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.7)
+
+    plot_file = "relative_speedup.png"
+    plt.savefig(plot_file)
+    print(f"📈 Speedup graph saved to {plot_file}")
+    plt.close()
+
+
 if __name__ == "__main__":
     import sys
 
     if len(sys.argv) > 1 and sys.argv[1] == "--plot":
         plot_comparison()
+        plot_relative_speedup()
     else:
         run_benchmark()
