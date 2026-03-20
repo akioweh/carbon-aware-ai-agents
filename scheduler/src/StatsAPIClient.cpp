@@ -20,16 +20,17 @@ using namespace std;
 using namespace drogon;
 
 StatsAPIClient::StatsAPIClient(std::string host) : host(std::move(host)) {}
-StatsAPIClient::StatsAPIClient(TimeIntervalParams time_interval, string host)
-    : host(std::move(host)), time_interval(time_interval) {}
 
-auto StatsAPIClient::addTimeIntervalPathParams() const -> std::string {
+auto StatsAPIClient::addTimeIntervalPathParams(
+    std::optional<TimeIntervalParams> interval) const -> std::string {
     std::string params = "?";
-    if (time_interval.start)
-        params +=
-            "start_time=" + utils::toIso8601(time_interval.start.value()) + '&';
-    if (time_interval.end)
-        params += "end_time=" + utils::toIso8601(time_interval.end.value());
+    if (interval) {
+        if (interval->start)
+            params +=
+                "start_time=" + utils::toIso8601(interval->start.value()) + '&';
+        if (interval->end)
+            params += "end_time=" + utils::toIso8601(interval->end.value());
+    }
 
     if (params.back() == '?' || params.back() == '&')
         params.pop_back();
@@ -47,9 +48,11 @@ auto StatsAPIClient::getLocations() const -> Task<vector<Location>> {
     co_return locations;
 }
 
-auto StatsAPIClient::getLoadForecast(const string &location) const
+auto StatsAPIClient::getLoadForecast(
+    const string &location, std::optional<TimeIntervalParams> interval) const
     -> Task<optional<LoadTimeSeries>> {
-    auto jsonPtr = co_await utils::makeGetRequest(host, getLoadPath(location));
+    auto jsonPtr =
+        co_await utils::makeGetRequest(host, getLoadPath(location, interval));
     assert(jsonPtr);
     const auto &json = *jsonPtr;
 
@@ -82,10 +85,11 @@ auto StatsAPIClient::getLoadForecast(const string &location) const
                              .data = std::move(data)};
 }
 
-auto StatsAPIClient::getCarbonIntensityForecast(const string &location) const
+auto StatsAPIClient::getCarbonIntensityForecast(
+    const string &location, std::optional<TimeIntervalParams> interval) const
     -> Task<optional<CarbonIntensityTimeSeries>> {
-    auto jsonPtr =
-        co_await utils::makeGetRequest(host, getCarbonIntensityPath(location));
+    auto jsonPtr = co_await utils::makeGetRequest(
+        host, getCarbonIntensityPath(location, interval));
     assert(jsonPtr);
     const auto &json = *jsonPtr;
 
@@ -119,11 +123,12 @@ auto StatsAPIClient::getCarbonIntensityForecast(const string &location) const
         .data = std::move(data)};
 }
 
-auto StatsAPIClient::getDatacenter(const string &datacenterName) const
-    -> Task<Datacenter> {
-    auto [loadOpt, carbon_intensityOpt] =
-        co_await coro::when_all(getLoadForecast(datacenterName),
-                                getCarbonIntensityForecast(datacenterName));
+auto StatsAPIClient::getDatacenter(
+    const string &datacenterName,
+    std::optional<TimeIntervalParams> interval) const -> Task<Datacenter> {
+    auto [loadOpt, carbon_intensityOpt] = co_await coro::when_all(
+        getLoadForecast(datacenterName, interval),
+        getCarbonIntensityForecast(datacenterName, interval));
     if (!loadOpt || !carbon_intensityOpt) {
         LOG_ERROR << "Failed to get complete data for " << datacenterName;
         co_return Datacenter{};
@@ -177,11 +182,12 @@ auto StatsAPIClient::getDatacenter(const string &datacenterName) const
 }
 
 auto StatsAPIClient::getAllDatacenters(
-    std::optional<std::string> preferred_datacenter) const
+    std::optional<std::string> preferred_datacenter,
+    std::optional<TimeIntervalParams> interval) const
     -> Task<vector<Datacenter>> {
     if (preferred_datacenter) {
         const auto &datacenterName = preferred_datacenter.value();
-        co_return vector(1, co_await getDatacenter(datacenterName));
+        co_return vector(1, co_await getDatacenter(datacenterName, interval));
     }
     auto locations = co_await getLocations();
     if (locations.empty()) {
@@ -190,8 +196,8 @@ auto StatsAPIClient::getAllDatacenters(
     }
 
     co_return co_await coro::when_all(
-        locations | views::transform([this](const auto &loc) -> auto {
-            return getDatacenter(loc.id);
+        locations | views::transform([this, interval](const auto &loc) -> auto {
+            return getDatacenter(loc.id, interval);
         }) |
         ranges::to<vector>());
 }

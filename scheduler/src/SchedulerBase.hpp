@@ -35,15 +35,13 @@ struct SchedulerData {
 class SchedulerBase {
   protected:
     StatsAPIClient stats_api;
+    TimeIntervalParams time_interval;
 
   public:
     virtual ~SchedulerBase() = default;
     SchedulerBase(scheduler::calendar::time_point start_time,
-                  scheduler::calendar::time_point end_time) {
-        const auto interval =
-            TimeIntervalParams{.start = start_time, .end = end_time};
-        stats_api = StatsAPIClient(interval);
-    }
+                  scheduler::calendar::time_point end_time)
+        : time_interval({.start = start_time, .end = end_time}) {}
 
   protected:
     auto fetch_data(const JobRequest &job) -> drogon::Task<SchedulerData>;

@@ -67,7 +67,6 @@ class StatsAPIClient {
 
   private:
     std::string host;
-    TimeIntervalParams time_interval;
 
     static auto getDefaultHost() -> const std::string & {
         static const auto res = []() -> std::string {
@@ -78,38 +77,49 @@ class StatsAPIClient {
     }
     static auto getLocationsPath() -> std::string { return "/locations"; }
 
-    [[nodiscard]] auto addTimeIntervalPathParams() const -> std::string;
+    [[nodiscard]] auto addTimeIntervalPathParams(
+        std::optional<TimeIntervalParams> interval = std::nullopt) const
+        -> std::string;
 
-    [[nodiscard]] auto getLoadPath(const std::string &locationId) const
+    [[nodiscard]] auto
+    getLoadPath(const std::string &locationId,
+                std::optional<TimeIntervalParams> interval = std::nullopt) const
         -> std::string {
         return "/locations/" + locationId + "/metrics/forecast_load" +
-               addTimeIntervalPathParams();
+               addTimeIntervalPathParams(interval);
     }
-    [[nodiscard]] auto
-    getCarbonIntensityPath(const std::string &locationId) const -> std::string {
+    [[nodiscard]] auto getCarbonIntensityPath(
+        const std::string &locationId,
+        std::optional<TimeIntervalParams> interval = std::nullopt) const
+        -> std::string {
         return "/locations/" + locationId +
                "/metrics/forecast_carbon_intensity" +
-               addTimeIntervalPathParams();
+               addTimeIntervalPathParams(interval);
     }
 
   public:
     StatsAPIClient(std::string host = getDefaultHost());
-    explicit StatsAPIClient(TimeIntervalParams time_interval,
-                            std::string host = getDefaultHost());
 
     [[nodiscard]] auto getLocations() const
         -> drogon::Task<std::vector<Location>>;
     // TODO: why do the following two return optional?
     // TODO: rename: these don't _only_ get forecasts (but also historical?)
-    [[nodiscard]] auto getLoadForecast(const std::string &location) const
+    [[nodiscard]] auto getLoadForecast(
+        const std::string &location,
+        std::optional<TimeIntervalParams> interval = std::nullopt) const
         -> drogon::Task<std::optional<LoadTimeSeries>>;
-    [[nodiscard]] auto
-    getCarbonIntensityForecast(const std::string &location) const
+    [[nodiscard]] auto getCarbonIntensityForecast(
+        const std::string &location,
+        std::optional<TimeIntervalParams> interval = std::nullopt) const
         -> drogon::Task<std::optional<CarbonIntensityTimeSeries>>;
 
-    [[nodiscard]] auto getDatacenter(const std::string &datacenterName) const
+    [[nodiscard]] auto getDatacenter(
+        const std::string &datacenterName,
+        std::optional<TimeIntervalParams> interval = std::nullopt) const
         -> drogon::Task<Datacenter>;
-    [[nodiscard]] auto getAllDatacenters(std::optional<std::string> = {}) const
+    [[nodiscard]] auto getAllDatacenters(
+        std::optional<std::string> preferred_datacenter = {},
+        std::optional<TimeIntervalParams> interval = std::nullopt) const
         -> drogon::Task<std::vector<Datacenter>>;
 };
 
