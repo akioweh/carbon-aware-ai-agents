@@ -1,13 +1,15 @@
 #ifndef SCHEDULER_SCHEDULING_QUEUE_HPP
 #define SCHEDULER_SCHEDULING_QUEUE_HPP
-#include <exception>
 #pragma once
 
+#include "SchedulerBase.hpp"
 #include "structs/JobRequest.hpp"
 #include "structs/SchedulerOutput.hpp"
 #include <atomic>
 #include <boost/lockfree/queue.hpp>
 #include <coroutine>
+#include <exception>
+#include <memory>
 
 namespace scheduler {
 
@@ -19,8 +21,11 @@ class SchedulerTask {
     std::exception_ptr except_ptr{nullptr};
 
   public:
+    std::unique_ptr<SchedulerBase> scheduler;
     JobRequest jobRequest;
-    SchedulerTask(JobRequest jobRequest) : jobRequest(std::move(jobRequest)) {};
+
+    SchedulerTask(std::unique_ptr<SchedulerBase> sched, JobRequest jobRequest)
+        : scheduler(std::move(sched)), jobRequest(std::move(jobRequest)) {};
 
     auto await_ready() -> bool {
         return state.load(std::memory_order_acquire) == State::Done;
@@ -63,12 +68,20 @@ class SchedulingQueue {
     std::atomic<int> queueSize{0};
 
     auto runTasks() -> drogon::Task<>;
-    auto push_back(SchedulerTask *);
+    void push_back(SchedulerTask *);
 
   public:
-    SchedulingQueue() = default;
-    auto computeSchedule(const JobRequest &) -> drogon::Task<SchedulerOutput>;
+    // Sched must be a subclass of SchedulerBase
+    template <typename Sched>
+    auto computeSchedule(const JobRequest &jobRequest)
+        -> drogon::Task<SchedulerOutput> {
+        auto schedulerTask = std::make_shared<SchedulerTask>(
+            std::make_unique<Sched>(), jobRequest);
+        push_back(schedulerTask.get());
+        co_return co_await *schedulerTask;
+    }
 
+    SchedulingQueue() = default;
     SchedulingQueue(const SchedulingQueue &) = delete;
     SchedulingQueue(SchedulingQueue &&) = delete;
     auto operator=(const SchedulingQueue &) = delete;
