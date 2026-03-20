@@ -5,6 +5,7 @@ import pandas as pd
 
 import db_utils
 from config import DEFAULT_CAPACITY, PREDICTION_WINDOW_HOURS
+from data.generate_history import generate_load
 from .ridge import get_next_week_carbon_intensity
 from .load import get_next_week_load
 
@@ -132,6 +133,12 @@ def refresh_historical_cache(location):
     raw_history = db_utils.get_historical_data(location, week_ago, None)
     upsampled = _upsample_historical(raw_history, fill_until=now)
 
+    # Fill missing load values with synthetic data (load has no real source)
+    for entry in upsampled:
+        load = entry['load']
+        if load is None or (isinstance(load, float) and pd.isna(load)):
+            entry['load'] = generate_load(entry['timestamp'], 0)
+
     db_utils.save_historical_cache(location, upsampled)
 
 
@@ -234,7 +241,7 @@ def get_load_time_series(location, start_time=None, end_time=None):
         for entry in historical:
             load = entry['load']
             if load is None or (isinstance(load, float) and pd.isna(load)):
-                continue
+                load = generate_load(entry['timestamp'], 0)
             data_points.append({
                 'timestamp': entry['timestamp'].isoformat(),
                 'value': max(0.0, float(load)),
