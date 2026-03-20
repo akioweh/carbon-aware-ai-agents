@@ -14,7 +14,7 @@ auto ForecastController::
     getForecast( // NOLINT(readability-convert-member-functions-to-static)
         HttpRequestPtr /*req*/, const DatacenterIdentifierParam datacenter,
         const TimeIntervalParams interval) const -> Task<HttpResponsePtr> {
-    const auto stats = StatsAPIClient();
+    auto &stats = StatsAPIClient::getInstance();
     Json::Value ret;
     if (datacenter.name == scheduler::calendar::ANY_DATACENTER) {
         ret = toJson(co_await stats.getAllDatacenters({}, interval));

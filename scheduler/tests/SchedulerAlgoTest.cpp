@@ -1,4 +1,5 @@
 #define BOOST_TEST_MODULE SchedulerAlgoTest
+
 #include <SchedulerAlgo.hpp>
 #include <boost/test/unit_test.hpp>
 #include <cmath>

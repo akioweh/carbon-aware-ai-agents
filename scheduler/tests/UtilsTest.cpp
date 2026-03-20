@@ -1,4 +1,5 @@
 #define BOOST_TEST_MODULE UtilsTest
+
 #include "utils/Utils.hpp"
 #include <boost/test/unit_test.hpp>
 #include <chrono>

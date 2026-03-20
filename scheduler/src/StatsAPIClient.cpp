@@ -19,10 +19,10 @@ namespace scheduler {
 using namespace std;
 using namespace drogon;
 
-StatsAPIClient::StatsAPIClient(std::string host) : host(std::move(host)) {}
+StatsAPIClient::StatsAPIClient() : host(getHost()) {}
 
 auto StatsAPIClient::addTimeIntervalPathParams(
-    std::optional<TimeIntervalParams> interval) const -> std::string {
+    std::optional<TimeIntervalParams> interval) -> std::string {
     std::string params = "?";
     if (interval) {
         if (interval->start)

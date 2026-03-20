@@ -1,16 +1,13 @@
 #include "SchedulingQueue.hpp"
-#include "Calendar.hpp"
-#include "Scheduler.hpp"
 #include "structs/JobRequest.hpp"
-#include "structs/TimeIntervalParams.hpp"
 #include <atomic>
 #include <drogon/utils/coroutine.h>
 #include <exception>
-#include <optional>
+#include <trantor/utils/Logger.h>
 
 namespace scheduler {
 
-auto SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
+void SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
     (void)queueSize.fetch_add(1, std::memory_order_release);
     while (!Q.push(schedulerTask))
         ;
@@ -24,27 +21,18 @@ auto SchedulingQueue::push_back(SchedulerTask *schedulerTask) {
     }
 }
 
-auto SchedulingQueue::computeSchedule(const JobRequest &jobRequest)
-    -> drogon::Task<SchedulerOutput> {
-    auto schedulerTask = std::make_shared<SchedulerTask>(jobRequest);
-    push_back(schedulerTask.get());
-    co_return co_await *schedulerTask;
-}
-
 auto SchedulingQueue::runTasks() -> drogon::Task<> {
 start:;
     SchedulerTask *task;
     while (Q.pop(task)) {
         (void)queueSize.fetch_sub(1, std::memory_order_release);
-
         try {
-            Scheduler scheduler(task->jobRequest.earliest_start,
-                                task->jobRequest.latest_finish);
-            auto res = co_await scheduler.scheduleJob(task->jobRequest);
+            auto res = co_await task->scheduler->scheduleJob(task->jobRequest);
             task->setValue(std::move(res));
         } catch (...) {
             task->setException(std::current_exception());
         }
+
         task->resume();
     }
 

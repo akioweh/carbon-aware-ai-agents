@@ -12,7 +12,7 @@ using namespace scheduler::exceptions;
 
 constexpr double EPSILON = 1e-6;
 
-auto Scheduler::scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
+auto Scheduler::doScheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
     auto data = co_await fetch_data(job);
     const auto n_intervals = data.n_intervals;
     auto costs_f = data.generate_cost_functions();
