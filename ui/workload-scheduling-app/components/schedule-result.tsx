@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Area, ComposedChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { Area, ComposedChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 import { JobScheduleResponse, ScheduleData } from "../types/schedule"
 
 interface DatacenterApiRecord {
@@ -376,6 +376,21 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     return Math.ceil(max / 10) * 10;
   }, [workloadData]);
 
+  const nowLineValue = useMemo(() => {
+    const now = Date.now()
+    let closest: string | null = null
+    let closestDiff = Infinity
+    for (const d of workloadData) {
+      const diff = Math.abs(new Date(d.time).getTime() - now)
+      if (diff < closestDiff) {
+        closestDiff = diff
+        closest = d.time
+      }
+    }
+    // Only show if the closest point is within 5 minutes of now
+    return closest && closestDiff < 5 * 60 * 1000 ? closest : null
+  }, [workloadData])
+
   const { start: rangeStart, end: rangeEnd } = getTimeRange()
 
   return (
@@ -507,6 +522,10 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               <div className="h-1 w-4 rounded bg-purple-500" />
               <span className="text-muted-foreground">Capacity</span>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-0.5 rounded bg-amber-500" />
+              <span className="text-muted-foreground">Now</span>
+            </div>
           </div>
 
           {loading ? (
@@ -567,6 +586,9 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
                     <Area yAxisId="left" type="monotone" dataKey="newJob" stackId="1" stroke={showTrivial ? "#ea580c" : "#059669"} fill="url(#colorNew)" isAnimationActive={false} />
                     <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
                     <Line yAxisId="left" type="monotone" dataKey="capacity" stroke="#a855f7" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    {nowLineValue && (
+                      <ReferenceLine yAxisId="left" x={nowLineValue} stroke="#f59e0b" strokeWidth={2} label={{ position: "insideTopRight", value: "Now", fontSize: 11, fontWeight: 600, fill: "#f59e0b" }} />
+                    )}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
