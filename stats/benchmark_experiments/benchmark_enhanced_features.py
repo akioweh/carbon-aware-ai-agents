@@ -21,6 +21,7 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,9 +30,12 @@ import pandas as pd
 warnings.filterwarnings('ignore')
 
 from benchmark import (
-    DB_PATH, TEST_DAYS, WEATHER_FEATURES,
-    load_data, fetch_weather_data,
+    DB_PATH,
+    TEST_DAYS,
+    WEATHER_FEATURES,
     compute_metrics,
+    fetch_weather_data,
+    load_data,
 )
 
 DOCS_DIR = Path(__file__).resolve().parent.parent / 'docs'
@@ -41,7 +45,7 @@ ENHANCED_MODELS = ['Random Forest', 'XGBoost', 'CatBoost', 'LightGBM', 'Direct-X
 
 # Feature counts
 ENHANCED_N_FEATURES = {
-    'Random Forest': 33,   # 6 cyclical + 19 lags + 5 rolling + 3 weather
+    'Random Forest': 33,  # 6 cyclical + 19 lags + 5 rolling + 3 weather
     'XGBoost': 33,
     'CatBoost': 33,
     'LightGBM': 33,
@@ -53,15 +57,16 @@ SPARSE_LAGS = list(range(1, 13)) + [24, 48, 72, 96, 144, 336]
 
 # Rolling window configs: (window_size, stat_type)
 ROLLING_CONFIGS = [
-    (12, 'mean'),    # 6 hours
-    (48, 'mean'),    # 24 hours
-    (336, 'mean'),   # 1 week
-    (48, 'std'),     # 24 hours std
-    (336, 'std'),    # 1 week std
+    (12, 'mean'),  # 6 hours
+    (48, 'mean'),  # 24 hours
+    (336, 'mean'),  # 1 week
+    (48, 'std'),  # 24 hours std
+    (336, 'std'),  # 1 week std
 ]
 
 
 # ── Enhanced Feature Engineering ─────────────────────────────────────────
+
 
 def build_enhanced_cyclical(timestamps: pd.Series) -> pd.DataFrame:
     """Build sin/cos features for hour, day-of-week, and week-of-year."""
@@ -69,14 +74,16 @@ def build_enhanced_cyclical(timestamps: pd.Series) -> pd.DataFrame:
     hour = ts.dt.hour + ts.dt.minute / 60.0
     dow = ts.dt.dayofweek
     week_of_year = ts.dt.isocalendar().week.astype(float).values
-    return pd.DataFrame({
-        'hour_sin': np.sin(2 * np.pi * hour / 24),
-        'hour_cos': np.cos(2 * np.pi * hour / 24),
-        'dow_sin':  np.sin(2 * np.pi * dow / 7),
-        'dow_cos':  np.cos(2 * np.pi * dow / 7),
-        'week_sin': np.sin(2 * np.pi * week_of_year / 52),
-        'week_cos': np.cos(2 * np.pi * week_of_year / 52),
-    })
+    return pd.DataFrame(
+        {
+            'hour_sin': np.sin(2 * np.pi * hour / 24),
+            'hour_cos': np.cos(2 * np.pi * hour / 24),
+            'dow_sin': np.sin(2 * np.pi * dow / 7),
+            'dow_cos': np.cos(2 * np.pi * dow / 7),
+            'week_sin': np.sin(2 * np.pi * week_of_year / 52),
+            'week_cos': np.cos(2 * np.pi * week_of_year / 52),
+        }
+    )
 
 
 def build_enhanced_lag_features(series: np.ndarray) -> pd.DataFrame:
@@ -101,8 +108,7 @@ def build_enhanced_ml_features(timestamps: pd.Series, values: np.ndarray) -> pd.
     return pd.concat([cyclical, lags], axis=1)
 
 
-def recursive_forecast_enhanced(model, train_ts, train_y, test_ts, test_y_actual,
-                                train_exog=None, test_exog=None):
+def recursive_forecast_enhanced(model, train_ts, train_y, test_ts, test_y_actual, train_exog=None, test_exog=None):
     """Recursive multi-step forecast with enhanced features."""
     n_train = len(train_y)
     n_test = len(test_ts)
@@ -154,7 +160,7 @@ def recursive_forecast_enhanced(model, train_ts, train_y, test_ts, test_y_actual
         lag_df = pd.DataFrame([lag_feats])
         x_step = pd.concat([cyclical.reset_index(drop=True), lag_df.reset_index(drop=True)], axis=1)
         if has_exog:
-            x_step = np.column_stack([x_step.values, test_exog[t:t+1]])
+            x_step = np.column_stack([x_step.values, test_exog[t : t + 1]])
         else:
             x_step = x_step.values
         pred = model.predict(x_step)[0]
@@ -164,8 +170,7 @@ def recursive_forecast_enhanced(model, train_ts, train_y, test_ts, test_y_actual
     return np.clip(preds, 0, 500)
 
 
-def build_direct_features_enhanced(train_ts, train_y, test_ts,
-                                   train_exog=None, test_exog=None):
+def build_direct_features_enhanced(train_ts, train_y, test_ts, train_exog=None, test_exog=None):
     """Direct features with enhanced cyclical + extended origin summary."""
     n_test = len(test_ts)
     n_train = len(train_y)
@@ -185,8 +190,8 @@ def build_direct_features_enhanced(train_ts, train_y, test_ts,
     origin_std_336 = np.zeros(n_train)
 
     for t in range(min_history, n_train):
-        recent_48 = train_y[max(0, t - 47):t + 1]
-        recent_336 = train_y[max(0, t - 335):t + 1]
+        recent_48 = train_y[max(0, t - 47) : t + 1]
+        recent_336 = train_y[max(0, t - 335) : t + 1]
         origin_last[t] = train_y[t]
         origin_mean_48[t] = np.mean(recent_48)
         origin_std_48[t] = np.std(recent_48) if len(recent_48) > 1 else 0
@@ -204,12 +209,18 @@ def build_direct_features_enhanced(train_ts, train_y, test_ts,
         targets = origins + h
         cyc = all_cyc[targets]
         h_col = np.full((len(origins), 1), h / 336.0)
-        h2_col = h_col ** 2
-        of = np.column_stack([
-            origin_last[origins], origin_mean_48[origins], origin_std_48[origins],
-            origin_lag_48[origins], origin_lag_336[origins],
-            origin_mean_336[origins], origin_std_336[origins],
-        ])
+        h2_col = h_col**2
+        of = np.column_stack(
+            [
+                origin_last[origins],
+                origin_mean_48[origins],
+                origin_std_48[origins],
+                origin_lag_48[origins],
+                origin_lag_336[origins],
+                origin_mean_336[origins],
+                origin_std_336[origins],
+            ]
+        )
         x = np.column_stack([cyc, h_col, h2_col, of])
         if has_exog:
             x = np.column_stack([x, train_exog[targets]])
@@ -223,16 +234,22 @@ def build_direct_features_enhanced(train_ts, train_y, test_ts,
     test_cyc = build_enhanced_cyclical(test_ts).values
     recent_48 = train_y[-48:]
     recent_336 = train_y[-336:] if len(train_y) >= 336 else train_y
-    of_test = np.array([[
-        train_y[-1],
-        np.mean(recent_48), np.std(recent_48),
-        train_y[-48] if len(train_y) >= 48 else train_y[0],
-        train_y[-336] if len(train_y) >= 336 else train_y[0],
-        np.mean(recent_336), np.std(recent_336),
-    ]])
+    of_test = np.array(
+        [
+            [
+                train_y[-1],
+                np.mean(recent_48),
+                np.std(recent_48),
+                train_y[-48] if len(train_y) >= 48 else train_y[0],
+                train_y[-336] if len(train_y) >= 336 else train_y[0],
+                np.mean(recent_336),
+                np.std(recent_336),
+            ]
+        ]
+    )
     of_test = np.tile(of_test, (n_test, 1))
     h_vals = np.arange(1, n_test + 1).reshape(-1, 1) / 336.0
-    X_test = np.column_stack([test_cyc, h_vals, h_vals ** 2, of_test])
+    X_test = np.column_stack([test_cyc, h_vals, h_vals**2, of_test])
     if has_exog:
         X_test = np.column_stack([X_test, test_exog])
 
@@ -241,63 +258,69 @@ def build_direct_features_enhanced(train_ts, train_y, test_ts,
 
 # ── Model Runners ────────────────────────────────────────────────────────
 
+
 def train_predict_rf_enhanced(train_ts, train_y, test_ts, test_y=None, **kw):
     from sklearn.ensemble import RandomForestRegressor
+
     t0 = time.time()
     model = RandomForestRegressor(n_estimators=200, max_depth=15, random_state=42, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = recursive_forecast_enhanced(model, train_ts, train_y, test_ts, test_y,
-                                        train_exog=kw.get('train_exog'),
-                                        test_exog=kw.get('test_exog'))
+    preds = recursive_forecast_enhanced(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_xgb_enhanced(train_ts, train_y, test_ts, test_y=None, **kw):
     from xgboost import XGBRegressor
+
     t0 = time.time()
-    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                         random_state=42, verbosity=0, n_jobs=-1)
+    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = recursive_forecast_enhanced(model, train_ts, train_y, test_ts, test_y,
-                                        train_exog=kw.get('train_exog'),
-                                        test_exog=kw.get('test_exog'))
+    preds = recursive_forecast_enhanced(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_catboost_enhanced(train_ts, train_y, test_ts, test_y=None, **kw):
     from catboost import CatBoostRegressor
+
     t0 = time.time()
-    model = CatBoostRegressor(iterations=200, depth=6, learning_rate=0.1,
-                              random_seed=42, verbose=0)
+    model = CatBoostRegressor(iterations=200, depth=6, learning_rate=0.1, random_seed=42, verbose=0)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = recursive_forecast_enhanced(model, train_ts, train_y, test_ts, test_y,
-                                        train_exog=kw.get('train_exog'),
-                                        test_exog=kw.get('test_exog'))
+    preds = recursive_forecast_enhanced(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_lgbm_enhanced(train_ts, train_y, test_ts, test_y=None, **kw):
     import lightgbm as lgb
+
     t0 = time.time()
-    model = lgb.LGBMRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                              random_state=42, verbose=-1, n_jobs=-1)
+    model = lgb.LGBMRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbose=-1, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = recursive_forecast_enhanced(model, train_ts, train_y, test_ts, test_y,
-                                        train_exog=kw.get('train_exog'),
-                                        test_exog=kw.get('test_exog'))
+    preds = recursive_forecast_enhanced(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_direct_xgb_enhanced(train_ts, train_y, test_ts, test_y=None, **kw):
     from xgboost import XGBRegressor
+
     t0 = time.time()
     X, y, X_test = build_direct_features_enhanced(
-        train_ts, train_y, test_ts,
-        train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog'),
+        train_ts,
+        train_y,
+        test_ts,
+        train_exog=kw.get('train_exog'),
+        test_exog=kw.get('test_exog'),
     )
     max_samples = 500_000
     if len(X) > max_samples:
@@ -305,8 +328,7 @@ def train_predict_direct_xgb_enhanced(train_ts, train_y, test_ts, test_y=None, *
         idx = rng.choice(len(X), max_samples, replace=False)
         X = X[idx]
         y = y[idx]
-    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                         random_state=42, verbosity=0, n_jobs=-1)
+    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1)
     model.fit(X, y)
     preds = model.predict(X_test)
     return np.clip(preds, 0, 500), time.time() - t0
@@ -323,6 +345,7 @@ ENHANCED_FUNCS = {
 
 # ── Visualization ────────────────────────────────────────────────────────
 
+
 def generate_comparison_chart(baseline_maes, enhanced_maes, output_path):
     """Bar chart comparing baseline vs enhanced MAE per model."""
     models = list(baseline_maes.keys())
@@ -330,8 +353,8 @@ def generate_comparison_chart(baseline_maes, enhanced_maes, output_path):
     width = 0.35
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    bars1 = ax.bar(x - width/2, [baseline_maes[m] for m in models], width, label='Baseline', color='#4a90d9')
-    bars2 = ax.bar(x + width/2, [enhanced_maes[m] for m in models], width, label='Enhanced', color='#e74c3c')
+    bars1 = ax.bar(x - width / 2, [baseline_maes[m] for m in models], width, label='Baseline', color='#4a90d9')
+    bars2 = ax.bar(x + width / 2, [enhanced_maes[m] for m in models], width, label='Enhanced', color='#e74c3c')
 
     ax.set_xlabel('Model')
     ax.set_ylabel('MAE (gCO₂/kWh)')
@@ -342,16 +365,28 @@ def generate_comparison_chart(baseline_maes, enhanced_maes, output_path):
 
     # Add value labels on bars
     for bar in bars1:
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
-                f'{bar.get_height():.1f}', ha='center', va='bottom', fontsize=8)
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.5,
+            f'{bar.get_height():.1f}',
+            ha='center',
+            va='bottom',
+            fontsize=8,
+        )
     for bar in bars2:
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
-                f'{bar.get_height():.1f}', ha='center', va='bottom', fontsize=8)
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.5,
+            f'{bar.get_height():.1f}',
+            ha='center',
+            va='bottom',
+            fontsize=8,
+        )
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
@@ -361,7 +396,7 @@ def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
 
     colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']
     for (name, preds), color in zip(all_preds.items(), colors):
-        ax.plot(test_ts[:len(preds)], preds, '-', color=color, linewidth=1, label=name, alpha=0.7)
+        ax.plot(test_ts[: len(preds)], preds, '-', color=color, linewidth=1, label=name, alpha=0.7)
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Carbon Intensity (gCO₂/kWh)')
@@ -371,13 +406,13 @@ def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 from matplotlib.dates import DateFormatter
 
-
 # ── Report Generation ────────────────────────────────────────────────────
+
 
 def generate_report(baseline_results, enhanced_results, output_path):
     """Generate markdown comparison report."""
@@ -391,8 +426,7 @@ def generate_report(baseline_results, enhanced_results, output_path):
         '1. **Sparse lag structure**: lag_1..12 + 24,48,72,96,144,336 (19 lags vs 48)',
         '2. **Enhanced rolling stats**: mean at 12,48,336 + std at 48,336 (5 vs 3)',
         '3. **Week-of-year cyclical**: Replaced minute-of-day with week_of_year sin/cos',
-        '4. **Extended Direct-XGBoost origin**: Added lag_48, lag_336, '
-        'rolling_mean_336, rolling_std_336',
+        '4. **Extended Direct-XGBoost origin**: Added lag_48, lag_336, rolling_mean_336, rolling_std_336',
         '',
         '### Feature Counts',
         '',
@@ -400,8 +434,7 @@ def generate_report(baseline_results, enhanced_results, output_path):
         '|-------|----------|----------|',
         '| Recursive trees | 63 (6 cyc + 48 lag + 3 roll + 3 weather + 3 roll) | '
         '33 (6 cyc + 19 lag + 5 roll + 3 weather) |',
-        '| Direct-XGBoost | 14 (6 cyc + 2 h + 3 origin + 3 weather) | '
-        '18 (6 cyc + 2 h + 7 origin + 3 weather) |',
+        '| Direct-XGBoost | 14 (6 cyc + 2 h + 3 origin + 3 weather) | 18 (6 cyc + 2 h + 7 origin + 3 weather) |',
         '',
         '## Results',
         '',
@@ -445,8 +478,7 @@ def generate_report(baseline_results, enhanced_results, output_path):
                     pct = (delta / base_mae * 100) if base_mae > 0 else 0
                     sign = '+' if delta > 0 else ''
                     lines.append(
-                        f'| {model_name} | {base_mae:.2f} | {enh_mae:.2f} | '
-                        f'{sign}{delta:.2f} | {sign}{pct:.1f}% |'
+                        f'| {model_name} | {base_mae:.2f} | {enh_mae:.2f} | {sign}{delta:.2f} | {sign}{pct:.1f}% |'
                     )
                 else:
                     lines.append(f'| {model_name} | N/A | {enh_mae:.2f} | — | — |')
@@ -479,8 +511,7 @@ def generate_report(baseline_results, enhanced_results, output_path):
                     pct = (delta / avg_base * 100) if avg_base > 0 else 0
                     sign = '+' if delta > 0 else ''
                     lines.append(
-                        f'| {model_name} | {avg_base:.2f} | {avg_enh:.2f} | '
-                        f'{sign}{delta:.2f} | {sign}{pct:.1f}% |'
+                        f'| {model_name} | {avg_base:.2f} | {avg_enh:.2f} | {sign}{delta:.2f} | {sign}{pct:.1f}% |'
                     )
                 else:
                     lines.append(f'| {model_name} | N/A | {avg_enh:.2f} | — | — |')
@@ -493,38 +524,39 @@ def generate_report(baseline_results, enhanced_results, output_path):
     lines.append('')
 
     output_path.write_text('\n'.join(lines))
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
+
 
 def main():
     # Load baseline results
     baseline_results = {}
     if TREE_RESULTS_PATH.exists():
         baseline_results = json.loads(TREE_RESULTS_PATH.read_text())
-        print(f"Loaded baseline results from {TREE_RESULTS_PATH}")
+        print(f'Loaded baseline results from {TREE_RESULTS_PATH}')
     else:
-        print("WARNING: No baseline tree_results.json found — will only show enhanced results")
+        print('WARNING: No baseline tree_results.json found — will only show enhanced results')
 
     # Load data
     df = load_data(DB_PATH)
     regions = sorted(df['region'].unique())
-    print(f"Regions: {regions}")
-    print(f"Date range: {df['ts'].min()} -> {df['ts'].max()}")
+    print(f'Regions: {regions}')
+    print(f'Date range: {df["ts"].min()} -> {df["ts"].max()}')
 
     total_days = (df['ts'].max() - df['ts'].min()).days
 
     # Fetch weather data
     date_min = df['ts'].min().strftime('%Y-%m-%d')
     date_max = df['ts'].max().strftime('%Y-%m-%d')
-    print("\nFetching weather data...")
+    print('\nFetching weather data...')
     weather_df = fetch_weather_data(regions, date_min, date_max)
     has_weather = len(weather_df) > 0
     if has_weather:
-        print(f"Weather data: {len(weather_df)} points")
+        print(f'Weather data: {len(weather_df)} points')
     else:
-        print("WARNING: No weather data — running without exogenous features")
+        print('WARNING: No weather data — running without exogenous features')
 
     # Full backfill only — enhanced features need lag_336 (1 week of history)
     split_date = df['ts'].max() - pd.Timedelta(days=TEST_DAYS)
@@ -542,7 +574,7 @@ def main():
         test = rdf[rdf['ts'] > split_date].reset_index(drop=True)
 
         if len(test) == 0:
-            print(f"\n{region}: no test data, skipping")
+            print(f'\n{region}: no test data, skipping')
             continue
 
         all_results[region] = {}
@@ -555,13 +587,13 @@ def main():
                 train = rdf[rdf['ts'] <= split_date].reset_index(drop=True)
 
             if len(train) < 400:
-                print(f"\n{region} [{window_name}]: insufficient training data ({len(train)} < 400), skipping")
+                print(f'\n{region} [{window_name}]: insufficient training data ({len(train)} < 400), skipping')
                 continue
 
             train_days = (train['ts'].max() - train['ts'].min()).days
-            print(f"\n{'='*60}")
-            print(f"  {region} [{window_name}]: train={len(train)} ({train_days}d), test={len(test)}")
-            print(f"{'='*60}")
+            print(f'\n{"=" * 60}')
+            print(f'  {region} [{window_name}]: train={len(train)} ({train_days}d), test={len(test)}')
+            print(f'{"=" * 60}')
 
             # Build weather exogenous features
             train_exog = None
@@ -585,13 +617,16 @@ def main():
 
             results = {}
             for model_name in ENHANCED_MODELS:
-                print(f"    {model_name}...", end=' ', flush=True)
+                print(f'    {model_name}...', end=' ', flush=True)
                 func = ENHANCED_FUNCS[model_name]
                 try:
                     preds, elapsed = func(
-                        train_ts=train_ts, train_y=train_y,
-                        test_ts=test_ts, test_y=test_y,
-                        train_exog=train_exog, test_exog=test_exog,
+                        train_ts=train_ts,
+                        train_y=train_y,
+                        test_ts=test_ts,
+                        test_y=test_y,
+                        train_exog=train_exog,
+                        test_exog=test_exog,
                     )
                     if len(preds) != len(test_y):
                         min_len = min(len(preds), len(test_y))
@@ -600,9 +635,8 @@ def main():
                     else:
                         test_y_eval = test_y
 
-                    metrics = compute_metrics(test_y_eval, preds,
-                                              n_features=ENHANCED_N_FEATURES[model_name])
-                    print(f"MAE={metrics['MAE']:.2f}  ({elapsed:.2f}s)")
+                    metrics = compute_metrics(test_y_eval, preds, n_features=ENHANCED_N_FEATURES[model_name])
+                    print(f'MAE={metrics["MAE"]:.2f}  ({elapsed:.2f}s)')
                     results[model_name] = {
                         'preds': preds.tolist(),
                         'metrics': metrics,
@@ -610,14 +644,17 @@ def main():
                     }
 
                     # Save for plotting (use Full backfill if available)
-                    if window_name == 'Full backfill' or (window_name == '7-day' and model_name not in all_preds_for_plot):
+                    if window_name == 'Full backfill' or (
+                        window_name == '7-day' and model_name not in all_preds_for_plot
+                    ):
                         all_preds_for_plot[model_name] = preds
                         last_test_ts = test_ts
                         last_test_y = test_y
 
                 except Exception as e:
-                    print(f"FAILED: {e}")
+                    print(f'FAILED: {e}')
                     import traceback
+
                     traceback.print_exc()
                     results[model_name] = None
 
@@ -626,17 +663,17 @@ def main():
     # Save results
     results_path = Path(__file__).parent / 'enhanced_features_results.json'
     results_path.write_text(json.dumps(all_results, indent=2))
-    print(f"\nResults saved to {results_path}")
+    print(f'\nResults saved to {results_path}')
 
     # Generate visualizations
-    print("\nGenerating visualizations...")
+    print('\nGenerating visualizations...')
 
     # Comparison chart (cross-region average, prefer Full backfill)
     baseline_avg_maes = {}
     enhanced_avg_maes = {}
-    preferred_window = 'Full backfill' if any(
-        'Full backfill' in all_results.get(r, {}) for r in all_results
-    ) else '7-day'
+    preferred_window = (
+        'Full backfill' if any('Full backfill' in all_results.get(r, {}) for r in all_results) else '7-day'
+    )
 
     for model_name in ENHANCED_MODELS:
         base_maes = []
@@ -661,23 +698,22 @@ def main():
         if common_models:
             b_maes = {m: baseline_avg_maes[m] for m in ENHANCED_MODELS if m in common_models}
             e_maes = {m: enhanced_avg_maes[m] for m in ENHANCED_MODELS if m in common_models}
-            generate_comparison_chart(b_maes, e_maes,
-                                     DOCS_DIR / 'benchmark_enhanced_features_comparison.png')
+            generate_comparison_chart(b_maes, e_maes, DOCS_DIR / 'benchmark_enhanced_features_comparison.png')
 
     if last_test_ts is not None and all_preds_for_plot:
-        generate_predictions_chart(last_test_ts, last_test_y, all_preds_for_plot,
-                                   DOCS_DIR / 'benchmark_enhanced_features_predictions.png')
+        generate_predictions_chart(
+            last_test_ts, last_test_y, all_preds_for_plot, DOCS_DIR / 'benchmark_enhanced_features_predictions.png'
+        )
 
     # Generate report
-    generate_report(baseline_results, all_results,
-                    DOCS_DIR / 'benchmark_enhanced_features.md')
+    generate_report(baseline_results, all_results, DOCS_DIR / 'benchmark_enhanced_features.md')
 
     # Print summary
-    print("\n" + "=" * 70)
-    print("ENHANCED FEATURES EXPERIMENT COMPLETE")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('ENHANCED FEATURES EXPERIMENT COMPLETE')
+    print('=' * 70)
     for window_name, _ in windows:
-        print(f"\n--- {window_name} ---")
+        print(f'\n--- {window_name} ---')
         active_regions = [r for r in regions if r in all_results and window_name in all_results[r]]
         for model_name in ENHANCED_MODELS:
             enh_maes = []
@@ -695,10 +731,12 @@ def main():
                     avg_base = np.mean(base_maes)
                     delta = avg_enh - avg_base
                     sign = '+' if delta > 0 else ''
-                    better = "✓ improved" if delta < 0 else "✗ worse"
-                    print(f"   {model_name:20s} Enhanced={avg_enh:6.2f}  Baseline={avg_base:6.2f}  Δ={sign}{delta:.2f}  {better}")
+                    better = '✓ improved' if delta < 0 else '✗ worse'
+                    print(
+                        f'   {model_name:20s} Enhanced={avg_enh:6.2f}  Baseline={avg_base:6.2f}  Δ={sign}{delta:.2f}  {better}'
+                    )
                 else:
-                    print(f"   {model_name:20s} Enhanced={avg_enh:6.2f}  (no baseline)")
+                    print(f'   {model_name:20s} Enhanced={avg_enh:6.2f}  (no baseline)')
 
 
 if __name__ == '__main__':

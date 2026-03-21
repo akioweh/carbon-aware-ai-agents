@@ -29,27 +29,36 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter
 import numpy as np
 import pandas as pd
+from matplotlib.dates import DateFormatter
 
 warnings.filterwarnings('ignore')
 
 from benchmark import (
-    DB_PATH, TEST_DAYS, WEATHER_FEATURES,
-    load_data, REGION_COORDS,
+    DB_PATH,
+    REGION_COORDS,
+    TEST_DAYS,
+    WEATHER_FEATURES,
     compute_metrics,
-)
-from benchmark_seasonal import (
-    MODELS, BEST_VARIANTS,
-    build_seasonal_cyclical, build_seasonal_lag_features,
-    build_seasonal_ml_features, SEASONAL_LAGS, SEASONAL_ROLLING_CONFIGS,
-    _get_model_params, _create_model,
-    build_direct_features_seasonal,
+    load_data,
 )
 from benchmark_residual import build_residual_training_data
+from benchmark_seasonal import (
+    BEST_VARIANTS,
+    MODELS,
+    SEASONAL_LAGS,
+    SEASONAL_ROLLING_CONFIGS,
+    _create_model,
+    _get_model_params,
+    build_direct_features_seasonal,
+    build_seasonal_cyclical,
+    build_seasonal_lag_features,
+    build_seasonal_ml_features,
+)
 
 DOCS_DIR = Path(__file__).resolve().parent.parent / 'docs'
 RESULTS_PATH = Path(__file__).parent / 'weather_results.json'
@@ -62,10 +71,17 @@ ORIGINAL_WEATHER = ['wind_speed', 'temperature', 'solar_radiation']
 
 # Extended raw weather features (8 new + 3 original = 11)
 EXTENDED_RAW_FIELDS = [
-    'wind_speed_10m', 'temperature_2m', 'shortwave_radiation',       # original 3
-    'wind_speed_100m', 'wind_gusts_10m', 'wind_direction_10m',       # wind extras
-    'cloud_cover', 'relative_humidity_2m', 'pressure_msl',           # atmosphere
-    'diffuse_radiation', 'direct_normal_irradiance',                  # solar extras
+    'wind_speed_10m',
+    'temperature_2m',
+    'shortwave_radiation',  # original 3
+    'wind_speed_100m',
+    'wind_gusts_10m',
+    'wind_direction_10m',  # wind extras
+    'cloud_cover',
+    'relative_humidity_2m',
+    'pressure_msl',  # atmosphere
+    'diffuse_radiation',
+    'direct_normal_irradiance',  # solar extras
 ]
 
 # Mapping from API field names to our column names
@@ -86,16 +102,16 @@ FIELD_TO_COL = {
 ALL_RAW_COLS = list(FIELD_TO_COL.values())  # 11 columns
 
 ENGINEERED_COLS = [
-    'wind_power_proxy',        # wind_speed_100m³
-    'wind_power_proxy_10m',    # wind_speed_10m³
-    'solar_effective',         # shortwave_radiation × (1 - cloud_cover/100)
-    'temp_demand_proxy',       # |temperature - 18|
+    'wind_power_proxy',  # wind_speed_100m³
+    'wind_power_proxy_10m',  # wind_speed_10m³
+    'solar_effective',  # shortwave_radiation × (1 - cloud_cover/100)
+    'temp_demand_proxy',  # |temperature - 18|
 ]
 
 # Variant definitions
-VARIANT_A_COLS = ALL_RAW_COLS                          # 11 raw
-VARIANT_B_COLS = ALL_RAW_COLS + ENGINEERED_COLS        # 11 raw + 4 engineered = 15
-VARIANT_C_COLS = ORIGINAL_WEATHER + ENGINEERED_COLS    # 3 original + 4 engineered = 7
+VARIANT_A_COLS = ALL_RAW_COLS  # 11 raw
+VARIANT_B_COLS = ALL_RAW_COLS + ENGINEERED_COLS  # 11 raw + 4 engineered = 15
+VARIANT_C_COLS = ORIGINAL_WEATHER + ENGINEERED_COLS  # 3 original + 4 engineered = 7
 
 VARIANTS = {
     'A_extended_raw': VARIANT_A_COLS,
@@ -105,6 +121,7 @@ VARIANTS = {
 
 
 # ── Extended Weather Data Fetching ───────────────────────────────────────
+
 
 def fetch_extended_weather(regions, date_min, date_max):
     """Fetch extended weather data from Open-Meteo archive API with caching."""
@@ -117,7 +134,7 @@ def fetch_extended_weather(regions, date_min, date_max):
             if cache.get('date_min') == date_min and cache.get('date_max') == date_max:
                 cached_regions = set(cache.get('regions', []))
                 if set(regions).issubset(cached_regions):
-                    print(f"  Using cached extended weather from {WEATHER_CACHE_PATH.name}")
+                    print(f'  Using cached extended weather from {WEATHER_CACHE_PATH.name}')
                     wdf = pd.DataFrame(cache['data'])
                     wdf['ts'] = pd.to_datetime(wdf['ts'], utc=True)
                     return wdf[wdf['region'].isin(regions)].reset_index(drop=True)
@@ -132,10 +149,10 @@ def fetch_extended_weather(regions, date_min, date_max):
 
     for region in regions:
         if region not in REGION_COORDS:
-            print(f"  WARNING: No coordinates for {region}, skipping")
+            print(f'  WARNING: No coordinates for {region}, skipping')
             continue
         lat, lon = REGION_COORDS[region]
-        print(f"  Fetching extended weather for {region} ({lat}, {lon})...")
+        print(f'  Fetching extended weather for {region} ({lat}, {lon})...')
 
         region_chunks = []
         chunk_start = pd.Timestamp(date_min)
@@ -144,11 +161,11 @@ def fetch_extended_weather(regions, date_min, date_max):
         while chunk_start < chunk_end_final:
             chunk_end = min(chunk_start + pd.Timedelta(days=89), chunk_end_final)
             url = (
-                f"https://archive-api.open-meteo.com/v1/archive"
-                f"?latitude={lat}&longitude={lon}"
-                f"&start_date={chunk_start.strftime('%Y-%m-%d')}"
-                f"&end_date={chunk_end.strftime('%Y-%m-%d')}"
-                f"&hourly={fields}"
+                f'https://archive-api.open-meteo.com/v1/archive'
+                f'?latitude={lat}&longitude={lon}'
+                f'&start_date={chunk_start.strftime("%Y-%m-%d")}'
+                f'&end_date={chunk_end.strftime("%Y-%m-%d")}'
+                f'&hourly={fields}'
             )
             try:
                 resp = requests.get(url, timeout=30)
@@ -162,7 +179,7 @@ def fetch_extended_weather(regions, date_min, date_max):
                         hdf[col_name] = hourly.get(api_field, [np.nan] * len(times))
                     region_chunks.append(hdf)
             except Exception as e:
-                print(f"    WARNING: Chunk {chunk_start.date()} to {chunk_end.date()} failed: {e}")
+                print(f'    WARNING: Chunk {chunk_start.date()} to {chunk_end.date()} failed: {e}')
             chunk_start = chunk_end + pd.Timedelta(days=1)
 
         if region_chunks:
@@ -175,7 +192,7 @@ def fetch_extended_weather(regions, date_min, date_max):
             rdf.columns = ['ts'] + ALL_RAW_COLS
             rdf['region'] = region
             all_rows.append(rdf)
-            print(f"    Got {len(rdf)} points")
+            print(f'    Got {len(rdf)} points')
 
     if not all_rows:
         return pd.DataFrame()
@@ -191,7 +208,7 @@ def fetch_extended_weather(regions, date_min, date_max):
     }
     cache_data['data']['ts'] = [str(t) for t in cache_data['data']['ts']]
     WEATHER_CACHE_PATH.write_text(json.dumps(cache_data))
-    print(f"  Cached to {WEATHER_CACHE_PATH.name}")
+    print(f'  Cached to {WEATHER_CACHE_PATH.name}')
 
     return weather_df
 
@@ -205,8 +222,8 @@ def engineer_weather_features(df):
     temp = df.get('temperature', pd.Series(15, index=df.index))
 
     df = df.copy()
-    df['wind_power_proxy'] = np.clip(ws100 ** 3, 0, 50000)
-    df['wind_power_proxy_10m'] = np.clip(ws10 ** 3, 0, 50000)
+    df['wind_power_proxy'] = np.clip(ws100**3, 0, 50000)
+    df['wind_power_proxy_10m'] = np.clip(ws10**3, 0, 50000)
     df['solar_effective'] = sr * (1 - cc / 100.0)
     df['temp_demand_proxy'] = np.abs(temp - 18.0)
     return df
@@ -214,9 +231,10 @@ def engineer_weather_features(df):
 
 # ── Recursive Forecast (Weather Variant) ─────────────────────────────────
 
-def recursive_forecast_weather(model, train_ts, train_y, test_ts, test_y_actual,
-                               train_exog=None, test_exog=None,
-                               use_residual_target=False):
+
+def recursive_forecast_weather(
+    model, train_ts, train_y, test_ts, test_y_actual, train_exog=None, test_exog=None, use_residual_target=False
+):
     """Recursive multi-step forecast with seasonal features + weather exog."""
     n_train = len(train_y)
     n_test = len(test_ts)
@@ -271,7 +289,7 @@ def recursive_forecast_weather(model, train_ts, train_y, test_ts, test_y_actual,
         lag_df = pd.DataFrame([lag_feats])
         x_step = pd.concat([cyclical.reset_index(drop=True), lag_df.reset_index(drop=True)], axis=1)
         if has_exog:
-            x_step = np.column_stack([x_step.values, test_exog[t:t+1]])
+            x_step = np.column_stack([x_step.values, test_exog[t : t + 1]])
         else:
             x_step = x_step.values
 
@@ -291,31 +309,38 @@ def recursive_forecast_weather(model, train_ts, train_y, test_ts, test_y_actual,
 
 # ── Direct Forecast (Weather Variant) ────────────────────────────────────
 
-def build_direct_features_weather(train_ts, train_y, test_ts,
-                                  train_exog=None, test_exog=None,
-                                  use_residual_target=False):
+
+def build_direct_features_weather(
+    train_ts, train_y, test_ts, train_exog=None, test_exog=None, use_residual_target=False
+):
     """Direct features with seasonal cyclical + extended origin summary + weather exog."""
     return build_direct_features_seasonal(
-        train_ts, train_y, test_ts,
-        train_exog=train_exog, test_exog=test_exog,
+        train_ts,
+        train_y,
+        test_ts,
+        train_exog=train_exog,
+        test_exog=test_exog,
         use_residual_target=use_residual_target,
     )
 
 
 # ── Train/Predict ────────────────────────────────────────────────────────
 
-def train_predict_weather(model_name, train_ts, train_y, test_ts, test_y=None,
-                          train_exog=None, test_exog=None):
+
+def train_predict_weather(model_name, train_ts, train_y, test_ts, test_y=None, train_exog=None, test_exog=None):
     """Train/predict using seasonal features + weather exog variant."""
     t0 = time.time()
     variant = BEST_VARIANTS[model_name]
     params = _get_model_params(model_name)
 
     if model_name == 'Direct-XGBoost':
-        use_residual = (variant == 'residual')
+        use_residual = variant == 'residual'
         X, y, X_test = build_direct_features_weather(
-            train_ts, train_y, test_ts,
-            train_exog=train_exog, test_exog=test_exog,
+            train_ts,
+            train_y,
+            test_ts,
+            train_exog=train_exog,
+            test_exog=test_exog,
             use_residual_target=use_residual,
         )
         max_samples = 500_000
@@ -331,19 +356,25 @@ def train_predict_weather(model_name, train_ts, train_y, test_ts, test_y=None,
             preds = train_y[-1] + preds
         return np.clip(preds, 0, 500), time.time() - t0
     else:
-        use_residual = (variant == 'residual')
+        use_residual = variant == 'residual'
         model = _create_model(model_name, params)
         if test_y is None:
             test_y = np.zeros(len(test_ts))
         preds = recursive_forecast_weather(
-            model, train_ts, train_y, test_ts, test_y,
-            train_exog=train_exog, test_exog=test_exog,
+            model,
+            train_ts,
+            train_y,
+            test_ts,
+            test_y,
+            train_exog=train_exog,
+            test_exog=test_exog,
             use_residual_target=use_residual,
         )
         return preds, time.time() - t0
 
 
 # ── Prepare Exogenous Features for a Variant ─────────────────────────────
+
 
 def prepare_exog(weather_df, region, train_df, test_df, variant_cols):
     """Merge weather data, engineer features, lag-1 shift, return train/test exog arrays."""
@@ -382,6 +413,7 @@ def prepare_exog(weather_df, region, train_df, test_df, variant_cols):
 
 # ── Per-Horizon MAE ──────────────────────────────────────────────────────
 
+
 def compute_horizon_mae(test_y, preds, interval_minutes=30):
     """Compute MAE at day 1, 3, 5, 7 horizons."""
     points_per_day = int(24 * 60 / interval_minutes)
@@ -399,10 +431,11 @@ def compute_horizon_mae(test_y, preds, interval_minutes=30):
 
 # ── Feature Importance ───────────────────────────────────────────────────
 
+
 def extract_feature_importance(model_name, train_ts, train_y, train_exog, weather_col_names):
     """Train model and return feature importances dict."""
     variant = BEST_VARIANTS[model_name]
-    use_residual = (variant == 'residual')
+    use_residual = variant == 'residual'
     params = _get_model_params(model_name)
 
     train_features = build_seasonal_ml_features(train_ts, train_y)
@@ -426,6 +459,7 @@ def extract_feature_importance(model_name, train_ts, train_y, train_exog, weathe
 
 # ── Visualization ────────────────────────────────────────────────────────
 
+
 def generate_comparison_chart(results_by_variant, baseline_maes, output_path):
     """Bar chart comparing variants + baseline."""
     variant_names = ['Baseline'] + list(results_by_variant.keys())
@@ -446,8 +480,7 @@ def generate_comparison_chart(results_by_variant, baseline_maes, output_path):
         for bar in bars:
             h = bar.get_height()
             if h > 0:
-                ax.text(bar.get_x() + bar.get_width() / 2, h + 0.3,
-                        f'{h:.1f}', ha='center', va='bottom', fontsize=6)
+                ax.text(bar.get_x() + bar.get_width() / 2, h + 0.3, f'{h:.1f}', ha='center', va='bottom', fontsize=6)
 
     ax.set_xlabel('Model')
     ax.set_ylabel('MAE (gCO2/kWh)')
@@ -458,7 +491,7 @@ def generate_comparison_chart(results_by_variant, baseline_maes, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
@@ -468,8 +501,7 @@ def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
 
     colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']
     for (name, preds), color in zip(all_preds.items(), colors):
-        ax.plot(test_ts[:len(preds)], preds, '-', color=color, linewidth=1,
-                label=name, alpha=0.7)
+        ax.plot(test_ts[: len(preds)], preds, '-', color=color, linewidth=1, label=name, alpha=0.7)
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Carbon Intensity (gCO2/kWh)')
@@ -479,7 +511,7 @@ def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_importance_chart(importance_dicts, output_path):
@@ -509,7 +541,7 @@ def generate_importance_chart(importance_dicts, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_horizon_chart(horizon_data, baseline_horizon, output_path):
@@ -531,15 +563,31 @@ def generate_horizon_chart(horizon_data, baseline_horizon, output_path):
         if model_name in baseline_horizon:
             bh = baseline_horizon[model_name]
             vals = [bh.get(f'day_{d}', np.nan) for d in days]
-            ax.plot(days, vals, color=colors[0], linestyle=linestyles[0],
-                    marker='o', markersize=4, label='Baseline', linewidth=1.5)
+            ax.plot(
+                days,
+                vals,
+                color=colors[0],
+                linestyle=linestyles[0],
+                marker='o',
+                markersize=4,
+                label='Baseline',
+                linewidth=1.5,
+            )
 
         for vi, (vname, vdata) in enumerate(horizon_data.items()):
             if model_name in vdata:
                 vh = vdata[model_name]
                 vals = [vh.get(f'day_{d}', np.nan) for d in days]
-                ax.plot(days, vals, color=colors[vi + 1], linestyle=linestyles[(vi + 1) % len(linestyles)],
-                        marker='s', markersize=4, label=vname, linewidth=1.5)
+                ax.plot(
+                    days,
+                    vals,
+                    color=colors[vi + 1],
+                    linestyle=linestyles[(vi + 1) % len(linestyles)],
+                    marker='s',
+                    markersize=4,
+                    label=vname,
+                    linewidth=1.5,
+                )
 
         ax.set_xlabel('Forecast Day')
         if ax_idx == 0:
@@ -554,10 +602,11 @@ def generate_horizon_chart(horizon_data, baseline_horizon, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 # ── Report Generation ────────────────────────────────────────────────────
+
 
 def generate_report(all_results, baseline_maes, horizon_data, baseline_horizon, output_path):
     """Generate markdown report."""
@@ -681,41 +730,44 @@ def generate_report(all_results, baseline_maes, horizon_data, baseline_horizon, 
         lines.append('')
 
     output_path.write_text('\n'.join(lines))
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
+
 
 def main():
     # Load data
     df = load_data(DB_PATH)
     regions = sorted(df['region'].unique())
     total_days = (df['ts'].max() - df['ts'].min()).days
-    print(f"Regions: {regions}")
-    print(f"Date range: {df['ts'].min()} -> {df['ts'].max()} ({total_days} days)")
+    print(f'Regions: {regions}')
+    print(f'Date range: {df["ts"].min()} -> {df["ts"].max()} ({total_days} days)')
 
     if total_days < 30:
-        print("ERROR: Not enough data. Run: python3 carbon_collector.py backfill 365")
+        print('ERROR: Not enough data. Run: python3 carbon_collector.py backfill 365')
         sys.exit(1)
 
     # Fetch extended weather data
     date_min = df['ts'].min().strftime('%Y-%m-%d')
     date_max = df['ts'].max().strftime('%Y-%m-%d')
-    print("\nFetching extended weather data...")
+    print('\nFetching extended weather data...')
     weather_df = fetch_extended_weather(regions, date_min, date_max)
 
     if len(weather_df) == 0:
-        print("ERROR: No weather data fetched. Cannot run weather experiment.")
+        print('ERROR: No weather data fetched. Cannot run weather experiment.')
         sys.exit(1)
-    print(f"Extended weather data: {len(weather_df)} points, "
-          f"columns: {[c for c in weather_df.columns if c not in ('ts', 'region')]}")
+    print(
+        f'Extended weather data: {len(weather_df)} points, '
+        f'columns: {[c for c in weather_df.columns if c not in ("ts", "region")]}'
+    )
 
     split_date = df['ts'].max() - pd.Timedelta(days=TEST_DAYS)
 
     # ── Run baseline (original 3 weather features) for comparison ────────
-    print("\n" + "=" * 70)
-    print("BASELINE (Stage 4 seasonal, 3 weather features)")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('BASELINE (Stage 4 seasonal, 3 weather features)')
+    print('=' * 70)
 
     baseline_results = {}
     baseline_preds = {}
@@ -736,22 +788,29 @@ def main():
         test_ts = test['ts'].reset_index(drop=True)
         test_y = test['actual'].values
 
-        print(f"\n  {region}: train={len(train)}, test={len(test)}")
+        print(f'\n  {region}: train={len(train)}, test={len(test)}')
         for model_name in MODELS:
-            print(f"    {model_name}...", end=' ', flush=True)
+            print(f'    {model_name}...', end=' ', flush=True)
             try:
                 preds, elapsed = train_predict_weather(
-                    model_name, train_ts, train_y, test_ts, test_y,
-                    train_exog=train_exog, test_exog=test_exog,
+                    model_name,
+                    train_ts,
+                    train_y,
+                    test_ts,
+                    test_y,
+                    train_exog=train_exog,
+                    test_exog=test_exog,
                 )
                 min_len = min(len(preds), len(test_y))
                 metrics = compute_metrics(test_y[:min_len], preds[:min_len], n_features=40)
-                print(f"MAE={metrics['MAE']:.2f} ({elapsed:.1f}s)")
+                print(f'MAE={metrics["MAE"]:.2f} ({elapsed:.1f}s)')
 
                 if region not in baseline_results:
                     baseline_results[region] = {}
                 baseline_results[region][model_name] = {
-                    'metrics': metrics, 'time': elapsed, 'preds': preds.tolist(),
+                    'metrics': metrics,
+                    'time': elapsed,
+                    'preds': preds.tolist(),
                 }
                 baseline_preds[model_name] = preds
                 last_test_ts = test_ts
@@ -764,13 +823,16 @@ def main():
                 baseline_horizon_all[model_name].append(hmae)
 
             except Exception as e:
-                print(f"FAILED: {e}")
+                print(f'FAILED: {e}')
 
     # Average baseline MAEs and horizon MAEs
     baseline_maes = {}
     for model_name in MODELS:
-        maes = [baseline_results[r][model_name]['metrics']['MAE']
-                for r in baseline_results if model_name in baseline_results[r]]
+        maes = [
+            baseline_results[r][model_name]['metrics']['MAE']
+            for r in baseline_results
+            if model_name in baseline_results[r]
+        ]
         if maes:
             baseline_maes[model_name] = np.mean(maes)
 
@@ -783,21 +845,21 @@ def main():
                 avg[key] = np.mean(vals)
         baseline_horizon_avg[model_name] = avg
 
-    print("\nBaseline cross-region avg MAE:")
+    print('\nBaseline cross-region avg MAE:')
     for m, mae in baseline_maes.items():
-        print(f"  {m:20s}: {mae:.2f}")
+        print(f'  {m:20s}: {mae:.2f}')
 
     # ── Run weather variants ─────────────────────────────────────────────
     all_variant_results = {}  # variant -> region -> model -> result
     all_variant_horizon = {}  # variant -> model -> horizon dict (averaged)
-    best_variant_preds = {}   # model -> preds (from best variant)
-    all_importances = {}      # model -> importance dict (from best variant)
+    best_variant_preds = {}  # model -> preds (from best variant)
+    all_importances = {}  # model -> importance dict (from best variant)
 
     for vname, vcols in VARIANTS.items():
-        print(f"\n{'=' * 70}")
-        print(f"VARIANT {vname} ({len(vcols)} weather features)")
-        print(f"  Features: {vcols}")
-        print(f"{'=' * 70}")
+        print(f'\n{"=" * 70}')
+        print(f'VARIANT {vname} ({len(vcols)} weather features)')
+        print(f'  Features: {vcols}')
+        print(f'{"=" * 70}')
 
         variant_results = {}
         variant_horizon_all = {}  # model -> list of per-region horizon dicts
@@ -811,7 +873,7 @@ def main():
 
             train_exog, test_exog = prepare_exog(weather_df, region, train, test, vcols)
             if train_exog is None:
-                print(f"  {region}: no weather data, skipping")
+                print(f'  {region}: no weather data, skipping')
                 continue
 
             train_ts = train['ts'].reset_index(drop=True)
@@ -819,24 +881,29 @@ def main():
             test_ts = test['ts'].reset_index(drop=True)
             test_y = test['actual'].values
 
-            print(f"\n  {region}: train={len(train)}, test={len(test)}, "
-                  f"exog_cols={train_exog.shape[1]}")
+            print(f'\n  {region}: train={len(train)}, test={len(test)}, exog_cols={train_exog.shape[1]}')
 
             region_results = {}
             for model_name in MODELS:
-                print(f"    {model_name}...", end=' ', flush=True)
+                print(f'    {model_name}...', end=' ', flush=True)
                 try:
                     preds, elapsed = train_predict_weather(
-                        model_name, train_ts, train_y, test_ts, test_y,
-                        train_exog=train_exog, test_exog=test_exog,
+                        model_name,
+                        train_ts,
+                        train_y,
+                        test_ts,
+                        test_y,
+                        train_exog=train_exog,
+                        test_exog=test_exog,
                     )
                     min_len = min(len(preds), len(test_y))
-                    metrics = compute_metrics(test_y[:min_len], preds[:min_len],
-                                              n_features=40 + len(vcols))
-                    print(f"MAE={metrics['MAE']:.2f} ({elapsed:.1f}s)")
+                    metrics = compute_metrics(test_y[:min_len], preds[:min_len], n_features=40 + len(vcols))
+                    print(f'MAE={metrics["MAE"]:.2f} ({elapsed:.1f}s)')
 
                     region_results[model_name] = {
-                        'metrics': metrics, 'time': elapsed, 'preds': preds.tolist(),
+                        'metrics': metrics,
+                        'time': elapsed,
+                        'preds': preds.tolist(),
                     }
 
                     # Horizon MAE
@@ -850,8 +917,9 @@ def main():
                         best_variant_preds[model_name] = preds
 
                 except Exception as e:
-                    print(f"FAILED: {e}")
+                    print(f'FAILED: {e}')
                     import traceback
+
                     traceback.print_exc()
 
             variant_results[region] = region_results
@@ -870,7 +938,7 @@ def main():
         all_variant_horizon[vname] = variant_horizon_avg
 
     # Feature importance for best variant (B)
-    print("\nExtracting feature importance (Variant B)...")
+    print('\nExtracting feature importance (Variant B)...')
     best_v_cols = VARIANT_B_COLS
     for imp_model in ['XGBoost', 'LightGBM', 'CatBoost']:
         try:
@@ -879,8 +947,7 @@ def main():
                 rdf = df[df['region'] == region].copy().reset_index(drop=True)
                 train = rdf[rdf['ts'] <= split_date].reset_index(drop=True)
                 if len(train) >= 2000:
-                    train_exog, _ = prepare_exog(weather_df, region, train,
-                                                 train.iloc[:1], best_v_cols)
+                    train_exog, _ = prepare_exog(weather_df, region, train, train.iloc[:1], best_v_cols)
                     if train_exog is not None:
                         imp = extract_feature_importance(
                             imp_model,
@@ -890,11 +957,10 @@ def main():
                             best_v_cols,
                         )
                         all_importances[imp_model] = imp
-                        print(f"  {imp_model}: top 5 = "
-                              f"{sorted(imp.items(), key=lambda x: -x[1])[:5]}")
+                        print(f'  {imp_model}: top 5 = {sorted(imp.items(), key=lambda x: -x[1])[:5]}')
                         break
         except Exception as e:
-            print(f"  {imp_model} importance failed: {e}")
+            print(f'  {imp_model} importance failed: {e}')
 
     # ── Compute cross-region averages per variant ────────────────────────
     variant_avg_maes = {}
@@ -902,8 +968,7 @@ def main():
         vdata = all_variant_results[vname]
         avg = {}
         for model_name in MODELS:
-            maes = [vdata[r][model_name]['metrics']['MAE']
-                    for r in vdata if model_name in vdata[r]]
+            maes = [vdata[r][model_name]['metrics']['MAE'] for r in vdata if model_name in vdata[r]]
             if maes:
                 avg[model_name] = np.mean(maes)
         variant_avg_maes[vname] = avg
@@ -913,8 +978,7 @@ def main():
         'baseline_maes': baseline_maes,
         'baseline_horizon': baseline_horizon_avg,
         'variant_maes': variant_avg_maes,
-        'variant_horizon': {v: {m: h for m, h in hdata.items()}
-                            for v, hdata in all_variant_horizon.items()},
+        'variant_horizon': {v: {m: h for m, h in hdata.items()} for v, hdata in all_variant_horizon.items()},
         'variant_results': {},
     }
     for vname in all_variant_results:
@@ -924,54 +988,53 @@ def main():
             for model in all_variant_results[vname][region]:
                 r = all_variant_results[vname][region][model]
                 save_data['variant_results'][vname][region][model] = {
-                    'metrics': r['metrics'], 'time': r['time'],
+                    'metrics': r['metrics'],
+                    'time': r['time'],
                 }
     RESULTS_PATH.write_text(json.dumps(save_data, indent=2))
-    print(f"\nResults saved to {RESULTS_PATH}")
+    print(f'\nResults saved to {RESULTS_PATH}')
 
     # ── Generate visualizations ──────────────────────────────────────────
-    print("\nGenerating visualizations...")
+    print('\nGenerating visualizations...')
 
-    generate_comparison_chart(variant_avg_maes, baseline_maes,
-                              DOCS_DIR / 'benchmark_weather_comparison.png')
+    generate_comparison_chart(variant_avg_maes, baseline_maes, DOCS_DIR / 'benchmark_weather_comparison.png')
 
     if last_test_ts is not None and best_variant_preds:
-        generate_predictions_chart(last_test_ts, last_test_y, best_variant_preds,
-                                   DOCS_DIR / 'benchmark_weather_predictions.png')
+        generate_predictions_chart(
+            last_test_ts, last_test_y, best_variant_preds, DOCS_DIR / 'benchmark_weather_predictions.png'
+        )
 
     if all_importances:
-        generate_importance_chart(all_importances,
-                                  DOCS_DIR / 'benchmark_weather_importance.png')
+        generate_importance_chart(all_importances, DOCS_DIR / 'benchmark_weather_importance.png')
 
-    generate_horizon_chart(all_variant_horizon, baseline_horizon_avg,
-                           DOCS_DIR / 'benchmark_weather_horizon.png')
+    generate_horizon_chart(all_variant_horizon, baseline_horizon_avg, DOCS_DIR / 'benchmark_weather_horizon.png')
 
-    generate_report(all_variant_results, baseline_maes,
-                    all_variant_horizon, baseline_horizon_avg,
-                    DOCS_DIR / 'benchmark_weather.md')
+    generate_report(
+        all_variant_results, baseline_maes, all_variant_horizon, baseline_horizon_avg, DOCS_DIR / 'benchmark_weather.md'
+    )
 
     # ── Print summary ────────────────────────────────────────────────────
-    print("\n" + "=" * 70)
-    print("WEATHER EXPERIMENT COMPLETE")
-    print("=" * 70)
-    print("\nCross-region average MAE:")
-    header = f"{'Model':20s} {'Baseline':>10s}"
+    print('\n' + '=' * 70)
+    print('WEATHER EXPERIMENT COMPLETE')
+    print('=' * 70)
+    print('\nCross-region average MAE:')
+    header = f'{"Model":20s} {"Baseline":>10s}'
     for vname in sorted(variant_avg_maes.keys()):
-        header += f" {vname:>25s}"
+        header += f' {vname:>25s}'
     print(header)
-    print("-" * len(header))
+    print('-' * len(header))
 
     for model_name in MODELS:
         bl = baseline_maes.get(model_name, float('nan'))
-        row = f"{model_name:20s} {bl:10.2f}"
+        row = f'{model_name:20s} {bl:10.2f}'
         for vname in sorted(variant_avg_maes.keys()):
             v = variant_avg_maes[vname].get(model_name, float('nan'))
             delta = v - bl if not np.isnan(v) and not np.isnan(bl) else float('nan')
             sign = '+' if delta > 0 else ''
-            row += f" {v:10.2f} ({sign}{delta:.2f})"
+            row += f' {v:10.2f} ({sign}{delta:.2f})'
         print(row)
 
-    print("\nBest model per variant:")
+    print('\nBest model per variant:')
     for vname in ['Baseline'] + sorted(variant_avg_maes.keys()):
         if vname == 'Baseline':
             maes = baseline_maes
@@ -979,7 +1042,7 @@ def main():
             maes = variant_avg_maes[vname]
         if maes:
             best = min(maes, key=maes.get)
-            print(f"  {vname}: {best} = {maes[best]:.2f}")
+            print(f'  {vname}: {best} = {maes[best]:.2f}')
 
 
 if __name__ == '__main__':

@@ -15,6 +15,9 @@ namespace scheduler {
  * knowledge of persistence or API concerns.
  */
 class Scheduler : public SchedulerBase {
+  public:
+    using SchedulerBase::SchedulerBase;
+
   protected:
     auto doScheduleJob(JobRequest job)
         -> drogon::Task<SchedulerOutput> override;

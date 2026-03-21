@@ -1,12 +1,15 @@
 """Database utilities for managing historical time-series data."""
 
 import json
+import logging
 import sqlite3
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from config import CARBON_DB_FILE, DB_FILE, PREDICTION_CACHE_TTL
+
+logger = logging.getLogger('stats.db_utils')
 
 # Canonical set of datacenters seeded into cache.db.
 # Keep Data-Center-1..5 mappings stable for scheduler compatibility.
@@ -149,9 +152,7 @@ def initialize_db():
         columns = [col[1] for col in cursor.fetchall()]
         if 'greenness' in columns and 'carbon_intensity' not in columns:
             # Migrate old schema
-            conn.execute(
-                'ALTER TABLE historical_data RENAME COLUMN greenness TO carbon_intensity'
-            )
+            conn.execute('ALTER TABLE historical_data RENAME COLUMN greenness TO carbon_intensity')
 
         # Predictions cache table
         conn.execute("""
@@ -167,17 +168,75 @@ def initialize_db():
             CREATE TABLE IF NOT EXISTS historical_data (
                 location TEXT NOT NULL,
                 timestamp REAL NOT NULL,
-                load REAL NOT NULL,
+                load REAL,
                 carbon_intensity REAL NOT NULL,
                 PRIMARY KEY (location, timestamp)
             )
         """)
 
+        # Migrate: allow NULL load (carbon-only rows from carbon sync)
+        cursor = conn.execute('PRAGMA table_info(historical_data)')
+        for col in cursor.fetchall():
+            if col[1] == 'load' and col[3] == 1:  # col[3]=notnull flag
+                conn.execute('DROP TABLE IF EXISTS historical_data_new')
+                conn.execute("""
+                    CREATE TABLE historical_data_new (
+                        location TEXT NOT NULL,
+                        timestamp REAL NOT NULL,
+                        load REAL,
+                        carbon_intensity REAL NOT NULL,
+                        PRIMARY KEY (location, timestamp)
+                    )
+                """)
+                conn.execute("""
+                    INSERT INTO historical_data_new (location, timestamp, load, carbon_intensity)
+                    SELECT location, timestamp, load, carbon_intensity FROM historical_data
+                """)
+                conn.execute('DROP TABLE historical_data')
+                conn.execute('ALTER TABLE historical_data_new RENAME TO historical_data')
+                # Clean up legacy load=0 rows from old carbon syncs
+                conn.execute("""
+                    UPDATE historical_data SET load = NULL WHERE load = 0
+                """)
+                break
+
         # Create indexes for efficient querying
         conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_historical_timestamp 
+            CREATE INDEX IF NOT EXISTS idx_historical_timestamp
             ON historical_data(timestamp)
         """)
+
+        # Pre-upsampled (5-min) historical cache table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS historical_cache (
+                location TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                load REAL,
+                carbon_intensity REAL,
+                PRIMARY KEY (location, timestamp)
+            )
+        """)
+
+        # Migrate: allow NULL load in cache table too
+        cursor = conn.execute('PRAGMA table_info(historical_cache)')
+        for col in cursor.fetchall():
+            if col[1] == 'load' and col[3] == 1:  # col[3]=notnull flag
+                conn.execute('DROP TABLE IF EXISTS historical_cache_new')
+                conn.execute("""
+                    CREATE TABLE historical_cache_new (
+                        location TEXT NOT NULL,
+                        timestamp REAL NOT NULL,
+                        load REAL,
+                        carbon_intensity REAL,
+                        PRIMARY KEY (location, timestamp)
+                    )
+                """)
+                conn.execute(
+                    'INSERT INTO historical_cache_new (location, timestamp, load, carbon_intensity) SELECT location, timestamp, load, carbon_intensity FROM historical_cache'
+                )
+                conn.execute('DROP TABLE historical_cache')
+                conn.execute('ALTER TABLE historical_cache_new RENAME TO historical_cache')
+                break
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS datacenters (
@@ -217,10 +276,7 @@ def initialize_db():
             SET region_id = ?, name = ?, updated_at = ?
             WHERE location_id = ?
             """,
-            [
-                (dc['region_id'], dc['name'], now, dc['location_id'])
-                for dc in DEFAULT_DATACENTERS
-            ],
+            [(dc['region_id'], dc['name'], now, dc['location_id']) for dc in DEFAULT_DATACENTERS],
         )
 
 
@@ -259,7 +315,7 @@ def get_datacenters(include_inactive: bool = True) -> List[Dict]:
                 )
             return [_datacenter_row_to_dict(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
-        print(f'Error retrieving datacenters: {e}')
+        logger.error('Error retrieving datacenters: %s', e)
         return []
 
 
@@ -280,7 +336,7 @@ def get_datacenter(location_id: str) -> Optional[Dict]:
                 return None
             return _datacenter_row_to_dict(row)
     except sqlite3.Error as e:
-        print(f'Error retrieving datacenter {location_id}: {e}')
+        logger.error('Error retrieving datacenter %s: %s', location_id, e)
         return None
 
 
@@ -298,7 +354,7 @@ def set_datacenter_active(location_id: str, active: bool) -> bool:
             )
             return cursor.rowcount > 0
     except sqlite3.Error as e:
-        print(f'Error updating datacenter active flag for {location_id}: {e}')
+        logger.error('Error updating datacenter active flag for %s: %s', location_id, e)
         return False
 
 
@@ -316,9 +372,7 @@ def get_cached_prediction(key: str) -> Optional[dict]:
     """Get cached prediction if it exists and is within the configured TTL."""
     try:
         with get_connection() as conn:
-            cursor = conn.execute(
-                'SELECT data, timestamp FROM predictions WHERE key = ?', (key,)
-            )
+            cursor = conn.execute('SELECT data, timestamp FROM predictions WHERE key = ?', (key,))
             row = cursor.fetchone()
 
             if row:
@@ -326,7 +380,7 @@ def get_cached_prediction(key: str) -> Optional[dict]:
                 if time.time() - timestamp < PREDICTION_CACHE_TTL:
                     return json.loads(data_json)
     except sqlite3.Error as e:
-        print(f'Cache read error: {e}')
+        logger.error('Cache read error: %s', e)
     return None
 
 
@@ -339,12 +393,71 @@ def save_prediction(key: str, data: dict):
                 (key, json.dumps(data), time.time()),
             )
     except sqlite3.Error as e:
-        print(f'Cache write error: {e}')
+        logger.error('Cache write error: %s', e)
 
 
-def insert_historical_data(
-    location: str, timestamp: datetime, load: float, carbon_intensity: float
-):
+def save_historical_cache(location: str, entries: List[Dict]):
+    """Replace the upsampled historical cache for a location.
+
+    Args:
+        entries: List of dicts with keys: timestamp (datetime), load, carbon_intensity
+    """
+    try:
+        with get_connection() as conn:
+            conn.execute('DELETE FROM historical_cache WHERE location = ?', (location,))
+            conn.executemany(
+                """INSERT INTO historical_cache
+                   (location, timestamp, load, carbon_intensity)
+                   VALUES (?, ?, ?, ?)""",
+                [
+                    (
+                        location,
+                        e['timestamp'].timestamp(),
+                        e['load'],
+                        e.get('carbon_intensity'),
+                    )
+                    for e in entries
+                ],
+            )
+    except sqlite3.Error as e:
+        logger.error('Historical cache write error: %s', e)
+
+
+def get_historical_cache(
+    location: str,
+    start_time: datetime,
+    end_time: datetime,
+) -> Optional[List[Dict]]:
+    """Get pre-upsampled 5-min historical data from cache.
+
+    Returns list of dicts on hit, None if the cache table is empty for this location.
+    """
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT timestamp, load, carbon_intensity
+                   FROM historical_cache
+                   WHERE location = ? AND timestamp >= ? AND timestamp <= ?
+                   ORDER BY timestamp ASC""",
+                (location, start_time.timestamp(), end_time.timestamp()),
+            )
+            rows = cursor.fetchall()
+            if not rows:
+                return None
+            return [
+                {
+                    'timestamp': datetime.fromtimestamp(row[0], tz=timezone.utc),
+                    'load': row[1],
+                    'carbon_intensity': row[2],
+                }
+                for row in rows
+            ]
+    except sqlite3.Error as e:
+        logger.error('Historical cache read error: %s', e)
+        return None
+
+
+def insert_historical_data(location: str, timestamp: datetime, load: float, carbon_intensity: float):
     """Insert a single historical data point. Replaces if timestamp already exists."""
     try:
         with get_connection() as conn:
@@ -355,7 +468,7 @@ def insert_historical_data(
                 (location, timestamp.timestamp(), load, carbon_intensity),
             )
     except sqlite3.Error as e:
-        print(f'Error inserting historical data: {e}')
+        logger.error('Error inserting historical data: %s', e)
         raise
 
 
@@ -382,7 +495,7 @@ def insert_historical_data_bulk(data: List[Dict]):
                 ],
             )
     except sqlite3.Error as e:
-        print(f'Error inserting bulk historical data: {e}')
+        logger.error('Error inserting bulk historical data: %s', e)
         raise
 
 
@@ -442,14 +555,14 @@ def get_historical_data(
             rows = cursor.fetchall()
             return [
                 {
-                    'timestamp': datetime.fromtimestamp(row[0]),
+                    'timestamp': datetime.fromtimestamp(row[0], tz=timezone.utc),
                     'load': row[1],
                     'carbon_intensity': row[2],
                 }
                 for row in rows
             ]
     except sqlite3.Error as e:
-        print(f'Error retrieving historical data: {e}')
+        logger.error('Error retrieving historical data: %s', e)
         return []
 
 
@@ -457,11 +570,9 @@ def delete_old_data(days: int = 30):
     """Delete historical data older than specified number of days."""
     cutoff = datetime.now() - timedelta(days=days)
     with get_connection() as conn:
-        cursor = conn.execute(
-            'DELETE FROM historical_data WHERE timestamp < ?', (cutoff.timestamp(),)
-        )
+        cursor = conn.execute('DELETE FROM historical_data WHERE timestamp < ?', (cutoff.timestamp(),))
         deleted_count = cursor.rowcount
-        print(f'Deleted {deleted_count} old historical data points')
+        logger.info('Deleted %d old historical data points', deleted_count)
 
 
 def get_latest_timestamp(location: str) -> Optional[datetime]:
@@ -474,10 +585,10 @@ def get_latest_timestamp(location: str) -> Optional[datetime]:
             )
             result = cursor.fetchone()
             if result and result[0]:
-                return datetime.fromtimestamp(result[0])
+                return datetime.fromtimestamp(result[0], tz=timezone.utc)
             return None
     except sqlite3.Error as e:
-        print(f'Error getting latest timestamp: {e}')
+        logger.error('Error getting latest timestamp: %s', e)
         return None
 
 
@@ -488,7 +599,7 @@ def count_historical_data() -> int:
             cursor = conn.execute('SELECT COUNT(*) FROM historical_data')
             return cursor.fetchone()[0]
     except sqlite3.Error as e:
-        print(f'Error counting historical data: {e}')
+        logger.error('Error counting historical data: %s', e)
         return 0
 
 
@@ -498,9 +609,7 @@ def count_historical_data() -> int:
 def get_carbon_db_connection():
     """Get a connection to the carbon intensity database."""
     if not CARBON_DB_FILE.exists():
-        raise FileNotFoundError(
-            f'Carbon intensity database not found: {CARBON_DB_FILE}'
-        )
+        raise FileNotFoundError(f'Carbon intensity database not found: {CARBON_DB_FILE}')
     conn = sqlite3.connect(CARBON_DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
@@ -544,7 +653,7 @@ def get_carbon_readings(
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
     except (sqlite3.Error, FileNotFoundError) as e:
-        print(f'Error reading carbon database: {e}')
+        logger.error('Error reading carbon database: %s', e)
         return []
 
 
@@ -565,7 +674,7 @@ def sync_carbon_to_historical(days_back: int = 365) -> int:
     readings = get_carbon_readings(since=since, limit=500000)
 
     if not readings:
-        print('No carbon readings found to sync')
+        logger.info('No carbon readings found to sync')
         return 0
 
     bulk_data = []
@@ -597,7 +706,7 @@ def sync_carbon_to_historical(days_back: int = 365) -> int:
 
     if bulk_data:
         _upsert_carbon_intensity_bulk(bulk_data)
-        print(f'Synced {len(bulk_data)} carbon readings to historical data')
+        logger.info('Synced %d carbon readings to historical data', len(bulk_data))
 
     return len(bulk_data)
 
@@ -606,15 +715,15 @@ def _upsert_carbon_intensity_bulk(data: List[Dict]):
     """Upsert carbon intensity into historical_data without overwriting load.
 
     For existing rows (matching location + timestamp), only carbon_intensity
-    is updated. For new rows, load is set to 0 (the load predictor generates
-    synthetic forecasts independently of historical load values).
+    is updated. For new rows, load is set to NULL so that forward-fill in
+    upsampling propagates the previous valid load value instead of injecting 0.
     """
     try:
         with get_connection() as conn:
             conn.executemany(
                 """INSERT INTO historical_data
                    (location, timestamp, load, carbon_intensity)
-                   VALUES (?, ?, 0, ?)
+                   VALUES (?, ?, NULL, ?)
                    ON CONFLICT(location, timestamp)
                    DO UPDATE SET carbon_intensity = excluded.carbon_intensity""",
                 [
@@ -627,7 +736,7 @@ def _upsert_carbon_intensity_bulk(data: List[Dict]):
                 ],
             )
     except sqlite3.Error as e:
-        print(f'Error upserting carbon intensity data: {e}')
+        logger.error('Error upserting carbon intensity data: %s', e)
         raise
 
 
@@ -638,7 +747,7 @@ def get_carbon_reading_count() -> int:
             cursor = conn.execute('SELECT COUNT(*) FROM carbon_readings')
             return cursor.fetchone()[0]
     except (sqlite3.Error, FileNotFoundError) as e:
-        print(f'Error counting carbon readings: {e}')
+        logger.error('Error counting carbon readings: %s', e)
         return 0
 
 

@@ -12,6 +12,9 @@ namespace scheduler {
  * baseline.
  */
 class TrivialScheduler : public SchedulerBase {
+  public:
+    using SchedulerBase::SchedulerBase;
+
   protected:
     auto doScheduleJob(JobRequest job)
         -> drogon::Task<SchedulerOutput> override;

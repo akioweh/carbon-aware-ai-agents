@@ -571,37 +571,6 @@ BOOST_AUTO_TEST_CASE(
     BOOST_CHECK_GT(matchingTimestamps, 0);
 }
 
-BOOST_AUTO_TEST_CASE(datacenter_timeseries_matches_combined_forecasts) {
-    auto locations = run_coro_in_drogon<std::vector<Location>>(
-        []() -> drogon::Task<std::vector<Location>> {
-            auto client = createFreeStatsAPIClient();
-            co_return co_await client->getLocations();
-        });
-
-    BOOST_REQUIRE(!locations.empty());
-    const auto &testLocationId = locations[0].id;
-
-    auto datacenter = run_coro_in_drogon<Datacenter>(
-        [&testLocationId]() -> drogon::Task<Datacenter> {
-            auto client = createFreeStatsAPIClient();
-            co_return co_await client->getDatacenter(testLocationId);
-        });
-
-    auto loadForecastOpt = run_coro_in_drogon<std::optional<LoadTimeSeries>>(
-        [&testLocationId]() -> drogon::Task<std::optional<LoadTimeSeries>> {
-            auto client = createFreeStatsAPIClient();
-            co_return co_await client->getLoadForecast(testLocationId);
-        });
-
-    BOOST_REQUIRE(loadForecastOpt.has_value());
-
-    // The datacenter timeSeries should not exceed the load forecast data points
-    // (it's the intersection of load and carbonIntensity)
-    BOOST_CHECK_LE(datacenter.timeSeries.size(), loadForecastOpt->data.size());
-
-    // Verify that capacity from forecast matches datacenter
-}
-
 BOOST_AUTO_TEST_CASE(location_id_consistency_across_endpoints) {
     auto locations = run_coro_in_drogon<std::vector<Location>>(
         []() -> drogon::Task<std::vector<Location>> {

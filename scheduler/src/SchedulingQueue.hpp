@@ -76,7 +76,9 @@ class SchedulingQueue {
     auto computeSchedule(const JobRequest &jobRequest)
         -> drogon::Task<SchedulerOutput> {
         auto schedulerTask = std::make_shared<SchedulerTask>(
-            std::make_unique<Sched>(), jobRequest);
+            std::make_unique<Sched>(jobRequest.earliest_start,
+                                    jobRequest.latest_finish),
+            jobRequest);
         push_back(schedulerTask.get());
         co_return co_await *schedulerTask;
     }

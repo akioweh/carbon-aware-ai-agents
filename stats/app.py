@@ -9,10 +9,14 @@ import config  # triggers logging setup
 import db_utils
 from background import carbon_sync_loop, prediction_loop
 from data.carbon_collector import (
+    DB_PATH as CARBON_DB_PATH,
+)
+from data.carbon_collector import (
     backfill,
     carbon_collector_loop,
+)
+from data.carbon_collector import (
     init_database as init_carbon_db,
-    DB_PATH as CARBON_DB_PATH,
 )
 from routes import router
 
@@ -50,20 +54,20 @@ async def lifespan(app: FastAPI):
     if config.CARBON_COLLECTION_ENABLED:
         collector_thread = threading.Thread(target=carbon_collector_loop, daemon=True)
         collector_thread.start()
-        print('Carbon collector background thread started')
+        logger.info('Carbon collector background thread started')
 
         sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
         sync_thread.start()
-        print('Carbon sync background thread started')
+        logger.info('Carbon sync background thread started')
     elif db_utils.has_carbon_data():
         sync_thread = threading.Thread(target=carbon_sync_loop, daemon=True)
         sync_thread.start()
-        print('Carbon sync background thread started')
+        logger.info('Carbon sync background thread started')
 
     openapi_data = app.openapi()
     with open('openapi.yaml', 'w') as f:
         yaml.dump(openapi_data, f, sort_keys=False)
-    print('openapi.yaml updated')
+    logger.info('openapi.yaml updated')
 
     yield
 
@@ -85,5 +89,5 @@ app.include_router(router)
 if __name__ == '__main__':
     import uvicorn
 
-    print(f'Starting Stats API on {config.HOST}:{config.PORT}')
+    logger.info('Starting Stats API on %s:%s', config.HOST, config.PORT)
     uvicorn.run(app, host=config.HOST, port=config.PORT)

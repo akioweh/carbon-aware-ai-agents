@@ -1,8 +1,11 @@
+import logging
 import math
 import random
 from datetime import datetime, timedelta
 
 import db_utils
+
+logger = logging.getLogger('stats.data.generate_history')
 
 MAX_CAPACITY = 200
 
@@ -89,12 +92,13 @@ def generate_history():
 
     # Insert all data into database
     db_utils.insert_historical_data_bulk(bulk_data)
-    print(
-        f'Generated and inserted {len(bulk_data)} historical data points into database.'
-    )
+    logger.info('Generated and inserted %d historical data points into database.', len(bulk_data))
 
 
 if __name__ == '__main__':
+    # ensure logging is configured
+    import config  # noqa: F401
+
     # ensure database is initialized
     db_utils.initialize_db()
     generate_history()

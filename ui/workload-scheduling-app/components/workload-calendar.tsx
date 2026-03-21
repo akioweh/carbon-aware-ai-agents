@@ -44,20 +44,43 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (!loading && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth
+    }
+  }, [loading, blocks, forecasts])
+
+  useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const [schedulesRes, forecastsRes] = await Promise.all([
-          fetch(`/api/schedules`),
-          fetch(`/api/forecast`)
-        ])
+        const schedulesRes = await fetch(`/api/schedules`)
+        let scheduleData: any[] = []
+
         if (schedulesRes.ok) {
-          const scheduleData = await schedulesRes.json()
+          scheduleData = await schedulesRes.json()
           setBlocks(Array.isArray(scheduleData) ? scheduleData : [])
         }
-        if (forecastsRes.ok) {
-          const forecastData = await forecastsRes.json()
-          setForecasts(Array.isArray(forecastData) ? forecastData : [])
+
+        if (scheduleData.length > 0) {
+          const allTimestamps = scheduleData.map((b: any) => new Date(b.timestamp).getTime())
+          const start = new Date(Math.min(...allTimestamps))
+          start.setMinutes(0, 0, 0)
+
+          const end = new Date(Math.max(...allTimestamps) + BLOCK_DURATION_MS)
+          end.setMinutes(0, 0, 0)
+          end.setHours(end.getHours() + 1)
+
+          const forecastsRes = await fetch(`/api/forecast?start_time=${encodeURIComponent(start.toISOString())}&end_time=${encodeURIComponent(end.toISOString())}`)
+          if (forecastsRes.ok) {
+            const forecastData = await forecastsRes.json()
+            setForecasts(Array.isArray(forecastData) ? forecastData : [])
+          }
+        } else {
+          const forecastsRes = await fetch(`/api/forecast`)
+          if (forecastsRes.ok) {
+            const forecastData = await forecastsRes.json()
+            setForecasts(Array.isArray(forecastData) ? forecastData : [])
+          }
         }
       } catch (err) {
         console.error("Error fetching data:", err)
@@ -137,6 +160,21 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
   const hasData = sampleIntervals.length > 0
   const pxPerBar = 2
 
+  const nowLineValue = useMemo(() => {
+    if (!firstDcId || sampleIntervals.length === 0) return null
+    const now = Date.now()
+    let closest: string | null = null
+    let closestDiff = Infinity
+    for (const d of sampleIntervals) {
+      const diff = Math.abs(d.time.getTime() - now)
+      if (diff < closestDiff) {
+        closestDiff = diff
+        closest = d.time.toISOString()
+      }
+    }
+    return closest && closestDiff < 5 * 60 * 1000 ? closest : null
+  }, [sampleIntervals, firstDcId])
+
   const formatDateShort = (date: Date) => date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
 
   return (
@@ -155,6 +193,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-red-500" /><span className="text-muted-foreground">Carbon-Intensity</span></div>
           <div className="flex items-center gap-2"><div className="h-3 w-3 rounded bg-blue-400" /><span className="text-muted-foreground">Outside-Load</span></div>
           <div className="flex items-center gap-2"><div className="h-1 w-4 rounded bg-purple-500" /><span className="text-muted-foreground">Capacity</span></div>
+          <div className="flex items-center gap-2"><div className="h-4 w-0.5 rounded bg-amber-500" /><span className="text-muted-foreground">Now</span></div>
         </div>
 
         {/* Chart */}
@@ -269,6 +308,9 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                           {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
                             <ReferenceLine key={k} yAxisId="left" x={d.time.toISOString()} stroke="#94a3b8" strokeDasharray="4 4" label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fontSize: 10 } : undefined} />
                           ))}
+                          {nowLineValue && (
+                            <ReferenceLine yAxisId="left" x={nowLineValue} stroke="#f59e0b" strokeWidth={2} label={i === 0 ? { position: "insideTopRight", value: "Now", fontSize: 11, fontWeight: 600, fill: "#f59e0b" } : undefined} />
+                          )}
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>

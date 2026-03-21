@@ -1,5 +1,5 @@
 import schemathesis
-from hypothesis import settings, HealthCheck
+from hypothesis import HealthCheck, settings
 
 # current setting it to True blows up your RAM (idk why, maybe because history generation?)
 RUN_DIRECTLY = False

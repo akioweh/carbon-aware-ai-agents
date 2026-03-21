@@ -28,15 +28,16 @@ import pandas as pd
 
 warnings.filterwarnings('ignore')
 # Suppress PyTorch Lightning verbosity from neuralforecast
-logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
-logging.getLogger("lightning.pytorch").setLevel(logging.ERROR)
-logging.getLogger("lightning.fabric").setLevel(logging.ERROR)
+logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
+logging.getLogger('lightning.pytorch').setLevel(logging.ERROR)
+logging.getLogger('lightning.fabric').setLevel(logging.ERROR)
 os.environ.setdefault('PYTORCH_LIGHTNING_LOG_LEVEL', '0')
 
 from benchmark import (
-    DB_PATH, TEST_DAYS,
-    load_data,
+    DB_PATH,
+    TEST_DAYS,
     compute_metrics,
+    load_data,
 )
 
 NEW_RESULTS_PATH = Path(__file__).parent / 'new_model_results.json'
@@ -77,10 +78,10 @@ def train_predict_chronos(train_ts, train_y, test_ts, **kw):
     t0 = time.time()
     n_test = len(test_ts)
 
-    print("[downloading/loading model]", end=' ', flush=True)
+    print('[downloading/loading model]', end=' ', flush=True)
     pipeline = ChronosPipeline.from_pretrained(
-        "amazon/chronos-t5-tiny",
-        device_map="cpu",
+        'amazon/chronos-t5-tiny',
+        device_map='cpu',
         torch_dtype=torch.float32,
     )
 
@@ -120,15 +121,17 @@ def train_predict_nbeats(train_ts, train_y, test_ts, **kw):
     min_needed = input_size + n_test
     if len(y_clean) < min_needed:
         raise ValueError(
-            f"Insufficient training data for N-BEATS: {len(y_clean)} < "
-            f"{min_needed} (input_size={input_size} + horizon={n_test})"
+            f'Insufficient training data for N-BEATS: {len(y_clean)} < '
+            f'{min_needed} (input_size={input_size} + horizon={n_test})'
         )
 
-    train_df = pd.DataFrame({
-        'unique_id': ['series'] * len(y_clean),
-        'ds': ds.values,
-        'y': y_clean.astype(float),
-    })
+    train_df = pd.DataFrame(
+        {
+            'unique_id': ['series'] * len(y_clean),
+            'ds': ds.values,
+            'y': y_clean.astype(float),
+        }
+    )
 
     model = NBEATS(
         h=n_test,
@@ -170,15 +173,17 @@ def train_predict_nhits(train_ts, train_y, test_ts, **kw):
     min_needed = input_size + n_test
     if len(y_clean) < min_needed:
         raise ValueError(
-            f"Insufficient training data for N-HiTS: {len(y_clean)} < "
-            f"{min_needed} (input_size={input_size} + horizon={n_test})"
+            f'Insufficient training data for N-HiTS: {len(y_clean)} < '
+            f'{min_needed} (input_size={input_size} + horizon={n_test})'
         )
 
-    train_df = pd.DataFrame({
-        'unique_id': ['series'] * len(y_clean),
-        'ds': ds.values,
-        'y': y_clean.astype(float),
-    })
+    train_df = pd.DataFrame(
+        {
+            'unique_id': ['series'] * len(y_clean),
+            'ds': ds.values,
+            'y': y_clean.astype(float),
+        }
+    )
 
     model = NHITS(
         h=n_test,
@@ -209,8 +214,8 @@ MODEL_FUNCS = {
 def main():
     df = load_data(DB_PATH)
     regions = sorted(df['region'].unique())
-    print(f"Regions: {regions}")
-    print(f"Date range: {df['ts'].min()} -> {df['ts'].max()}")
+    print(f'Regions: {regions}')
+    print(f'Date range: {df["ts"].min()} -> {df["ts"].max()}')
 
     total_days = (df['ts'].max() - df['ts'].min()).days
 
@@ -228,7 +233,7 @@ def main():
         test = rdf[rdf['ts'] > split_date].reset_index(drop=True)
 
         if len(test) == 0:
-            print(f"\n{region}: no test data, skipping")
+            print(f'\n{region}: no test data, skipping')
             continue
 
         all_results[region] = {}
@@ -241,13 +246,13 @@ def main():
                 train = rdf[rdf['ts'] <= split_date].reset_index(drop=True)
 
             if len(train) < 48:
-                print(f"\n{region} [{window_name}]: insufficient training data, skipping")
+                print(f'\n{region} [{window_name}]: insufficient training data, skipping')
                 continue
 
             train_days = (train['ts'].max() - train['ts'].min()).days
-            print(f"\n{'='*60}")
-            print(f"  {region} [{window_name}]: train={len(train)} ({train_days}d), test={len(test)}")
-            print(f"{'='*60}")
+            print(f'\n{"=" * 60}')
+            print(f'  {region} [{window_name}]: train={len(train)} ({train_days}d), test={len(test)}')
+            print(f'{"=" * 60}')
 
             train_ts = train['ts'].reset_index(drop=True)
             train_y = train['actual'].values
@@ -255,12 +260,14 @@ def main():
 
             results = {}
             for model_name in NEW_MODELS:
-                print(f"    {model_name}...", end=' ', flush=True)
+                print(f'    {model_name}...', end=' ', flush=True)
                 func = MODEL_FUNCS[model_name]
                 try:
                     preds, elapsed = func(
-                        train_ts=train_ts, train_y=train_y,
-                        test_ts=test_ts, test_y=test_y,
+                        train_ts=train_ts,
+                        train_y=train_y,
+                        test_ts=test_ts,
+                        test_y=test_y,
                     )
                     if len(preds) != len(test_y):
                         min_len = min(len(preds), len(test_y))
@@ -269,30 +276,29 @@ def main():
                     else:
                         test_y_eval = test_y
 
-                    metrics = compute_metrics(test_y_eval, preds,
-                                              n_features=NEW_N_FEATURES[model_name])
-                    print(f"MAE={metrics['MAE']:.2f}  ({elapsed:.2f}s)")
+                    metrics = compute_metrics(test_y_eval, preds, n_features=NEW_N_FEATURES[model_name])
+                    print(f'MAE={metrics["MAE"]:.2f}  ({elapsed:.2f}s)')
                     results[model_name] = {
                         'preds': preds.tolist(),
                         'metrics': metrics,
                         'time': elapsed,
                     }
                 except Exception as e:
-                    print(f"FAILED: {e}")
+                    print(f'FAILED: {e}')
                     results[model_name] = None
 
             all_results[region][window_name] = results
 
     # Save results
     NEW_RESULTS_PATH.write_text(json.dumps(all_results, indent=2))
-    print(f"\nResults saved to {NEW_RESULTS_PATH}")
+    print(f'\nResults saved to {NEW_RESULTS_PATH}')
 
     # Summary
-    print("\n" + "=" * 70)
-    print("NEW MODEL BENCHMARK COMPLETE")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('NEW MODEL BENCHMARK COMPLETE')
+    print('=' * 70)
     for window_name, _ in windows:
-        print(f"\n--- {window_name} ---")
+        print(f'\n--- {window_name} ---')
         active_regions = [r for r in regions if r in all_results and window_name in all_results[r]]
         model_maes = {}
         for model_name in NEW_MODELS:
@@ -305,10 +311,10 @@ def main():
                 model_maes[model_name] = np.mean(maes)
         sorted_models = sorted(model_maes, key=model_maes.get)
         for i, m in enumerate(sorted_models):
-            best = " <-- best" if i == 0 else ""
-            print(f"   {i+1}. {m:20s} MAE={model_maes[m]:6.2f}{best}")
+            best = ' <-- best' if i == 0 else ''
+            print(f'   {i + 1}. {m:20s} MAE={model_maes[m]:6.2f}{best}')
 
-    print(f"\nNow run: python benchmark.py  (will auto-merge new model results)")
+    print(f'\nNow run: python benchmark.py  (will auto-merge new model results)')
 
 
 if __name__ == '__main__':
