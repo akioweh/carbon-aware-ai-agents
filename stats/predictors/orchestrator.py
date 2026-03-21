@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 
 import db_utils
-from config import DEFAULT_CAPACITY, PREDICTION_WINDOW_HOURS
+from config import DEFAULT_CAPACITY
 from data.generate_history import generate_load
 
 from .load import get_next_week_load
@@ -169,16 +169,6 @@ def _get_cached_historical(location, start, end):
     return db_utils.get_historical_cache(location, start, end)
 
 
-def _resolve_time_window(start_time, end_time, now):
-    """Compute effective start/end from optional params.
-
-    Returns (effective_start, effective_end) as UTC-aware datetimes.
-    """
-    effective_end = end_time if end_time else now + timedelta(hours=PREDICTION_WINDOW_HOURS)
-    effective_start = start_time  # None means "all available history"
-    return effective_start, effective_end
-
-
 def _slice_cached_data(data_points, start_time, end_time):
     """Filter cached data points to those within [start_time, end_time]."""
     result = []
@@ -222,19 +212,19 @@ def _get_forecast_data(location, metric):
     return result['data']
 
 
-def get_load_time_series(location, start_time=None, end_time=None):
+def get_load_time_series(location, start_time: datetime, end_time: datetime):
     """Get load time series stitching historical observations and forecasts.
 
     Args:
         location: Datacenter location ID
-        start_time: Optional UTC-aware start datetime
-        end_time: Optional UTC-aware end datetime
+        start_time: UTC-aware start datetime
+        end_time: UTC-aware end datetime
 
     Returns:
         Response dict with location_id, metric, unit, data
     """
     now = datetime.now(timezone.utc)
-    effective_start, effective_end = _resolve_time_window(start_time, end_time, now)
+    effective_start, effective_end = start_time, end_time
 
     data_points = []
 
@@ -297,19 +287,19 @@ def get_load_time_series(location, start_time=None, end_time=None):
     }
 
 
-def get_carbon_intensity_time_series(location, start_time=None, end_time=None):
+def get_carbon_intensity_time_series(location, start_time: datetime, end_time: datetime):
     """Get carbon intensity time series stitching historical observations and forecasts.
 
     Args:
         location: Datacenter location ID
-        start_time: Optional UTC-aware start datetime
-        end_time: Optional UTC-aware end datetime
+        start_time: UTC-aware start datetime
+        end_time: UTC-aware end datetime
 
     Returns:
         Response dict with location_id, metric, unit, data
     """
     now = datetime.now(timezone.utc)
-    effective_start, effective_end = _resolve_time_window(start_time, end_time, now)
+    effective_start, effective_end = start_time, end_time
 
     data_points = []
 

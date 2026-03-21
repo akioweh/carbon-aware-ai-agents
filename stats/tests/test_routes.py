@@ -3,45 +3,6 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-import pytest
-
-from routes import _parse_iso_timestamp
-
-# ── Timestamp Parsing ────────────────────────────────────────────────────
-
-
-class TestParseIsoTimestamp:
-    def test_utc_offset(self):
-        result = _parse_iso_timestamp('2026-03-18T12:00:00+00:00')
-        assert result == datetime(2026, 3, 18, 12, 0, tzinfo=timezone.utc)
-
-    def test_z_suffix(self):
-        result = _parse_iso_timestamp('2026-03-18T12:00:00Z')
-        assert result == datetime(2026, 3, 18, 12, 0, tzinfo=timezone.utc)
-
-    def test_naive_becomes_utc(self):
-        result = _parse_iso_timestamp('2026-03-18T12:00:00')
-        assert result.tzinfo == timezone.utc
-
-    def test_non_utc_offset(self):
-        result = _parse_iso_timestamp('2026-03-18T12:00:00+05:30')
-        assert result is not None
-        assert result.utcoffset().total_seconds() == 5.5 * 3600
-
-    def test_none_returns_none(self):
-        assert _parse_iso_timestamp(None) is None
-
-    def test_empty_string(self):
-        assert _parse_iso_timestamp('') is None
-
-    def test_null_string(self):
-        assert _parse_iso_timestamp('null') is None
-        assert _parse_iso_timestamp('NULL') is None
-
-    def test_garbage(self):
-        assert _parse_iso_timestamp('not-a-date') is None
-
-
 # ── GET /predictionWindow ────────────────────────────────────────────────
 
 
@@ -143,23 +104,31 @@ def test_load_forecast_success(client):
 
 
 def test_load_forecast_start_after_end(client):
-    resp = client.get(
-        '/locations/Data-Center-1/metrics/forecast_load',
-        params={
-            'start_time': '2026-03-20T00:00:00Z',
-            'end_time': '2026-03-18T00:00:00Z',
-        },
-    )
-    assert resp.status_code == 422
+    with patch(
+        'routes.get_load_time_series',
+        return_value={'location_id': 'Data-Center-1', 'metric': 'forecast_load', 'unit': 'FLOs', 'data': []},
+    ):
+        resp = client.get(
+            '/locations/Data-Center-1/metrics/forecast_load',
+            params={
+                'start_time': '2026-03-20T00:00:00Z',
+                'end_time': '2026-03-18T00:00:00Z',
+            },
+        )
+        assert resp.status_code == 422
 
 
 def test_load_forecast_end_beyond_window(client):
     far = (datetime.now(timezone.utc) + timedelta(hours=200)).isoformat()
-    resp = client.get(
-        '/locations/Data-Center-1/metrics/forecast_load',
-        params={'end_time': far},
-    )
-    assert resp.status_code == 400
+    with patch(
+        'routes.get_load_time_series',
+        return_value={'location_id': 'Data-Center-1', 'metric': 'forecast_load', 'unit': 'FLOs', 'data': []},
+    ):
+        resp = client.get(
+            '/locations/Data-Center-1/metrics/forecast_load',
+            params={'end_time': far},
+        )
+        assert resp.status_code == 422
 
 
 def test_load_forecast_404_on_value_error(client):
@@ -203,14 +172,23 @@ def test_carbon_forecast_success(client):
 
 
 def test_carbon_forecast_start_after_end(client):
-    resp = client.get(
-        '/locations/Data-Center-1/metrics/forecast_carbon_intensity',
-        params={
-            'start_time': '2026-03-20T00:00:00Z',
-            'end_time': '2026-03-18T00:00:00Z',
+    with patch(
+        'routes.get_carbon_intensity_time_series',
+        return_value={
+            'location_id': 'Data-Center-1',
+            'metric': 'forecast_carbon_intensity',
+            'unit': 'gCO2/kWh',
+            'data': [],
         },
-    )
-    assert resp.status_code == 422
+    ):
+        resp = client.get(
+            '/locations/Data-Center-1/metrics/forecast_carbon_intensity',
+            params={
+                'start_time': '2026-03-20T00:00:00Z',
+                'end_time': '2026-03-18T00:00:00Z',
+            },
+        )
+        assert resp.status_code == 422
 
 
 def test_carbon_forecast_404_on_value_error(client):
@@ -222,17 +200,10 @@ def test_carbon_forecast_404_on_value_error(client):
     assert resp.status_code == 404
 
 
-def test_carbon_forecast_invalid_timestamp_ignored(client):
-    """Invalid timestamps are silently treated as absent (no filter)."""
-    mock_data = {
-        'location_id': 'Data-Center-1',
-        'metric': 'forecast_carbon_intensity',
-        'unit': 'gCO2/kWh',
-        'data': [],
-    }
-    with patch('routes.get_carbon_intensity_time_series', return_value=mock_data):
-        resp = client.get(
-            '/locations/Data-Center-1/metrics/forecast_carbon_intensity',
-            params={'start_time': 'garbage', 'end_time': 'also-garbage'},
-        )
-    assert resp.status_code == 200
+def test_carbon_forecast_invalid_timestamp_422(client):
+    """Invalid timestamps should be caught by FastAPI validation."""
+    resp = client.get(
+        '/locations/Data-Center-1/metrics/forecast_carbon_intensity',
+        params={'start_time': 'garbage', 'end_time': 'also-garbage'},
+    )
+    assert resp.status_code == 422

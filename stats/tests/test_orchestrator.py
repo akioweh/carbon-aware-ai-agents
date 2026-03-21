@@ -7,7 +7,6 @@ import pandas as pd
 import pytest
 
 from predictors.orchestrator import (
-    _resolve_time_window,
     _slice_cached_data,
     _upsample_historical,
     generate_next_week_carbon_intensity_prediction,
@@ -66,25 +65,6 @@ class TestUpsampleHistorical:
         entries = [{'timestamp': base, 'load': 10.0, 'carbon_intensity': None}]
         result = _upsample_historical(entries)
         assert result[0]['carbon_intensity'] is None
-
-
-# ── _resolve_time_window ─────────────────────────────────────────────────
-
-
-class TestResolveTimeWindow:
-    def test_defaults(self):
-        now = datetime(2026, 3, 18, 12, 0, tzinfo=timezone.utc)
-        start, end = _resolve_time_window(None, None, now)
-        assert start is None
-        assert end == now + timedelta(hours=168)
-
-    def test_explicit_bounds(self):
-        now = datetime(2026, 3, 18, 12, 0, tzinfo=timezone.utc)
-        s = datetime(2026, 3, 17, tzinfo=timezone.utc)
-        e = datetime(2026, 3, 20, tzinfo=timezone.utc)
-        start, end = _resolve_time_window(s, e, now)
-        assert start == s
-        assert end == e
 
 
 # ── _slice_cached_data ───────────────────────────────────────────────────

@@ -2,9 +2,10 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import AwareDatetime, BeforeValidator
 
 import db_utils
 from config import PREDICTION_WINDOW_HOURS
@@ -27,22 +28,52 @@ logger = logging.getLogger('stats.routes')
 router = APIRouter()
 
 
-def _parse_iso_timestamp(value: Optional[str]) -> Optional[datetime]:
-    """Parse an ISO 8601 string to a UTC-aware datetime.
+def _parse_flexible_datetime(v):
+    if v == 'null':
+        return None  # JavaScript shenanigans :(
+    if isinstance(v, str) and not v.endswith('Z') and '+' not in v and '-' not in v[10:]:
+        return v + 'Z'  # default to UTC if no timezone provided
+    return v
 
-    Returns None for absent, empty, or unparseable values so that
-    invalid query params are silently treated as "no filter".
-    """
-    if not value or value.lower() == 'null':
-        return None
-    try:
-        value = value.replace('Z', '+00:00')
-        dt = datetime.fromisoformat(value)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, TypeError):
-        return None
+
+FlexibleDatetime = Annotated[Optional[AwareDatetime], BeforeValidator(_parse_flexible_datetime)]
+
+
+def get_time_window(
+    start_time: Annotated[
+        FlexibleDatetime,
+        Query(
+            description='Start of time window (ISO 8601)',
+            openapi_examples={'default': {'value': '2026-03-18T00:00:00Z'}},
+        ),
+    ] = None,
+    end_time: Annotated[
+        FlexibleDatetime,
+        Query(
+            description='End of time window (ISO 8601)',
+            openapi_examples={'default': {'value': '2026-03-25T00:00:00Z'}},
+        ),
+    ] = None,
+) -> tuple[datetime, datetime]:
+    now = datetime.now(timezone.utc)
+
+    effective_start = start_time if start_time is not None else now
+    effective_end = end_time if end_time is not None else now + timedelta(hours=PREDICTION_WINDOW_HOURS)
+
+    max_end = now + timedelta(hours=PREDICTION_WINDOW_HOURS)
+    if effective_end > max_end:
+        raise HTTPException(
+            status_code=422,
+            detail=f'end_time cannot exceed the forecast window ({PREDICTION_WINDOW_HOURS}h from now)',
+        )
+
+    if effective_start >= effective_end:
+        raise HTTPException(
+            status_code=422,
+            detail='start_time must be before end_time',
+        )
+
+    return effective_start, effective_end
 
 
 @router.get(
@@ -50,38 +81,26 @@ def _parse_iso_timestamp(value: Optional[str]) -> Optional[datetime]:
     response_model=LoadForecastResponse,
     tags=['Forecasts'],
     summary='Load forecast for a location',
-    description='Returns load data for the requested time window. Supports optional start_time and end_time query params (ISO 8601). Historical observations have is_forecast=false, predictions have is_forecast=true. Without params, returns all available history plus a 7-day forecast.',
+    description='Returns load data for the requested time window. Supports optional start_time and end_time query params (ISO 8601). Historical observations have is_forecast=false, predictions have is_forecast=true. Without params, returns a 7-day forecast from now.',
     responses={
+        422: {
+            'model': ErrorResponse,
+            'description': 'Invalid time window (e.g. start after end, or exceeds forecast window)',
+        },
         404: {
             'model': ErrorResponse,
-            'description': 'No historical data for this location',
+            'description': 'No load data for this location',
         },
         500: {'model': ErrorResponse, 'description': 'Prediction generation failed'},
     },
 )
 def get_load_forecast(
     location: str,
-    start_time: Optional[str] = Query(None, description='Start of time window (ISO 8601, e.g. 2026-03-18T00:00:00Z)'),
-    end_time: Optional[str] = Query(None, description='End of time window (ISO 8601, e.g. 2026-03-25T00:00:00Z)'),
+    window: tuple[datetime, datetime] = Depends(get_time_window),
 ):
-    parsed_start = _parse_iso_timestamp(start_time)
-    parsed_end = _parse_iso_timestamp(end_time)
-
-    if parsed_start and parsed_end and parsed_start >= parsed_end:
-        raise HTTPException(
-            status_code=422,
-            detail='start_time must be before end_time',
-        )
-
-    max_end = datetime.now(timezone.utc) + timedelta(hours=PREDICTION_WINDOW_HOURS)
-    if parsed_end and parsed_end > max_end:
-        raise HTTPException(
-            status_code=400,
-            detail=f'end_time cannot exceed the forecast window ({PREDICTION_WINDOW_HOURS}h from now)',
-        )
-
+    effective_start, effective_end = window
     try:
-        data = get_load_time_series(location, parsed_start, parsed_end)
+        data = get_load_time_series(location, effective_start, effective_end)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -96,8 +115,12 @@ def get_load_forecast(
     response_model=CarbonIntensityForecastResponse,
     tags=['Forecasts'],
     summary='Carbon intensity forecast for a location',
-    description='Returns carbon intensity data for the requested time window. Supports optional start_time and end_time query params (ISO 8601). Historical observations have is_forecast=false, predictions have is_forecast=true. Without params, returns all available history plus a 7-day forecast.',
+    description='Returns carbon intensity data for the requested time window. Supports optional start_time and end_time query params (ISO 8601). Historical observations have is_forecast=false, predictions have is_forecast=true. Without params, returns a 7-day forecast from now.',
     responses={
+        422: {
+            'model': ErrorResponse,
+            'description': 'Invalid time window (e.g. start after end, or exceeds forecast window)',
+        },
         404: {
             'model': ErrorResponse,
             'description': 'No carbon intensity data for this location',
@@ -107,27 +130,11 @@ def get_load_forecast(
 )
 def get_carbon_forecast(
     location: str,
-    start_time: Optional[str] = Query(None, description='Start of time window (ISO 8601, e.g. 2026-03-18T00:00:00Z)'),
-    end_time: Optional[str] = Query(None, description='End of time window (ISO 8601, e.g. 2026-03-25T00:00:00Z)'),
+    window: tuple[datetime, datetime] = Depends(get_time_window),
 ):
-    parsed_start = _parse_iso_timestamp(start_time)
-    parsed_end = _parse_iso_timestamp(end_time)
-
-    if parsed_start and parsed_end and parsed_start >= parsed_end:
-        raise HTTPException(
-            status_code=422,
-            detail='start_time must be before end_time',
-        )
-
-    max_end = datetime.now(timezone.utc) + timedelta(hours=PREDICTION_WINDOW_HOURS)
-    if parsed_end and parsed_end > max_end:
-        raise HTTPException(
-            status_code=400,
-            detail=f'end_time cannot exceed the forecast window ({PREDICTION_WINDOW_HOURS}h from now)',
-        )
-
+    effective_start, effective_end = window
     try:
-        data = get_carbon_intensity_time_series(location, parsed_start, parsed_end)
+        data = get_carbon_intensity_time_series(location, effective_start, effective_end)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
