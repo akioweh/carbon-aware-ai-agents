@@ -1,0 +1,11 @@
+[checks]
+positive_data_acceptance.expected-statuses = [
+  "2xx",
+  "401",
+  "403",
+  "404",
+  "409",
+  "422",
+  "5xx",
+]
+
