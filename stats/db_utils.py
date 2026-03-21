@@ -178,6 +178,7 @@ def initialize_db():
         cursor = conn.execute('PRAGMA table_info(historical_data)')
         for col in cursor.fetchall():
             if col[1] == 'load' and col[3] == 1:  # col[3]=notnull flag
+                conn.execute('DROP TABLE IF EXISTS historical_data_new')
                 conn.execute("""
                     CREATE TABLE historical_data_new (
                         location TEXT NOT NULL,
@@ -188,8 +189,8 @@ def initialize_db():
                     )
                 """)
                 conn.execute("""
-                    INSERT INTO historical_data_new
-                    SELECT * FROM historical_data
+                    INSERT INTO historical_data_new (location, timestamp, load, carbon_intensity)
+                    SELECT location, timestamp, load, carbon_intensity FROM historical_data
                 """)
                 conn.execute('DROP TABLE historical_data')
                 conn.execute('ALTER TABLE historical_data_new RENAME TO historical_data')
@@ -220,6 +221,7 @@ def initialize_db():
         cursor = conn.execute('PRAGMA table_info(historical_cache)')
         for col in cursor.fetchall():
             if col[1] == 'load' and col[3] == 1:  # col[3]=notnull flag
+                conn.execute('DROP TABLE IF EXISTS historical_cache_new')
                 conn.execute("""
                     CREATE TABLE historical_cache_new (
                         location TEXT NOT NULL,
@@ -229,7 +231,9 @@ def initialize_db():
                         PRIMARY KEY (location, timestamp)
                     )
                 """)
-                conn.execute('INSERT INTO historical_cache_new SELECT * FROM historical_cache')
+                conn.execute(
+                    'INSERT INTO historical_cache_new (location, timestamp, load, carbon_intensity) SELECT location, timestamp, load, carbon_intensity FROM historical_cache'
+                )
                 conn.execute('DROP TABLE historical_cache')
                 conn.execute('ALTER TABLE historical_cache_new RENAME TO historical_cache')
                 break
