@@ -130,7 +130,7 @@ def fetch_current_regional() -> dict | None:
 
 def store_regional_slot(conn: sqlite3.Connection, slot: dict) -> int:
     """Store one time slot's data for all tracked regions. Returns count of rows stored."""
-    collected_at = datetime.utcnow().isoformat()
+    collected_at = datetime.now(timezone.utc).isoformat()
     ts_from = slot.get('from', '')
     ts_to = slot.get('to', '')
     stored = 0
