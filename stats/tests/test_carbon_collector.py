@@ -1,9 +1,5 @@
 """Tests for carbon intensity collector — DB operations and data storage."""
 
-import sqlite3
-from datetime import datetime, timezone
-from pathlib import Path
-
 import pytest
 
 from data.carbon_collector import (
