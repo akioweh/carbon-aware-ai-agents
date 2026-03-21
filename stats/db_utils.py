@@ -1,12 +1,15 @@
 """Database utilities for managing historical time-series data."""
 
 import json
+import logging
 import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from config import CARBON_DB_FILE, DB_FILE, PREDICTION_CACHE_TTL
+
+logger = logging.getLogger('stats.db_utils')
 
 # Canonical set of datacenters seeded into cache.db.
 # Keep Data-Center-1..5 mappings stable for scheduler compatibility.
@@ -308,7 +311,7 @@ def get_datacenters(include_inactive: bool = True) -> List[Dict]:
                 )
             return [_datacenter_row_to_dict(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
-        print(f'Error retrieving datacenters: {e}')
+        logger.error('Error retrieving datacenters: %s', e)
         return []
 
 
@@ -329,7 +332,7 @@ def get_datacenter(location_id: str) -> Optional[Dict]:
                 return None
             return _datacenter_row_to_dict(row)
     except sqlite3.Error as e:
-        print(f'Error retrieving datacenter {location_id}: {e}')
+        logger.error('Error retrieving datacenter %s: %s', location_id, e)
         return None
 
 
@@ -347,7 +350,7 @@ def set_datacenter_active(location_id: str, active: bool) -> bool:
             )
             return cursor.rowcount > 0
     except sqlite3.Error as e:
-        print(f'Error updating datacenter active flag for {location_id}: {e}')
+        logger.error('Error updating datacenter active flag for %s: %s', location_id, e)
         return False
 
 
@@ -373,7 +376,7 @@ def get_cached_prediction(key: str) -> Optional[dict]:
                 if time.time() - timestamp < PREDICTION_CACHE_TTL:
                     return json.loads(data_json)
     except sqlite3.Error as e:
-        print(f'Cache read error: {e}')
+        logger.error('Cache read error: %s', e)
     return None
 
 
@@ -386,7 +389,7 @@ def save_prediction(key: str, data: dict):
                 (key, json.dumps(data), time.time()),
             )
     except sqlite3.Error as e:
-        print(f'Cache write error: {e}')
+        logger.error('Cache write error: %s', e)
 
 
 def save_historical_cache(location: str, entries: List[Dict]):
@@ -413,7 +416,7 @@ def save_historical_cache(location: str, entries: List[Dict]):
                 ],
             )
     except sqlite3.Error as e:
-        print(f'Historical cache write error: {e}')
+        logger.error('Historical cache write error: %s', e)
 
 
 def get_historical_cache(
@@ -446,7 +449,7 @@ def get_historical_cache(
                 for row in rows
             ]
     except sqlite3.Error as e:
-        print(f'Historical cache read error: {e}')
+        logger.error('Historical cache read error: %s', e)
         return None
 
 
@@ -461,7 +464,7 @@ def insert_historical_data(location: str, timestamp: datetime, load: float, carb
                 (location, timestamp.timestamp(), load, carbon_intensity),
             )
     except sqlite3.Error as e:
-        print(f'Error inserting historical data: {e}')
+        logger.error('Error inserting historical data: %s', e)
         raise
 
 
@@ -488,7 +491,7 @@ def insert_historical_data_bulk(data: List[Dict]):
                 ],
             )
     except sqlite3.Error as e:
-        print(f'Error inserting bulk historical data: {e}')
+        logger.error('Error inserting bulk historical data: %s', e)
         raise
 
 
@@ -555,7 +558,7 @@ def get_historical_data(
                 for row in rows
             ]
     except sqlite3.Error as e:
-        print(f'Error retrieving historical data: {e}')
+        logger.error('Error retrieving historical data: %s', e)
         return []
 
 
@@ -565,7 +568,7 @@ def delete_old_data(days: int = 30):
     with get_connection() as conn:
         cursor = conn.execute('DELETE FROM historical_data WHERE timestamp < ?', (cutoff.timestamp(),))
         deleted_count = cursor.rowcount
-        print(f'Deleted {deleted_count} old historical data points')
+        logger.info('Deleted %d old historical data points', deleted_count)
 
 
 def get_latest_timestamp(location: str) -> Optional[datetime]:
@@ -581,7 +584,7 @@ def get_latest_timestamp(location: str) -> Optional[datetime]:
                 return datetime.fromtimestamp(result[0], tz=timezone.utc)
             return None
     except sqlite3.Error as e:
-        print(f'Error getting latest timestamp: {e}')
+        logger.error('Error getting latest timestamp: %s', e)
         return None
 
 
@@ -592,7 +595,7 @@ def count_historical_data() -> int:
             cursor = conn.execute('SELECT COUNT(*) FROM historical_data')
             return cursor.fetchone()[0]
     except sqlite3.Error as e:
-        print(f'Error counting historical data: {e}')
+        logger.error('Error counting historical data: %s', e)
         return 0
 
 
@@ -646,7 +649,7 @@ def get_carbon_readings(
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
     except (sqlite3.Error, FileNotFoundError) as e:
-        print(f'Error reading carbon database: {e}')
+        logger.error('Error reading carbon database: %s', e)
         return []
 
 
@@ -667,7 +670,7 @@ def sync_carbon_to_historical(days_back: int = 365) -> int:
     readings = get_carbon_readings(since=since, limit=500000)
 
     if not readings:
-        print('No carbon readings found to sync')
+        logger.info('No carbon readings found to sync')
         return 0
 
     bulk_data = []
@@ -699,7 +702,7 @@ def sync_carbon_to_historical(days_back: int = 365) -> int:
 
     if bulk_data:
         _upsert_carbon_intensity_bulk(bulk_data)
-        print(f'Synced {len(bulk_data)} carbon readings to historical data')
+        logger.info('Synced %d carbon readings to historical data', len(bulk_data))
 
     return len(bulk_data)
 
@@ -729,7 +732,7 @@ def _upsert_carbon_intensity_bulk(data: List[Dict]):
                 ],
             )
     except sqlite3.Error as e:
-        print(f'Error upserting carbon intensity data: {e}')
+        logger.error('Error upserting carbon intensity data: %s', e)
         raise
 
 
@@ -740,7 +743,7 @@ def get_carbon_reading_count() -> int:
             cursor = conn.execute('SELECT COUNT(*) FROM carbon_readings')
             return cursor.fetchone()[0]
     except (sqlite3.Error, FileNotFoundError) as e:
-        print(f'Error counting carbon readings: {e}')
+        logger.error('Error counting carbon readings: %s', e)
         return 0
 
 

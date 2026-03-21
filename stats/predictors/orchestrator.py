@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -9,6 +10,8 @@ from data.generate_history import generate_load
 
 from .load import get_next_week_load
 from .ridge import get_next_week_carbon_intensity
+
+logger = logging.getLogger('stats.predictors.orchestrator')
 
 
 def generate_next_week_load_prediction(location):
@@ -65,7 +68,7 @@ def generate_next_week_carbon_intensity_prediction(location):
         ]
     )
 
-    if historical_df['carbon_intensity'].isna().all():
+    if bool(historical_df['carbon_intensity'].isna().all()):
         raise ValueError(f'No carbon intensity data available for location: {location}')
 
     next_week_ci_df = get_next_week_carbon_intensity(historical_df, now=now)
@@ -106,11 +109,9 @@ def _upsample_historical(entries, fill_until=None):
     # Build a 5-min grid from the first observation to fill_until (or last obs)
     end = df.index[-1]
     if fill_until is not None:
-        fill_ts = (
-            pd.Timestamp(fill_until).tz_localize('UTC')
-            if pd.Timestamp(fill_until).tzinfo is None
-            else pd.Timestamp(fill_until)
-        )
+        fill_ts = pd.Timestamp(fill_until)
+        if fill_ts.tzinfo is None:
+            fill_ts = fill_ts.tz_localize('UTC')
         fill_ts = fill_ts.ceil('5min')
         end = max(end, fill_ts)
 
@@ -120,12 +121,20 @@ def _upsample_historical(entries, fill_until=None):
     result = []
     for ts, row in df.iterrows():
         load = row['load']
+        is_load_na = pd.isna(load)
+        if isinstance(is_load_na, pd.Series):
+            is_load_na = is_load_na.any()
+
         entry = {
-            'timestamp': ts.to_pydatetime(),
-            'load': None if (load is None or pd.isna(load)) else load,
+            'timestamp': ts,
+            'load': None if (load is None or is_load_na) else load,
         }
         ci = row.get('carbon_intensity')
-        entry['carbon_intensity'] = None if (ci is None or pd.isna(ci)) else ci
+        is_ci_na = pd.isna(ci)
+        if isinstance(is_ci_na, pd.Series):
+            is_ci_na = is_ci_na.any()
+
+        entry['carbon_intensity'] = None if (ci is None or is_ci_na) else ci
         result.append(entry)
     return result
 
@@ -356,6 +365,8 @@ def get_carbon_intensity_time_series(location, start_time=None, end_time=None):
 
 
 if __name__ == '__main__':
+    import config  # noqa: F401
+
     all_predictions = {}
 
     db_utils.initialize_db()
@@ -363,14 +374,14 @@ if __name__ == '__main__':
 
     for dc in data_centres:
         load_pred = generate_next_week_load_prediction(dc)
-        print(f'Generated {len(load_pred["data"])} load predictions for {dc}')
+        logger.info('Generated %d load predictions for %s', len(load_pred['data']), dc)
 
         try:
             ci_pred = generate_next_week_carbon_intensity_prediction(dc)
-            print(f'Generated {len(ci_pred["data"])} carbon intensity predictions for {dc}')
+            logger.info('Generated %d carbon intensity predictions for %s', len(ci_pred['data']), dc)
         except ValueError as exc:
             ci_pred = {'error': str(exc)}
-            print(f'Skipping carbon intensity for {dc}: {exc}')
+            logger.warning('Skipping carbon intensity for %s: %s', dc, exc)
 
         all_predictions[dc] = {
             'load_prediction': load_pred,
@@ -380,4 +391,4 @@ if __name__ == '__main__':
     with open('predictions.json', 'w') as f:
         json.dump(all_predictions, f, indent=2)
 
-    print('Predictions saved to predictions.json')
+    logger.info('Predictions saved to predictions.json')

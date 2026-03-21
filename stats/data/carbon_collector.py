@@ -35,6 +35,8 @@ from config import (
     CARBON_INTERVAL_MINUTES as INTERVAL_MINUTES,
 )
 
+logger = logging.getLogger('stats.data.carbon_collector')
+
 REGIONS = {
     1: 'North Scotland',
     2: 'South Scotland',
@@ -110,7 +112,7 @@ def fetch_regional_intensity(from_str: str, to_str: str) -> dict | None:
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        print(f'  Error fetching {from_str} -> {to_str}: {e}')
+        logger.error('Error fetching %s -> %s: %s', from_str, to_str, e)
         return None
 
 
@@ -122,7 +124,7 @@ def fetch_current_regional() -> dict | None:
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        print(f'  Error fetching current regional data: {e}')
+        logger.error('Error fetching current regional data: %s', e)
         return None
 
 
@@ -211,9 +213,10 @@ def backfill(conn: sqlite3.Connection, days: int = BACKFILL_DAYS) -> None:
     missing_regions = expected_regions - existing_regions
 
     if missing_regions and latest_ts:
-        print(
-            f'Detected {len(missing_regions)} regions with no data '
-            f'(regions {sorted(missing_regions)}). Running full backfill...'
+        logger.info(
+            'Detected %d regions with no data (regions %s). Running full backfill...',
+            len(missing_regions),
+            sorted(missing_regions),
         )
         # Force a full backfill so the API returns data for all regions
         latest_ts = None
@@ -221,12 +224,12 @@ def backfill(conn: sqlite3.Connection, days: int = BACKFILL_DAYS) -> None:
     if latest_ts:
         start = latest_ts
         if (end - start).total_seconds() < 1800:  # Less than 30 mins, nothing to backfill
-            print('Database is up to date. Skipping backfill.')
+            logger.info('Database is up to date. Skipping backfill.')
             return
-        print(f'Incremental backfill: fetching data since {start.isoformat()}...')
+        logger.info('Incremental backfill: fetching data since %s...', start.isoformat())
     else:
         start = end - timedelta(days=days)
-        print(f'Full backfill: fetching last {days} days of data...')
+        logger.info('Full backfill: fetching last %d days of data...', days)
 
     current = start
     total_stored = 0
@@ -244,30 +247,30 @@ def backfill(conn: sqlite3.Connection, days: int = BACKFILL_DAYS) -> None:
             conn.commit()
             total_stored += day_stored
             if day_stored > 0:
-                print(f'  {current.strftime("%b %d")}: {day_stored} readings stored')
+                logger.info('  %s: %d readings stored', current.strftime('%b %d'), day_stored)
         else:
-            print(f'  {current.strftime("%b %d")}: FAILED')
+            logger.error('  %s: FAILED', current.strftime('%b %d'))
 
         current = next_chunk
         if current < end:
             time.sleep(0.5)
 
-    print(f'Backfill complete: {total_stored} readings stored')
+    logger.info('Backfill complete: %d readings stored', total_stored)
 
 
 def collect_current(conn: sqlite3.Connection) -> None:
     """Fetch and store current data for all regions."""
-    print(f'\n[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Collecting current data...')
+    logger.info('Collecting current data...')
 
     data = fetch_current_regional()
     if not data:
-        print('  Failed to fetch current data')
+        logger.error('Failed to fetch current data')
         return
 
     # The /regional endpoint returns data nested differently
     regions_data = data.get('data', [{}])[0].get('regions', [])
     if not regions_data:
-        print('  No region data in response')
+        logger.error('No region data in response')
         return
 
     # Build a slot-like structure to reuse store_regional_slot
@@ -278,7 +281,7 @@ def collect_current(conn: sqlite3.Connection) -> None:
     }
     stored = store_regional_slot(conn, slot)
     conn.commit()
-    print(f'  Stored {stored} readings. Total: {get_reading_count(conn)}')
+    logger.info('Stored %d readings. Total: %d', stored, get_reading_count(conn))
 
 
 def dump_database(db_path: Path, output_path: Optional[Path] = None) -> Path:
@@ -288,7 +291,7 @@ def dump_database(db_path: Path, output_path: Optional[Path] = None) -> Path:
         output_path = db_path.parent / f'carbon_intensity_dump_{timestamp}.db'
 
     shutil.copy2(db_path, output_path)
-    print(f'Database dumped to: {output_path}')
+    logger.info('Database dumped to: %s', output_path)
     return output_path
 
 
@@ -302,7 +305,7 @@ def _signal_handler(signum, frame):
     """Handle shutdown signals gracefully."""
     global _shutdown_requested
     sig_name = signal.Signals(signum).name
-    print(f'\n\nReceived {sig_name}, shutting down gracefully...')
+    logger.info('Received %s, shutting down gracefully...', sig_name)
     _shutdown_requested = True
 
 
@@ -310,23 +313,22 @@ def run_collector():
     """Main collection loop - runs indefinitely until stopped."""
     global _shutdown_requested
 
-    print('Carbon Intensity Data Collector')
-    print(f'Database: {DB_PATH}')
-    print(f'Interval: {INTERVAL_MINUTES} minutes')
-    print(f'Mode: Continuous (runs indefinitely)')
-    print(f'Regions: {", ".join(REGIONS.values())}')
+    logger.info('Carbon Intensity Data Collector')
+    logger.info('Database: %s', DB_PATH)
+    logger.info('Interval: %d minutes', INTERVAL_MINUTES)
+    logger.info('Mode: Continuous (runs indefinitely)')
+    logger.info('Regions: %s', ', '.join(REGIONS.values()))
 
     # Set up signal handlers for graceful shutdown
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
 
     conn = init_database(DB_PATH)
-    start_time = datetime.now()
-    print(f'\nStarted at: {start_time}')
+    logger.info('Started at: %s', datetime.now())
 
     # Backfill missing data on startup
     backfill(conn)
-    print('Send SIGTERM or press Ctrl+C to stop.\n')
+    logger.info('Send SIGTERM or press Ctrl+C to stop.')
 
     def job():
         collect_current(conn)
@@ -341,14 +343,14 @@ def run_collector():
         time.sleep(1)
 
     # Cleanup
-    print(f'\nTotal readings collected: {get_reading_count(conn)}')
+    logger.info('Total readings collected: %d', get_reading_count(conn))
     conn.close()
-    print('Database connection closed. Goodbye!')
+    logger.info('Database connection closed. Goodbye!')
 
 
 def carbon_collector_loop():
     """Background loop to collect carbon intensity data from UK API."""
-    logger = logging.getLogger('stats.background')
+    # Note: caller may have already configured stats.background logger
     logger.info('Carbon collector starting (interval: %d min)', INTERVAL_MINUTES)
     logger.info('Database: %s', DB_PATH)
 
@@ -383,19 +385,22 @@ def carbon_collector_loop():
 if __name__ == '__main__':
     import sys
 
+    # Ensure logging is configured for CLI use
+    import config  # noqa: F401
+
     if len(sys.argv) > 1:
         if sys.argv[1] == 'dump':
             if DB_PATH.exists():
                 dump_database(DB_PATH)
             else:
-                print(f'Database not found: {DB_PATH}')
+                logger.error('Database not found: %s', DB_PATH)
         elif sys.argv[1] == 'stats':
             if DB_PATH.exists():
                 conn = sqlite3.connect(DB_PATH)
-                print(f'Total readings: {get_reading_count(conn)}')
+                logger.info('Total readings: %d', get_reading_count(conn))
                 conn.close()
             else:
-                print(f'Database not found: {DB_PATH}')
+                logger.error('Database not found: %s', DB_PATH)
         elif sys.argv[1] == 'backfill':
             if DB_PATH.exists():
                 conn = init_database(DB_PATH)
@@ -403,6 +408,6 @@ if __name__ == '__main__':
                 backfill(conn, days)
                 conn.close()
             else:
-                print(f'Database not found: {DB_PATH}')
+                logger.error('Database not found: %s', DB_PATH)
     else:
         run_collector()
