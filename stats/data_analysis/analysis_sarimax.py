@@ -12,9 +12,10 @@ import sqlite3
 import time
 import warnings
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
@@ -34,12 +35,15 @@ def carbon_intensity_to_greenness(intensity):
 
 # ── 1. Load & deduplicate ────────────────────────────────────────────────
 conn = sqlite3.connect(DB_PATH)
-df = pd.read_sql_query("""
+df = pd.read_sql_query(
+    """
     SELECT r.name AS region, cr.timestamp_from AS ts, cr.actual
     FROM carbon_readings cr
     JOIN regions r ON cr.region_id = r.region_id
     WHERE cr.actual IS NOT NULL
-""", conn)
+""",
+    conn,
+)
 conn.close()
 
 df['ts'] = pd.to_datetime(df['ts'])
@@ -47,26 +51,29 @@ df = df.drop_duplicates(subset=['region', 'ts']).sort_values(['region', 'ts']).r
 df['greenness'] = carbon_intensity_to_greenness(df['actual'].values)
 
 regions = sorted(df['region'].unique())
-print(f"Regions: {regions}")
-print(f"Date range: {df['ts'].min()} → {df['ts'].max()}")
-print(f"Rows (deduplicated): {len(df)}")
+print(f'Regions: {regions}')
+print(f'Date range: {df["ts"].min()} → {df["ts"].max()}')
+print(f'Rows (deduplicated): {len(df)}')
 
 
 # ── 2. Model definitions ─────────────────────────────────────────────────
+
 
 def build_ridge_features(timestamps):
     ts = pd.Series(timestamps) if not isinstance(timestamps, pd.Series) else timestamps
     hour = ts.dt.hour + ts.dt.minute / 60.0
     dow = ts.dt.dayofweek
     minute_of_day = ts.dt.hour * 60 + ts.dt.minute
-    return pd.DataFrame({
-        'hour_sin': np.sin(2 * np.pi * hour / 24),
-        'hour_cos': np.cos(2 * np.pi * hour / 24),
-        'dow_sin':  np.sin(2 * np.pi * dow / 7),
-        'dow_cos':  np.cos(2 * np.pi * dow / 7),
-        'min_sin':  np.sin(2 * np.pi * minute_of_day / 1440),
-        'min_cos':  np.cos(2 * np.pi * minute_of_day / 1440),
-    })
+    return pd.DataFrame(
+        {
+            'hour_sin': np.sin(2 * np.pi * hour / 24),
+            'hour_cos': np.cos(2 * np.pi * hour / 24),
+            'dow_sin': np.sin(2 * np.pi * dow / 7),
+            'dow_cos': np.cos(2 * np.pi * dow / 7),
+            'min_sin': np.sin(2 * np.pi * minute_of_day / 1440),
+            'min_cos': np.cos(2 * np.pi * minute_of_day / 1440),
+        }
+    )
 
 
 def train_predict_ridge(train_ts, train_y, test_ts, clip_min, clip_max):
@@ -109,7 +116,7 @@ def train_predict_sarimax(train_series, n_test, clip_min, clip_max):
 
 test_days = 30
 split_date = df['ts'].max() - pd.Timedelta(days=test_days)
-short_train_start = split_date - pd.Timedelta(days=7)   # 7-day window
+short_train_start = split_date - pd.Timedelta(days=7)  # 7-day window
 
 experiments = [
     ('7-day train', short_train_start),
@@ -123,7 +130,7 @@ for region in regions:
     test = rdf[rdf['ts'] > split_date].reset_index(drop=True)
 
     if len(test) == 0:
-        print(f"\n{region}: no test data, skipping")
+        print(f'\n{region}: no test data, skipping')
         continue
 
     all_results[region] = {}
@@ -135,7 +142,7 @@ for region in regions:
             train = rdf[rdf['ts'] <= split_date].reset_index(drop=True)
 
         train_days_actual = (train['ts'].max() - train['ts'].min()).days
-        print(f"\n{region} [{exp_name}]: train={len(train)} pts ({train_days_actual}d), test={len(test)} pts")
+        print(f'\n{region} [{exp_name}]: train={len(train)} pts ({train_days_actual}d), test={len(test)} pts')
 
         exp_results = {}
 
@@ -147,9 +154,7 @@ for region in regions:
 
             # Ridge (no trend)
             t0 = time.time()
-            ridge_preds = train_predict_ridge(
-                train['ts'], train[col].values, test['ts'], clip_min, clip_max
-            )
+            ridge_preds = train_predict_ridge(train['ts'], train[col].values, test['ts'], clip_min, clip_max)
             ridge_time = time.time() - t0
             ridge_mae = np.mean(np.abs(y_test - ridge_preds))
             ridge_rmse = np.sqrt(np.mean((y_test - ridge_preds) ** 2))
@@ -162,14 +167,14 @@ for region in regions:
             train_series = train_series.reindex(full_idx).interpolate(method='time')
             train_series = train_series.asfreq(freq)
 
-            sarimax_preds, sarimax_time = train_predict_sarimax(
-                train_series, len(test), clip_min, clip_max
-            )
+            sarimax_preds, sarimax_time = train_predict_sarimax(train_series, len(test), clip_min, clip_max)
             sarimax_mae = np.mean(np.abs(y_test - sarimax_preds))
             sarimax_rmse = np.sqrt(np.mean((y_test - sarimax_preds) ** 2))
 
-            print(f"  {target:20s}  Ridge: MAE={ridge_mae:6.2f} RMSE={ridge_rmse:6.2f} ({ridge_time:.2f}s)"
-                  f"  |  SARIMAX: MAE={sarimax_mae:6.2f} RMSE={sarimax_rmse:6.2f} ({sarimax_time:.2f}s)")
+            print(
+                f'  {target:20s}  Ridge: MAE={ridge_mae:6.2f} RMSE={ridge_rmse:6.2f} ({ridge_time:.2f}s)'
+                f'  |  SARIMAX: MAE={sarimax_mae:6.2f} RMSE={sarimax_rmse:6.2f} ({sarimax_time:.2f}s)'
+            )
 
             exp_results[target] = {
                 'ridge_preds': ridge_preds,
@@ -191,13 +196,13 @@ for region in regions:
 
 # ── 4. Summary table ─────────────────────────────────────────────────────
 
-print("\n" + "=" * 100)
-print("SUMMARY: MAE comparison (lower is better)")
-print("=" * 100)
+print('\n' + '=' * 100)
+print('SUMMARY: MAE comparison (lower is better)')
+print('=' * 100)
 
-header = f"{'Region':<20} {'Experiment':<16} {'Target':<20} {'Ridge MAE':>10} {'SARIMAX MAE':>12} {'Winner':>10} {'Δ MAE':>8}"
+header = f'{"Region":<20} {"Experiment":<16} {"Target":<20} {"Ridge MAE":>10} {"SARIMAX MAE":>12} {"Winner":>10} {"Δ MAE":>8}'
 print(header)
-print("-" * len(header))
+print('-' * len(header))
 
 for region in regions:
     if region not in all_results:
@@ -209,7 +214,9 @@ for region in regions:
             r = all_results[region][exp_name][target]
             winner = 'SARIMAX' if r['sarimax_mae'] < r['ridge_mae'] else 'Ridge'
             delta = r['ridge_mae'] - r['sarimax_mae']
-            print(f"  {region:<18} {exp_name:<16} {target:<20} {r['ridge_mae']:>10.2f} {r['sarimax_mae']:>12.2f} {winner:>10} {delta:>+8.2f}")
+            print(
+                f'  {region:<18} {exp_name:<16} {target:<20} {r["ridge_mae"]:>10.2f} {r["sarimax_mae"]:>12.2f} {winner:>10} {delta:>+8.2f}'
+            )
 
 
 # ── 5. Graph: SARIMAX vs Ridge for carbon intensity (full backfill) ──────
@@ -227,22 +234,32 @@ for ax, region in zip(axes, regions):
     test = r['test']
 
     # Training data (faded)
-    ax.plot(train['ts'], train['actual'],
-            linewidth=0.6, color='#90CAF9', alpha=0.4, label='Train (actual)')
+    ax.plot(train['ts'], train['actual'], linewidth=0.6, color='#90CAF9', alpha=0.4, label='Train (actual)')
     # Split line
     ax.axvline(split_date, color='gray', linestyle='--', linewidth=1, label='Split')
     # Test actual
-    ax.plot(test['ts'], test['actual'],
-            linewidth=1.2, color='#2196F3', label='Test (actual)')
+    ax.plot(test['ts'], test['actual'], linewidth=1.2, color='#2196F3', label='Test (actual)')
     # Ridge predictions
-    ax.plot(test['ts'], r['ridge_preds'],
-            linewidth=1.2, color='#F44336', linestyle='--', label=f"Ridge MAE={r['ridge_mae']:.1f}")
+    ax.plot(
+        test['ts'],
+        r['ridge_preds'],
+        linewidth=1.2,
+        color='#F44336',
+        linestyle='--',
+        label=f'Ridge MAE={r["ridge_mae"]:.1f}',
+    )
     # SARIMAX predictions
-    ax.plot(test['ts'], r['sarimax_preds'],
-            linewidth=1.2, color='#4CAF50', linestyle='-.', label=f"SARIMAX MAE={r['sarimax_mae']:.1f}")
+    ax.plot(
+        test['ts'],
+        r['sarimax_preds'],
+        linewidth=1.2,
+        color='#4CAF50',
+        linestyle='-.',
+        label=f'SARIMAX MAE={r["sarimax_mae"]:.1f}',
+    )
 
     ax.set_ylabel('gCO₂/kWh')
-    ax.set_title(f"{region}")
+    ax.set_title(f'{region}')
     ax.legend(loc='upper right', fontsize=8)
     ax.grid(True, alpha=0.3)
 
@@ -250,7 +267,7 @@ axes[-1].xaxis.set_major_formatter(DateFormatter('%b %d'))
 fig.suptitle('SARIMAX vs Ridge: Carbon Intensity — 30-Day Forecast (Full Backfill Training)', fontsize=14, y=1.01)
 fig.tight_layout()
 fig.savefig('sarimax_vs_ridge_carbon_intensity.png', dpi=150, bbox_inches='tight')
-print("\nSaved: sarimax_vs_ridge_carbon_intensity.png")
+print('\nSaved: sarimax_vs_ridge_carbon_intensity.png')
 plt.close(fig)
 
 
@@ -269,25 +286,38 @@ for row, region in enumerate(regions):
         r = all_results[region][exp_name]['carbon_intensity']
         test = r['test']
 
-        ax.plot(test['ts'], test['actual'],
-                linewidth=1.2, color='#2196F3', label='Actual')
-        ax.plot(test['ts'], r['ridge_preds'],
-                linewidth=1.1, color='#F44336', linestyle='--',
-                label=f"Ridge MAE={r['ridge_mae']:.1f}")
-        ax.plot(test['ts'], r['sarimax_preds'],
-                linewidth=1.1, color='#4CAF50', linestyle='-.',
-                label=f"SARIMAX MAE={r['sarimax_mae']:.1f}")
+        ax.plot(test['ts'], test['actual'], linewidth=1.2, color='#2196F3', label='Actual')
+        ax.plot(
+            test['ts'],
+            r['ridge_preds'],
+            linewidth=1.1,
+            color='#F44336',
+            linestyle='--',
+            label=f'Ridge MAE={r["ridge_mae"]:.1f}',
+        )
+        ax.plot(
+            test['ts'],
+            r['sarimax_preds'],
+            linewidth=1.1,
+            color='#4CAF50',
+            linestyle='-.',
+            label=f'SARIMAX MAE={r["sarimax_mae"]:.1f}',
+        )
 
         ax.set_ylabel('gCO₂/kWh')
-        ax.set_title(f"{region} — {exp_name}")
+        ax.set_title(f'{region} — {exp_name}')
         ax.legend(loc='upper right', fontsize=7)
         ax.grid(True, alpha=0.3)
 
 for ax in axes[-1]:
     ax.xaxis.set_major_formatter(DateFormatter('%b %d'))
 
-fig.suptitle('Training Window Comparison: 7-day vs Full Backfill — 30-Day Forecast (Carbon Intensity gCO₂/kWh)', fontsize=14, y=1.01)
+fig.suptitle(
+    'Training Window Comparison: 7-day vs Full Backfill — 30-Day Forecast (Carbon Intensity gCO₂/kWh)',
+    fontsize=14,
+    y=1.01,
+)
 fig.tight_layout()
 fig.savefig('sarimax_training_window_ci_comparison.png', dpi=150, bbox_inches='tight')
-print("Saved: sarimax_training_window_ci_comparison.png")
+print('Saved: sarimax_training_window_ci_comparison.png')
 plt.close(fig)

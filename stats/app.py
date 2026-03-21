@@ -9,10 +9,14 @@ import config  # triggers logging setup
 import db_utils
 from background import carbon_sync_loop, prediction_loop
 from data.carbon_collector import (
+    DB_PATH as CARBON_DB_PATH,
+)
+from data.carbon_collector import (
     backfill,
     carbon_collector_loop,
+)
+from data.carbon_collector import (
     init_database as init_carbon_db,
-    DB_PATH as CARBON_DB_PATH,
 )
 from routes import router
 

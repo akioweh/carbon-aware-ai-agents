@@ -22,9 +22,7 @@ def prediction_loop():
 
         all_datacenters = db_utils.get_all_datacenter_ids()
         if not all_datacenters:
-            logger.warning(
-                'No datacenters configured; skipping prediction refresh'
-            )
+            logger.warning('No datacenters configured; skipping prediction refresh')
             time.sleep(PREDICTION_INTERVAL)
             continue
 
@@ -44,20 +42,14 @@ def prediction_loop():
                     ci_data = generate_next_week_carbon_intensity_prediction(dc)
                     db_utils.save_prediction(f'carbon_intensity_forecast_{dc}', ci_data)
                 except ValueError as e:
-                    logger.warning(
-                        'ValueError updating CI predictions for %s: %s', dc, e
-                    )
-                    logger.warning(
-                        'No carbon intensity data for %s, skipping CI forecast', dc
-                    )
+                    logger.warning('ValueError updating CI predictions for %s: %s', dc, e)
+                    logger.warning('No carbon intensity data for %s, skipping CI forecast', dc)
 
                 # Refresh pre-upsampled historical cache
                 try:
                     refresh_historical_cache(dc)
                 except Exception as e:
-                    logger.warning(
-                        'Failed to refresh historical cache for %s: %s', dc, e
-                    )
+                    logger.warning('Failed to refresh historical cache for %s: %s', dc, e)
 
                 if consecutive_failures[dc]:
                     logger.info(

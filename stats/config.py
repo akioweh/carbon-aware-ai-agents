@@ -10,9 +10,7 @@ LOG_FILE = os.environ.get('STATS_LOG_FILE', 'app.log')
 
 # Database paths
 DB_FILE = _STATS_DIR / 'cache.db'
-CARBON_DB_FILE = Path(
-    os.environ.get('CARBON_DB_PATH', _STATS_DIR / 'carbon_intensity.db')
-)
+CARBON_DB_FILE = Path(os.environ.get('CARBON_DB_PATH', _STATS_DIR / 'carbon_intensity.db'))
 
 # Logging setup — writes to both stdout and a persistent log file
 _log_fmt = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'

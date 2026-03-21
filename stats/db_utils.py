@@ -149,9 +149,7 @@ def initialize_db():
         columns = [col[1] for col in cursor.fetchall()]
         if 'greenness' in columns and 'carbon_intensity' not in columns:
             # Migrate old schema
-            conn.execute(
-                'ALTER TABLE historical_data RENAME COLUMN greenness TO carbon_intensity'
-            )
+            conn.execute('ALTER TABLE historical_data RENAME COLUMN greenness TO carbon_intensity')
 
         # Predictions cache table
         conn.execute("""
@@ -174,7 +172,7 @@ def initialize_db():
         """)
 
         # Migrate: allow NULL load (carbon-only rows from carbon sync)
-        cursor = conn.execute("PRAGMA table_info(historical_data)")
+        cursor = conn.execute('PRAGMA table_info(historical_data)')
         for col in cursor.fetchall():
             if col[1] == 'load' and col[3] == 1:  # col[3]=notnull flag
                 conn.execute("""
@@ -190,8 +188,8 @@ def initialize_db():
                     INSERT INTO historical_data_new
                     SELECT * FROM historical_data
                 """)
-                conn.execute("DROP TABLE historical_data")
-                conn.execute("ALTER TABLE historical_data_new RENAME TO historical_data")
+                conn.execute('DROP TABLE historical_data')
+                conn.execute('ALTER TABLE historical_data_new RENAME TO historical_data')
                 # Clean up legacy load=0 rows from old carbon syncs
                 conn.execute("""
                     UPDATE historical_data SET load = NULL WHERE load = 0
@@ -216,7 +214,7 @@ def initialize_db():
         """)
 
         # Migrate: allow NULL load in cache table too
-        cursor = conn.execute("PRAGMA table_info(historical_cache)")
+        cursor = conn.execute('PRAGMA table_info(historical_cache)')
         for col in cursor.fetchall():
             if col[1] == 'load' and col[3] == 1:  # col[3]=notnull flag
                 conn.execute("""
@@ -228,9 +226,9 @@ def initialize_db():
                         PRIMARY KEY (location, timestamp)
                     )
                 """)
-                conn.execute("INSERT INTO historical_cache_new SELECT * FROM historical_cache")
-                conn.execute("DROP TABLE historical_cache")
-                conn.execute("ALTER TABLE historical_cache_new RENAME TO historical_cache")
+                conn.execute('INSERT INTO historical_cache_new SELECT * FROM historical_cache')
+                conn.execute('DROP TABLE historical_cache')
+                conn.execute('ALTER TABLE historical_cache_new RENAME TO historical_cache')
                 break
 
         conn.execute("""
@@ -271,10 +269,7 @@ def initialize_db():
             SET region_id = ?, name = ?, updated_at = ?
             WHERE location_id = ?
             """,
-            [
-                (dc['region_id'], dc['name'], now, dc['location_id'])
-                for dc in DEFAULT_DATACENTERS
-            ],
+            [(dc['region_id'], dc['name'], now, dc['location_id']) for dc in DEFAULT_DATACENTERS],
         )
 
 
@@ -370,9 +365,7 @@ def get_cached_prediction(key: str) -> Optional[dict]:
     """Get cached prediction if it exists and is within the configured TTL."""
     try:
         with get_connection() as conn:
-            cursor = conn.execute(
-                'SELECT data, timestamp FROM predictions WHERE key = ?', (key,)
-            )
+            cursor = conn.execute('SELECT data, timestamp FROM predictions WHERE key = ?', (key,))
             row = cursor.fetchone()
 
             if row:
@@ -404,9 +397,7 @@ def save_historical_cache(location: str, entries: List[Dict]):
     """
     try:
         with get_connection() as conn:
-            conn.execute(
-                'DELETE FROM historical_cache WHERE location = ?', (location,)
-            )
+            conn.execute('DELETE FROM historical_cache WHERE location = ?', (location,))
             conn.executemany(
                 """INSERT INTO historical_cache
                    (location, timestamp, load, carbon_intensity)
@@ -459,9 +450,7 @@ def get_historical_cache(
         return None
 
 
-def insert_historical_data(
-    location: str, timestamp: datetime, load: float, carbon_intensity: float
-):
+def insert_historical_data(location: str, timestamp: datetime, load: float, carbon_intensity: float):
     """Insert a single historical data point. Replaces if timestamp already exists."""
     try:
         with get_connection() as conn:
@@ -574,9 +563,7 @@ def delete_old_data(days: int = 30):
     """Delete historical data older than specified number of days."""
     cutoff = datetime.now() - timedelta(days=days)
     with get_connection() as conn:
-        cursor = conn.execute(
-            'DELETE FROM historical_data WHERE timestamp < ?', (cutoff.timestamp(),)
-        )
+        cursor = conn.execute('DELETE FROM historical_data WHERE timestamp < ?', (cutoff.timestamp(),))
         deleted_count = cursor.rowcount
         print(f'Deleted {deleted_count} old historical data points')
 
@@ -615,9 +602,7 @@ def count_historical_data() -> int:
 def get_carbon_db_connection():
     """Get a connection to the carbon intensity database."""
     if not CARBON_DB_FILE.exists():
-        raise FileNotFoundError(
-            f'Carbon intensity database not found: {CARBON_DB_FILE}'
-        )
+        raise FileNotFoundError(f'Carbon intensity database not found: {CARBON_DB_FILE}')
     conn = sqlite3.connect(CARBON_DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn

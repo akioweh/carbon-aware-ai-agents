@@ -12,40 +12,44 @@ Designed to run indefinitely on a server (e.g., Oracle Cloud VM).
 """
 
 import logging
-import sqlite3
-import requests
-import time
 import shutil
-import schedule
 import signal
+import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
+import requests
+import schedule
 
 from config import (
     API_BASE_URL,
     BACKFILL_DAYS,
-    CARBON_DB_FILE as DB_PATH,
-    CARBON_INTERVAL_MINUTES as INTERVAL_MINUTES,
     FAILURE_ALERT_THRESHOLD,
+)
+from config import (
+    CARBON_DB_FILE as DB_PATH,
+)
+from config import (
+    CARBON_INTERVAL_MINUTES as INTERVAL_MINUTES,
 )
 
 REGIONS = {
-    1: "North Scotland",
-    2: "South Scotland",
-    3: "North West England",
-    4: "North East England",
-    5: "South Yorkshire",
-    6: "North Wales, Merseyside and Cheshire",
-    7: "South Wales",
-    8: "West Midlands",
-    9: "East Midlands",
-    10: "East England",
-    11: "South West England",
-    12: "South England",
-    13: "London",
-    14: "South East England",
+    1: 'North Scotland',
+    2: 'South Scotland',
+    3: 'North West England',
+    4: 'North East England',
+    5: 'South Yorkshire',
+    6: 'North Wales, Merseyside and Cheshire',
+    7: 'South Wales',
+    8: 'West Midlands',
+    9: 'East Midlands',
+    10: 'East England',
+    11: 'South West England',
+    12: 'South England',
+    13: 'London',
+    14: 'South East England',
 }
 
 # Graceful shutdown flag
@@ -175,9 +179,7 @@ def store_regional_slot(conn: sqlite3.Connection, slot: dict) -> int:
 
 def get_latest_reading_timestamp(conn: sqlite3.Connection) -> datetime | None:
     """Get the timestamp of the most recent reading in the database."""
-    cursor = conn.execute(
-        'SELECT MAX(timestamp_from) FROM carbon_readings WHERE actual IS NOT NULL'
-    )
+    cursor = conn.execute('SELECT MAX(timestamp_from) FROM carbon_readings WHERE actual IS NOT NULL')
     res = cursor.fetchone()
     if res and res[0]:
         try:
@@ -190,9 +192,7 @@ def get_latest_reading_timestamp(conn: sqlite3.Connection) -> datetime | None:
 
 def _get_regions_with_data(conn: sqlite3.Connection) -> set[int]:
     """Get the set of region IDs that have at least one actual reading."""
-    cursor = conn.execute(
-        'SELECT DISTINCT region_id FROM carbon_readings WHERE actual IS NOT NULL'
-    )
+    cursor = conn.execute('SELECT DISTINCT region_id FROM carbon_readings WHERE actual IS NOT NULL')
     return {row[0] for row in cursor.fetchall()}
 
 
@@ -220,9 +220,7 @@ def backfill(conn: sqlite3.Connection, days: int = BACKFILL_DAYS) -> None:
 
     if latest_ts:
         start = latest_ts
-        if (
-            end - start
-        ).total_seconds() < 1800:  # Less than 30 mins, nothing to backfill
+        if (end - start).total_seconds() < 1800:  # Less than 30 mins, nothing to backfill
             print('Database is up to date. Skipping backfill.')
             return
         print(f'Incremental backfill: fetching data since {start.isoformat()}...')
@@ -259,9 +257,7 @@ def backfill(conn: sqlite3.Connection, days: int = BACKFILL_DAYS) -> None:
 
 def collect_current(conn: sqlite3.Connection) -> None:
     """Fetch and store current data for all regions."""
-    print(
-        f'\n[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Collecting current data...'
-    )
+    print(f'\n[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Collecting current data...')
 
     data = fetch_current_regional()
     if not data:

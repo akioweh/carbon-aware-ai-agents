@@ -6,8 +6,9 @@ import pandas as pd
 import db_utils
 from config import DEFAULT_CAPACITY, PREDICTION_WINDOW_HOURS
 from data.generate_history import generate_load
-from .ridge import get_next_week_carbon_intensity
+
 from .load import get_next_week_load
+from .ridge import get_next_week_carbon_intensity
 
 
 def generate_next_week_load_prediction(location):
@@ -105,7 +106,11 @@ def _upsample_historical(entries, fill_until=None):
     # Build a 5-min grid from the first observation to fill_until (or last obs)
     end = df.index[-1]
     if fill_until is not None:
-        fill_ts = pd.Timestamp(fill_until).tz_localize('UTC') if pd.Timestamp(fill_until).tzinfo is None else pd.Timestamp(fill_until)
+        fill_ts = (
+            pd.Timestamp(fill_until).tz_localize('UTC')
+            if pd.Timestamp(fill_until).tzinfo is None
+            else pd.Timestamp(fill_until)
+        )
         fill_ts = fill_ts.ceil('5min')
         end = max(end, fill_ts)
 
@@ -242,12 +247,14 @@ def get_load_time_series(location, start_time=None, end_time=None):
             load = entry['load']
             if load is None or (isinstance(load, float) and pd.isna(load)):
                 load = generate_load(entry['timestamp'], 0)
-            data_points.append({
-                'timestamp': entry['timestamp'].isoformat(),
-                'value': max(0.0, float(load)),
-                'is_forecast': False,
-                'capacity': DEFAULT_CAPACITY,
-            })
+            data_points.append(
+                {
+                    'timestamp': entry['timestamp'].isoformat(),
+                    'value': max(0.0, float(load)),
+                    'is_forecast': False,
+                    'capacity': DEFAULT_CAPACITY,
+                }
+            )
 
     # Forecast data (future)
     if effective_end > now:
@@ -310,11 +317,13 @@ def get_carbon_intensity_time_series(location, start_time=None, end_time=None):
         for entry in historical:
             ci = entry.get('carbon_intensity')
             if ci is not None:
-                data_points.append({
-                    'timestamp': entry['timestamp'].isoformat(),
-                    'value': float(ci),
-                    'is_forecast': False,
-                })
+                data_points.append(
+                    {
+                        'timestamp': entry['timestamp'].isoformat(),
+                        'value': float(ci),
+                        'is_forecast': False,
+                    }
+                )
 
     # Forecast data (future)
     if effective_end > now:
@@ -358,9 +367,7 @@ if __name__ == '__main__':
 
         try:
             ci_pred = generate_next_week_carbon_intensity_prediction(dc)
-            print(
-                f'Generated {len(ci_pred["data"])} carbon intensity predictions for {dc}'
-            )
+            print(f'Generated {len(ci_pred["data"])} carbon intensity predictions for {dc}')
         except ValueError as exc:
             ci_pred = {'error': str(exc)}
             print(f'Skipping carbon intensity for {dc}: {exc}')

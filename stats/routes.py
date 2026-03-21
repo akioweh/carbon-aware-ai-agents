@@ -18,10 +18,8 @@ from models import (
     PredictionWindowModel,
 )
 from predictors import (
-    generate_next_week_carbon_intensity_prediction,
-    generate_next_week_load_prediction,
-    get_load_time_series,
     get_carbon_intensity_time_series,
+    get_load_time_series,
 )
 
 logger = logging.getLogger('stats.routes')
@@ -87,9 +85,7 @@ def get_load_forecast(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(
-            'Error generating load forecast for %s: %s', location, e, exc_info=True
-        )
+        logger.error('Error generating load forecast for %s: %s', location, e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
     return data
@@ -135,9 +131,7 @@ def get_carbon_forecast(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(
-            'Error generating CI forecast for %s: %s', location, e, exc_info=True
-        )
+        logger.error('Error generating CI forecast for %s: %s', location, e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
     return data
@@ -226,15 +220,11 @@ def patch_datacenter(location_id: str, payload: DatacenterPatchRequest):
     """Updates whether a datacenter is active for scheduler-visible locations."""
     updated = db_utils.set_datacenter_active(location_id, payload.active)
     if not updated:
-        raise HTTPException(
-            status_code=404, detail=f'Datacenter not found: {location_id}'
-        )
+        raise HTTPException(status_code=404, detail=f'Datacenter not found: {location_id}')
 
     datacenter = db_utils.get_datacenter(location_id)
     if not datacenter:
-        raise HTTPException(
-            status_code=500, detail=f'Failed to load updated datacenter: {location_id}'
-        )
+        raise HTTPException(status_code=500, detail=f'Failed to load updated datacenter: {location_id}')
 
     return Datacenter(
         id=datacenter['id'],

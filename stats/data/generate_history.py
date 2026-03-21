@@ -89,9 +89,7 @@ def generate_history():
 
     # Insert all data into database
     db_utils.insert_historical_data_bulk(bulk_data)
-    print(
-        f'Generated and inserted {len(bulk_data)} historical data points into database.'
-    )
+    print(f'Generated and inserted {len(bulk_data)} historical data points into database.')
 
 
 if __name__ == '__main__':

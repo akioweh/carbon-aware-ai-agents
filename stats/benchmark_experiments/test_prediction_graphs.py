@@ -1,7 +1,6 @@
 import json
 
 import matplotlib.pyplot as plt
-
 from generate_history import DATA_CENTRES
 
 # Load the data
@@ -33,9 +32,7 @@ for idx, dc in enumerate(DATA_CENTRES):
         )
 
     if dc in prediction_data:
-        prediction_load = [
-            item['value'] for item in prediction_data[dc]['load_prediction']['data']
-        ]
+        prediction_load = [item['value'] for item in prediction_data[dc]['load_prediction']['data']]
         prediction_indices = range(len(prediction_load))
         plt.plot(
             prediction_indices,
@@ -56,9 +53,7 @@ plt.grid(True, alpha=0.3)
 plt.subplot(2, 1, 2)
 for idx, dc in enumerate(DATA_CENTRES):
     if dc in history_data:
-        history_carbon_intensity = [
-            item['carbon_intensity'] for item in history_data[dc]
-        ]
+        history_carbon_intensity = [item['carbon_intensity'] for item in history_data[dc]]
         history_indices = range(len(history_carbon_intensity))
         plt.plot(
             history_indices,
@@ -71,8 +66,7 @@ for idx, dc in enumerate(DATA_CENTRES):
 
     if dc in prediction_data:
         prediction_carbon_intensity = [
-            item['value']
-            for item in prediction_data[dc]['carbon_intensity_prediction']['data']
+            item['value'] for item in prediction_data[dc]['carbon_intensity_prediction']['data']
         ]
         prediction_indices = range(len(prediction_carbon_intensity))
         plt.plot(

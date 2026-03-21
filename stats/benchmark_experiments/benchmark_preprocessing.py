@@ -28,13 +28,19 @@ warnings.filterwarnings('ignore')
 
 # Reuse infrastructure from benchmark.py
 from benchmark import (
-    DB_PATH, TEST_DAYS, WEATHER_FEATURES, DOCS_DIR,
-    load_data, fetch_weather_data,
-    build_cyclical_features, _build_direct_features,
+    DB_PATH,
+    DOCS_DIR,
+    TEST_DAYS,
+    WEATHER_FEATURES,
+    _build_direct_features,
+    build_cyclical_features,
     compute_metrics,
+    fetch_weather_data,
+    load_data,
 )
 
 # ── Feature builders ─────────────────────────────────────────────────────
+
 
 def build_onehot_features(timestamps: pd.Series) -> pd.DataFrame:
     """48 half-hour-of-day + 7 day-of-week binary columns."""
@@ -58,8 +64,7 @@ def build_onehot_features(timestamps: pd.Series) -> pd.DataFrame:
     hh_dummies = hh_dummies[[f'hh_{i}' for i in range(48)]]
     dow_dummies = dow_dummies[[f'dow_{i}' for i in range(7)]]
 
-    return pd.concat([hh_dummies.reset_index(drop=True),
-                      dow_dummies.reset_index(drop=True)], axis=1)
+    return pd.concat([hh_dummies.reset_index(drop=True), dow_dummies.reset_index(drop=True)], axis=1)
 
 
 def build_fourier_features(timestamps: pd.Series, n_harmonics: int = 3) -> pd.DataFrame:
@@ -133,14 +138,14 @@ def stl_extrapolate(trend: np.ndarray, seasonal: np.ndarray, n_test: int, period
 # ── Variant dispatcher ───────────────────────────────────────────────────
 
 VARIANTS = {
-    'Baseline':       {'n_features': 14, 'alpha': 1.0},
-    'One-Hot Time':   {'n_features': 63, 'alpha': 10.0},
-    'Fourier-3':      {'n_features': 26, 'alpha': 1.0},
-    'One-Hot+Fourier':{'n_features': 71, 'alpha': 10.0},
-    'MA-3h Target':   {'n_features': 14, 'alpha': 1.0},
-    'diff(48)':       {'n_features': 14, 'alpha': 1.0},
-    'STL Residual':   {'n_features': 14, 'alpha': 1.0},
-    'Hour×Weather':   {'n_features': 20, 'alpha': 1.0},
+    'Baseline': {'n_features': 14, 'alpha': 1.0},
+    'One-Hot Time': {'n_features': 63, 'alpha': 10.0},
+    'Fourier-3': {'n_features': 26, 'alpha': 1.0},
+    'One-Hot+Fourier': {'n_features': 71, 'alpha': 10.0},
+    'MA-3h Target': {'n_features': 14, 'alpha': 1.0},
+    'diff(48)': {'n_features': 14, 'alpha': 1.0},
+    'STL Residual': {'n_features': 14, 'alpha': 1.0},
+    'Hour×Weather': {'n_features': 20, 'alpha': 1.0},
 }
 
 
@@ -150,7 +155,7 @@ def _build_horizon_origin(train_y, n_train, n_test, min_history=48, max_h=336):
     origin_mean = np.zeros(n_train)
     origin_std = np.zeros(n_train)
     for t in range(min_history, n_train):
-        recent = train_y[max(0, t - 47):t + 1]
+        recent = train_y[max(0, t - 47) : t + 1]
         origin_last[t] = train_y[t]
         origin_mean[t] = np.mean(recent)
         origin_std[t] = np.std(recent) if len(recent) > 1 else 0
@@ -162,7 +167,7 @@ def _build_horizon_origin(train_y, n_train, n_test, min_history=48, max_h=336):
             continue
         targets = origins + h
         h_col = np.full((len(origins), 1), h / 336.0)
-        h2_col = h_col ** 2
+        h2_col = h_col**2
         of = np.column_stack([origin_last[origins], origin_mean[origins], origin_std[origins]])
         yield h, origins, targets, h_col, h2_col, of
 
@@ -175,11 +180,10 @@ def _test_horizon_origin(train_y, n_test):
     of_test = np.array([[train_y[-1], np.mean(recent), np.std(recent)]])
     of_test = np.tile(of_test, (n_test, 1))
     h_vals = np.arange(1, n_test + 1).reshape(-1, 1) / 336.0
-    return h_vals, h_vals ** 2, of_test
+    return h_vals, h_vals**2, of_test
 
 
-def run_variant(name, train_ts, train_y, test_ts, test_y,
-                train_exog=None, test_exog=None):
+def run_variant(name, train_ts, train_y, test_ts, test_y, train_exog=None, test_exog=None):
     """Run a single variant end-to-end. Returns (preds, elapsed, n_features)."""
     cfg = VARIANTS[name]
     alpha = cfg['alpha']
@@ -231,7 +235,7 @@ def run_variant(name, train_ts, train_y, test_ts, test_y,
     origin_mean = np.zeros(n_train)
     origin_std = np.zeros(n_train)
     for t in range(min_history, n_train):
-        recent = eff_train_y[max(0, t - 47):t + 1]
+        recent = eff_train_y[max(0, t - 47) : t + 1]
         origin_last[t] = eff_train_y[t]
         origin_mean[t] = np.mean(recent)
         origin_std[t] = np.std(recent) if len(recent) > 1 else 0
@@ -245,7 +249,7 @@ def run_variant(name, train_ts, train_y, test_ts, test_y,
         targets = origins + h
         cyc = time_feat_train[targets]
         h_col = np.full((len(origins), 1), h / 336.0)
-        h2_col = h_col ** 2
+        h2_col = h_col**2
         of = np.column_stack([origin_last[origins], origin_mean[origins], origin_std[origins]])
         x = np.column_stack([cyc, h_col, h2_col, of])
 
@@ -272,7 +276,7 @@ def run_variant(name, train_ts, train_y, test_ts, test_y,
     of_test = np.array([[eff_train_y[-1], np.mean(recent), np.std(recent)]])
     of_test = np.tile(of_test, (n_test, 1))
     h_vals = np.arange(1, n_test + 1).reshape(-1, 1) / 336.0
-    X_test = np.column_stack([time_feat_test, h_vals, h_vals ** 2, of_test])
+    X_test = np.column_stack([time_feat_test, h_vals, h_vals**2, of_test])
 
     if has_exog:
         X_test = np.column_stack([X_test, test_exog])
@@ -313,9 +317,11 @@ def run_variant(name, train_ts, train_y, test_ts, test_y,
 
 # ── Plotting ─────────────────────────────────────────────────────────────
 
+
 def plot_comparison(results_df):
     """Grouped bar chart of MAE per variant, averaged across regions."""
     import matplotlib
+
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
@@ -332,20 +338,27 @@ def plot_comparison(results_df):
     ax.axhline(y=avg.get('Baseline', 33), color='red', linestyle='--', alpha=0.5, label='Baseline')
 
     for bar, val in zip(bars, avg.values):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.3,
-                f'{val:.2f}', ha='center', va='bottom', fontsize=9)
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.3,
+            f'{val:.2f}',
+            ha='center',
+            va='bottom',
+            fontsize=9,
+        )
 
     ax.legend()
     plt.tight_layout()
     path = DOCS_DIR / 'benchmark_preprocessing_comparison.png'
     fig.savefig(path, dpi=150)
     plt.close(fig)
-    print(f"Saved {path}")
+    print(f'Saved {path}')
 
 
 def plot_predictions(results_df, test_dfs, all_preds):
     """Predictions vs actual for best region, top 4 variants."""
     import matplotlib
+
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
@@ -382,38 +395,39 @@ def plot_predictions(results_df, test_dfs, all_preds):
     path = DOCS_DIR / 'benchmark_preprocessing_predictions.png'
     fig.savefig(path, dpi=150)
     plt.close(fig)
-    print(f"Saved {path}")
+    print(f'Saved {path}')
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
 
+
 def main():
-    print("=" * 70)
-    print("  PREPROCESSING EXPERIMENT")
-    print("  Can we beat Direct-Ridge MAE 32.99?")
-    print("=" * 70)
+    print('=' * 70)
+    print('  PREPROCESSING EXPERIMENT')
+    print('  Can we beat Direct-Ridge MAE 32.99?')
+    print('=' * 70)
 
     # Load data
     df = load_data(DB_PATH)
     regions = sorted(df['region'].unique())
-    print(f"\nRegions: {regions}")
-    print(f"Date range: {df['ts'].min()} -> {df['ts'].max()}")
+    print(f'\nRegions: {regions}')
+    print(f'Date range: {df["ts"].min()} -> {df["ts"].max()}')
 
     total_days = (df['ts'].max() - df['ts'].min()).days
     if total_days < 14:
-        print("ERROR: Need at least 14 days of data for full backfill experiment")
+        print('ERROR: Need at least 14 days of data for full backfill experiment')
         sys.exit(1)
 
     # Weather data
     date_min = df['ts'].min().strftime('%Y-%m-%d')
     date_max = df['ts'].max().strftime('%Y-%m-%d')
-    print("\nFetching weather data...")
+    print('\nFetching weather data...')
     weather_df = fetch_weather_data(regions, date_min, date_max)
     has_weather = len(weather_df) > 0
     if has_weather:
-        print(f"Weather data: {len(weather_df)} points")
+        print(f'Weather data: {len(weather_df)} points')
     else:
-        print("WARNING: No weather data — running without exogenous features")
+        print('WARNING: No weather data — running without exogenous features')
 
     # Train/test split (full backfill only)
     split_date = df['ts'].max() - pd.Timedelta(days=TEST_DAYS)
@@ -428,21 +442,21 @@ def main():
         test = rdf[rdf['ts'] > split_date].reset_index(drop=True)
 
         if len(test) == 0:
-            print(f"\n{region}: no test data, skipping")
+            print(f'\n{region}: no test data, skipping')
             continue
 
         train = rdf[rdf['ts'] <= split_date].reset_index(drop=True)
         if len(train) < 48:
-            print(f"\n{region}: insufficient training data ({len(train)} points), skipping")
+            print(f'\n{region}: insufficient training data ({len(train)} points), skipping')
             continue
 
         test_dfs[region] = test
         test_y = test['actual'].values
         train_days = (train['ts'].max() - train['ts'].min()).days
 
-        print(f"\n{'='*60}")
-        print(f"  {region}: train={len(train)} ({train_days}d), test={len(test)}")
-        print(f"{'='*60}")
+        print(f'\n{"=" * 60}')
+        print(f'  {region}: train={len(train)} ({train_days}d), test={len(test)}')
+        print(f'{"=" * 60}')
 
         # Build weather exogenous features
         train_exog = None
@@ -465,93 +479,100 @@ def main():
         test_ts = test['ts'].reset_index(drop=True)
 
         for vname in VARIANTS:
-            print(f"    {vname}...", end=' ', flush=True)
+            print(f'    {vname}...', end=' ', flush=True)
             try:
                 preds, elapsed, actual_nf = run_variant(
-                    vname, train_ts, train_y_vals, test_ts, test_y,
-                    train_exog=train_exog, test_exog=test_exog,
+                    vname,
+                    train_ts,
+                    train_y_vals,
+                    test_ts,
+                    test_y,
+                    train_exog=train_exog,
+                    test_exog=test_exog,
                 )
                 min_len = min(len(preds), len(test_y))
-                metrics = compute_metrics(test_y[:min_len], preds[:min_len],
-                                          n_features=actual_nf)
-                print(f"MAE={metrics['MAE']:.2f}  ({elapsed:.2f}s)")
-                all_rows.append({
-                    'region': region,
-                    'variant': vname,
-                    **metrics,
-                    'time': elapsed,
-                    'n_features': actual_nf,
-                })
+                metrics = compute_metrics(test_y[:min_len], preds[:min_len], n_features=actual_nf)
+                print(f'MAE={metrics["MAE"]:.2f}  ({elapsed:.2f}s)')
+                all_rows.append(
+                    {
+                        'region': region,
+                        'variant': vname,
+                        **metrics,
+                        'time': elapsed,
+                        'n_features': actual_nf,
+                    }
+                )
                 all_preds[(region, vname)] = preds
             except Exception as e:
-                print(f"FAILED: {e}")
+                print(f'FAILED: {e}')
                 import traceback
+
                 traceback.print_exc()
 
     if not all_rows:
-        print("\nERROR: No results collected")
+        print('\nERROR: No results collected')
         sys.exit(1)
 
     results_df = pd.DataFrame(all_rows)
 
     # ── Results table ────────────────────────────────────────────────────
-    print("\n" + "=" * 70)
-    print("  RESULTS (averaged across regions)")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('  RESULTS (averaged across regions)')
+    print('=' * 70)
 
     avg = results_df.groupby('variant')[['MAE', 'RMSE', 'R2', 'n_features']].mean()
     avg = avg.sort_values('MAE')
-    print(f"\n{'Variant':<20} {'MAE':>8} {'RMSE':>8} {'R²':>8} {'#Feat':>6}")
-    print("-" * 54)
+    print(f'\n{"Variant":<20} {"MAE":>8} {"RMSE":>8} {"R²":>8} {"#Feat":>6}')
+    print('-' * 54)
     for vname, row in avg.iterrows():
-        print(f"{vname:<20} {row['MAE']:>8.2f} {row['RMSE']:>8.2f} {row['R2']:>8.4f} {int(row['n_features']):>6}")
+        print(f'{vname:<20} {row["MAE"]:>8.2f} {row["RMSE"]:>8.2f} {row["R2"]:>8.4f} {int(row["n_features"]):>6}')
 
     baseline_mae = avg.loc['Baseline', 'MAE'] if 'Baseline' in avg.index else 33.0
-    print(f"\nBaseline MAE: {baseline_mae:.2f}")
+    print(f'\nBaseline MAE: {baseline_mae:.2f}')
     best_name = avg.index[0]
     best_mae = avg.iloc[0]['MAE']
     if best_mae < baseline_mae:
-        print(f"BEST: {best_name} with MAE {best_mae:.2f} (Δ = {best_mae - baseline_mae:+.2f})")
+        print(f'BEST: {best_name} with MAE {best_mae:.2f} (Δ = {best_mae - baseline_mae:+.2f})')
     else:
-        print(f"No variant beat the baseline.")
+        print(f'No variant beat the baseline.')
 
     # ── Plots ────────────────────────────────────────────────────────────
-    print("\nGenerating plots...")
+    print('\nGenerating plots...')
     plot_comparison(results_df)
     plot_predictions(results_df, test_dfs, all_preds)
 
     # ── Append to comparison_report.md ───────────────────────────────────
     report_path = DOCS_DIR / 'comparison_report.md'
-    section = "\n\n## Preprocessing Experiment\n\n"
-    section += "Can smarter feature engineering or target preprocessing beat Direct-Ridge MAE 32.99?\n\n"
-    section += "All variants use Ridge regression with full-backfill training, same train/test split.\n\n"
-    section += f"| Variant | MAE | RMSE | R² | #Features |\n"
-    section += f"|---------|-----|------|----|-----------|\n"
+    section = '\n\n## Preprocessing Experiment\n\n'
+    section += 'Can smarter feature engineering or target preprocessing beat Direct-Ridge MAE 32.99?\n\n'
+    section += 'All variants use Ridge regression with full-backfill training, same train/test split.\n\n'
+    section += f'| Variant | MAE | RMSE | R² | #Features |\n'
+    section += f'|---------|-----|------|----|-----------|\n'
     for vname, row in avg.iterrows():
         delta = row['MAE'] - baseline_mae
-        section += f"| {vname} | {row['MAE']:.2f} | {row['RMSE']:.2f} | {row['R2']:.4f} | {int(row['n_features'])} |\n"
+        section += f'| {vname} | {row["MAE"]:.2f} | {row["RMSE"]:.2f} | {row["R2"]:.4f} | {int(row["n_features"])} |\n'
 
-    section += f"\nBaseline Direct-Ridge MAE: {baseline_mae:.2f}\n"
+    section += f'\nBaseline Direct-Ridge MAE: {baseline_mae:.2f}\n'
     if best_mae < baseline_mae:
-        section += f"Best variant: **{best_name}** with MAE {best_mae:.2f} (Δ = {best_mae - baseline_mae:+.2f})\n"
+        section += f'Best variant: **{best_name}** with MAE {best_mae:.2f} (Δ = {best_mae - baseline_mae:+.2f})\n'
     else:
-        section += "No variant beat the baseline.\n"
+        section += 'No variant beat the baseline.\n'
 
-    section += "\n![Preprocessing Comparison](benchmark_preprocessing_comparison.png)\n"
-    section += "![Preprocessing Predictions](benchmark_preprocessing_predictions.png)\n"
+    section += '\n![Preprocessing Comparison](benchmark_preprocessing_comparison.png)\n'
+    section += '![Preprocessing Predictions](benchmark_preprocessing_predictions.png)\n'
 
     if report_path.exists():
         existing = report_path.read_text()
         # Remove existing section if re-running
-        marker = "## Preprocessing Experiment"
+        marker = '## Preprocessing Experiment'
         if marker in existing:
-            existing = existing[:existing.index(marker)].rstrip()
+            existing = existing[: existing.index(marker)].rstrip()
         report_path.write_text(existing + section)
     else:
-        report_path.write_text("# Comparison Report\n" + section)
+        report_path.write_text('# Comparison Report\n' + section)
 
-    print(f"\nAppended results to {report_path}")
-    print("\nDone!")
+    print(f'\nAppended results to {report_path}')
+    print('\nDone!')
 
 
 if __name__ == '__main__':

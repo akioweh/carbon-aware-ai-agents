@@ -4,8 +4,9 @@ Usage: PREDICTION_INTERVAL=30 PREDICTION_CACHE_TTL=45 python3 app.py
        Then in another terminal: python3 test_concurrency.py
 """
 
-import time
 import concurrent.futures
+import time
+
 import requests
 
 BASE = 'http://127.0.0.1:5001'
@@ -82,7 +83,7 @@ def main():
     if slow:
         print(f'\n  {len(slow)} requests took >3s. Scheduler would likely timeout.')
     else:
-        print(f'\n  All requests under 3s. Looks good.')
+        print('\n  All requests under 3s. Looks good.')
 
 
 if __name__ == '__main__':
