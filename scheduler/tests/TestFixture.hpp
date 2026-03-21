@@ -22,9 +22,6 @@ struct SchedulerGlobalFixture {
         // Register Exception Handler
         scheduler::exceptions::registerExceptionHandler();
 
-        // Seed some active datacenters in the stats API
-        seedActiveDatacenters();
-
         // Start the app in a thread
         t = std::jthread([]() -> void { drogon::app().run(); });
 
@@ -37,6 +34,9 @@ struct SchedulerGlobalFixture {
             }
             std::this_thread::sleep_for(10ms);
         }
+
+        // Seed some active datacenters in the stats API
+        seedActiveDatacenters();
     }
 
     ~SchedulerGlobalFixture() { drogon::app().quit(); }
