@@ -31,7 +31,6 @@ BOOST_AUTO_TEST_CASE(test_when_all_variadic_success) {
 
 BOOST_AUTO_TEST_CASE(test_when_all_mixed_types_with_void) {
     drogon::sync_wait([]() -> drogon::Task<void> {
-        // void tasks should result in std::monostate in the tuple[cite: 7]
         auto [val, empty] = co_await when_all(successTask(100), voidTask());
         BOOST_CHECK_EQUAL(val, 100);
         static_assert(std::is_same_v<decltype(empty), std::monostate>);
@@ -42,7 +41,6 @@ BOOST_AUTO_TEST_CASE(test_when_all_mixed_types_with_void) {
 
 BOOST_AUTO_TEST_CASE(test_when_all_exception_propagation) {
     drogon::sync_wait([]() -> drogon::Task<void> {
-        // By default, when_all should rethrow the captured exception[cite: 7]
         BOOST_CHECK_THROW(co_await when_all(successTask(1), failingTask()),
                           std::runtime_error);
     }());
@@ -50,7 +48,6 @@ BOOST_AUTO_TEST_CASE(test_when_all_exception_propagation) {
 
 BOOST_AUTO_TEST_CASE(test_when_all_return_exceptions_flag) {
     drogon::sync_wait([]() -> drogon::Task<void> {
-        // With return_exceptions = true, we get std::expected objects[cite: 7]
         auto [res1, res2] = co_await scheduler::coro::when_all<true>(
             successTask(1), failingTask());
 
