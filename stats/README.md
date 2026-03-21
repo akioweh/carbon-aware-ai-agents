@@ -57,6 +57,14 @@ as per the endpoints every time `app` is ran.
 The project uses `pytest`.  
 `schemathesis` is used for property-based API testing.
 
+Run all tests:
+
+```bash
+uv run pytest tests
+```
+
+Run a specific test suite:
+
 ```bash
 uv run pytest tests/<test_name>.py
 ```
