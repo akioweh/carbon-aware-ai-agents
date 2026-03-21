@@ -1,9 +1,7 @@
 """Tests for the prediction orchestrator — upsampling, time windows, stitching."""
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
 from predictors.orchestrator import (

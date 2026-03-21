@@ -1,7 +1,6 @@
 """Tests for the load predictor."""
 
 import pandas as pd
-import pytest
 
 from predictors.load import get_next_week_load
 
