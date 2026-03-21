@@ -2,6 +2,7 @@
 
 #include "Scheduler.hpp"
 #include "SchedulingQueue.hpp"
+#include "TestFixture.hpp"
 #include "exceptions/ExceptionHandler.hpp"
 #include "utils/Coro.hpp"
 #include <boost/test/tools/old/interface.hpp>
@@ -17,38 +18,6 @@
 #include <vector>
 
 using namespace scheduler::coro;
-
-struct SchedulerGlobalFixture {
-    SchedulerGlobalFixture() {
-        // Ensure clean state
-        if (std::filesystem::exists("scheduler_test.db")) {
-            std::filesystem::remove("scheduler_test.db");
-        }
-
-        // Load test config
-        drogon::app().loadConfigFile("config.test.json");
-
-        // Register Exception Handler
-        scheduler::exceptions::registerExceptionHandler();
-
-        // Start the app in a thread
-        t = std::jthread([]() -> void { drogon::app().run(); });
-
-        // Wait for server to start
-        using namespace std::chrono_literals;
-        auto start = std::chrono::steady_clock::now();
-        while (!drogon::app().isRunning()) {
-            if (std::chrono::steady_clock::now() - start > 10s) {
-                throw std::runtime_error("Timeout waiting for Drogon to start");
-            }
-            std::this_thread::sleep_for(10ms);
-        }
-    }
-
-    ~SchedulerGlobalFixture() { drogon::app().quit(); }
-
-    std::jthread t;
-};
 
 BOOST_TEST_GLOBAL_FIXTURE(SchedulerGlobalFixture);
 

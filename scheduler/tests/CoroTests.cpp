@@ -1,56 +1,21 @@
 #define BOOST_TEST_MODULE CoroTest
 
-#include "exceptions/ExceptionHandler.hpp"
+#include "TestFixture.hpp"
 #include "utils/Coro.hpp"
 #include <boost/test/unit_test.hpp>
-#include <chrono>
 #include <drogon/HttpController.h>
 #include <drogon/drogon.h>
 #include <drogon/utils/coroutine.h>
-#include <filesystem>
 #include <ranges>
-#include <thread>
 
 using namespace scheduler::coro;
 
-drogon::Task<int> successTask(int val) { co_return val; }
-drogon::Task<void> voidTask() { co_return; }
-drogon::Task<int> failingTask() {
+auto successTask(int val) -> drogon::Task<int> { co_return val; }
+auto voidTask() -> drogon::Task<void> { co_return; }
+auto failingTask() -> drogon::Task<int> {
     throw std::runtime_error("Task Failed");
     co_return 0;
 }
-
-struct SchedulerGlobalFixture {
-    SchedulerGlobalFixture() {
-        // Ensure clean state
-        if (std::filesystem::exists("scheduler_test.db")) {
-            std::filesystem::remove("scheduler_test.db");
-        }
-
-        // Load test config
-        drogon::app().loadConfigFile("config.test.json");
-
-        // Register Exception Handler
-        scheduler::exceptions::registerExceptionHandler();
-
-        // Start the app in a thread
-        t = std::jthread([]() -> void { drogon::app().run(); });
-
-        // Wait for server to start
-        using namespace std::chrono_literals;
-        auto start = std::chrono::steady_clock::now();
-        while (!drogon::app().isRunning()) {
-            if (std::chrono::steady_clock::now() - start > 10s) {
-                throw std::runtime_error("Timeout waiting for Drogon to start");
-            }
-            std::this_thread::sleep_for(10ms);
-        }
-    }
-
-    ~SchedulerGlobalFixture() { drogon::app().quit(); }
-
-    std::jthread t;
-};
 
 BOOST_TEST_GLOBAL_FIXTURE(SchedulerGlobalFixture);
 
