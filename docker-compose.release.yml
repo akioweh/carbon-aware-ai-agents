@@ -1,4 +1,5 @@
-# use this to run scheduler and ui and use the external stats
+# docker-compose.release.yml
+# Use REPO_OWNER to ose tthe GitHub username/org if you've forked it.
 
 services:
   db:
@@ -12,6 +13,8 @@ services:
       - "${DB_HOST_PORT:-5433}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
+      # Note: init.sql still needs to be present or the schema won't be created.
+      # For a truly standalone run, you might want to bake the schema into a custom DB image.
       - ./scheduler/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d calendar_db"]
@@ -20,9 +23,7 @@ services:
       retries: 5
 
   stats:
-    profiles: ["full"]
-    build:
-      context: ./stats
+    image: ghcr.io/${REPO_OWNER:-akioweh}/carbon-aware-ai-agents/stats:latest
     container_name: stats
     environment:
       - STATS_PORT=5000
@@ -31,8 +32,7 @@ services:
       - "${STATS_HOST_PORT:-5000}:5000"
 
   scheduler:
-    build:
-      context: ./scheduler
+    image: ghcr.io/${REPO_OWNER:-akioweh}/carbon-aware-ai-agents/scheduler:latest
     container_name: scheduler
     environment:
       - PORT=6969
@@ -41,24 +41,26 @@ services:
       - PGDATABASE=calendar_db
       - PGUSER=postgres
       - PGPASSWORD=123
-      - STATS_API_URL=${STATS_API_URL:-http://140.238.79.139:5000}
+      - STATS_API_URL=${STATS_API_URL:-http://stats:5000}
     ports:
       - "${SCHEDULER_HOST_PORT:-6970}:6969"
     depends_on:
       db:
         condition: service_healthy
+      stats:
+        condition: service_started
 
   ui:
-    build:
-      context: ./ui/workload-scheduling-app
+    image: ghcr.io/${REPO_OWNER:-akioweh}/carbon-aware-ai-agents/ui:latest
     container_name: ui
     environment:
       - SCHEDULER_API_URL=http://scheduler:6969
-      - STATS_API_URL=${STATS_API_URL:-http://140.238.79.139:5000}
+      - STATS_API_URL=${STATS_API_URL:-http://stats:5000}
     ports:
       - "${UI_HOST_PORT:-8080}:3000"
     depends_on:
       - scheduler
+      - stats
 
 volumes:
   db-data:
