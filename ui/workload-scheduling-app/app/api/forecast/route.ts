@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-
-const FORECAST_URL = "http://localhost:6969/api/forecast"
+import { SCHEDULER_API_URL } from "@/app/api/apiConfig"
 
 export async function GET(request: NextRequest) {
     try {
-        const url = new URL(FORECAST_URL)
+        const url = new URL(`${SCHEDULER_API_URL}/api/forecast`)
         request.nextUrl.searchParams.forEach((value, key) => {
             url.searchParams.set(key, value)
         })
