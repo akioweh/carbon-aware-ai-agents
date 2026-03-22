@@ -66,6 +66,18 @@ resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
   location: location
   properties: {
     zoneRedundant: false
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+      {
+        name: 'dedicated-d4'
+        workloadProfileType: 'D4'
+        minimumCount: 1
+        maximumCount: 1
+      }
+    ]
   }
 }
 
@@ -75,6 +87,7 @@ resource schedulerApp 'Microsoft.App/containerApps@2023-05-01' = {
   location: location
   properties: {
     managedEnvironmentId: containerAppEnv.id
+    workloadProfileName: 'dedicated-d4'
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
