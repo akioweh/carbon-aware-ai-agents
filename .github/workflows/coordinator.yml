@@ -1,0 +1,41 @@
+name: Main Deployment Coordinator
+
+on:
+  push:
+    branches: [main, ci/deploy]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      infra: ${{ steps.filter.outputs.infra }}
+      apps: ${{ steps.filter.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            infra:
+              - 'infra/**'
+            apps:
+              - 'scheduler/**'
+              - 'ui/**'
+              - 'stats/**'
+
+  deploy-infra:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.infra == 'true' }}
+    uses: ./.github/workflows/deploy-infra.yml
+    secrets: inherit
+
+  deploy-apps:
+    needs: [detect-changes, deploy-infra]
+    if: ${{ always() && needs.detect-changes.outputs.apps == 'true' && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') }}
+    uses: ./.github/workflows/deploy-apps.yml
+    secrets: inherit

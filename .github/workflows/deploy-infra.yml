@@ -1,21 +1,12 @@
 name: Deploy Infrastructure
 
 on:
-  push:
-    branches: [main, ci/deploy]
-    paths:
-      - "infra/**"
-      - ".github/workflows/deploy-infra.yml"
-  workflow_dispatch:
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   deploy-infra:
