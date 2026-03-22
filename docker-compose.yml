@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: calendar-db
+    environment:
+      POSTGRES_DB: calendar_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+    ports:
+      - "${DB_HOST_PORT:-5433}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./scheduler/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d calendar_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  scheduler:
+    build:
+      context: ./scheduler
+    container_name: scheduler
+    environment:
+      - PORT=6969
+      - PGHOST=db
+      - PGPORT=5432
+      - PGDATABASE=calendar_db
+      - PGUSER=postgres
+      - PGPASSWORD=123
+      - STATS_API_URL=http://140.238.79.139:5000
+    ports:
+      - "${SCHEDULER_HOST_PORT:-6970}:6969"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ui:
+    build:
+      context: ./ui/workload-scheduling-app
+    container_name: ui
+    environment:
+      - SCHEDULER_API_URL=http://scheduler:6969
+      - STATS_API_URL=http://140.238.79.139:5000
+    ports:
+      - "${UI_HOST_PORT:-8080}:3000"
+    depends_on:
+      - scheduler
+
+volumes:
+  db-data:
