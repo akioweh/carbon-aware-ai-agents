@@ -27,22 +27,28 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter
 import numpy as np
 import pandas as pd
+from matplotlib.dates import DateFormatter
 
 warnings.filterwarnings('ignore')
 
 from benchmark import (
-    DB_PATH, TEST_DAYS, WEATHER_FEATURES,
-    load_data, fetch_weather_data,
+    DB_PATH,
+    TEST_DAYS,
+    WEATHER_FEATURES,
     compute_metrics,
+    fetch_weather_data,
+    load_data,
 )
 from benchmark_enhanced_features import (
-    SPARSE_LAGS, ROLLING_CONFIGS,
-    build_enhanced_cyclical, build_enhanced_lag_features,
+    ROLLING_CONFIGS,
+    SPARSE_LAGS,
+    build_enhanced_cyclical,
+    build_enhanced_lag_features,
 )
 from benchmark_residual import build_residual_training_data
 
@@ -54,10 +60,10 @@ MODELS = ['Random Forest', 'XGBoost', 'CatBoost', 'LightGBM', 'Direct-XGBoost']
 
 # Best variant per model from prior experiments
 BEST_VARIANTS = {
-    'Random Forest':  'residual',
-    'XGBoost':        'enhanced',
-    'CatBoost':       'residual',
-    'LightGBM':       'enhanced',
+    'Random Forest': 'residual',
+    'XGBoost': 'enhanced',
+    'CatBoost': 'residual',
+    'LightGBM': 'enhanced',
     'Direct-XGBoost': 'baseline',  # uses enhanced features, no residual target
 }
 
@@ -66,13 +72,14 @@ SEASONAL_LAGS = SPARSE_LAGS + [672, 1344]
 
 # Extended rolling configs: original + 2-week and 4-week windows
 SEASONAL_ROLLING_CONFIGS = ROLLING_CONFIGS + [
-    (672, 'mean'),    # 2 weeks
-    (672, 'std'),     # 2 weeks std
-    (1344, 'mean'),   # 4 weeks
+    (672, 'mean'),  # 2 weeks
+    (672, 'std'),  # 2 weeks std
+    (1344, 'mean'),  # 4 weeks
 ]
 
 
 # ── Seasonal Feature Engineering ─────────────────────────────────────────
+
 
 def build_seasonal_cyclical(timestamps: pd.Series) -> pd.DataFrame:
     """Build 11 cyclical features: hour, dow, week, month, day-of-year, daylight proxy."""
@@ -83,19 +90,21 @@ def build_seasonal_cyclical(timestamps: pd.Series) -> pd.DataFrame:
     month = ts.dt.month.astype(float)
     doy = ts.dt.dayofyear.astype(float)
 
-    return pd.DataFrame({
-        'hour_sin': np.sin(2 * np.pi * hour / 24),
-        'hour_cos': np.cos(2 * np.pi * hour / 24),
-        'dow_sin':  np.sin(2 * np.pi * dow / 7),
-        'dow_cos':  np.cos(2 * np.pi * dow / 7),
-        'week_sin': np.sin(2 * np.pi * week_of_year / 52),
-        'week_cos': np.cos(2 * np.pi * week_of_year / 52),
-        'month_sin': np.sin(2 * np.pi * month / 12),
-        'month_cos': np.cos(2 * np.pi * month / 12),
-        'doy_sin': np.sin(2 * np.pi * doy / 365.25),
-        'doy_cos': np.cos(2 * np.pi * doy / 365.25),
-        'daylight_proxy': np.sin((doy - 80) * 2 * np.pi / 365.25),
-    })
+    return pd.DataFrame(
+        {
+            'hour_sin': np.sin(2 * np.pi * hour / 24),
+            'hour_cos': np.cos(2 * np.pi * hour / 24),
+            'dow_sin': np.sin(2 * np.pi * dow / 7),
+            'dow_cos': np.cos(2 * np.pi * dow / 7),
+            'week_sin': np.sin(2 * np.pi * week_of_year / 52),
+            'week_cos': np.cos(2 * np.pi * week_of_year / 52),
+            'month_sin': np.sin(2 * np.pi * month / 12),
+            'month_cos': np.cos(2 * np.pi * month / 12),
+            'doy_sin': np.sin(2 * np.pi * doy / 365.25),
+            'doy_cos': np.cos(2 * np.pi * doy / 365.25),
+            'daylight_proxy': np.sin((doy - 80) * 2 * np.pi / 365.25),
+        }
+    )
 
 
 def build_seasonal_lag_features(series: np.ndarray) -> pd.DataFrame:
@@ -122,9 +131,10 @@ def build_seasonal_ml_features(timestamps: pd.Series, values: np.ndarray) -> pd.
 
 # ── Recursive Forecast (Seasonal, unified) ───────────────────────────────
 
-def recursive_forecast_seasonal(model, train_ts, train_y, test_ts, test_y_actual,
-                                train_exog=None, test_exog=None,
-                                use_residual_target=False):
+
+def recursive_forecast_seasonal(
+    model, train_ts, train_y, test_ts, test_y_actual, train_exog=None, test_exog=None, use_residual_target=False
+):
     """Recursive multi-step forecast with seasonal features.
 
     If use_residual_target=True: trains on y - lag_1, reconstructs raw.
@@ -187,7 +197,7 @@ def recursive_forecast_seasonal(model, train_ts, train_y, test_ts, test_y_actual
         lag_df = pd.DataFrame([lag_feats])
         x_step = pd.concat([cyclical.reset_index(drop=True), lag_df.reset_index(drop=True)], axis=1)
         if has_exog:
-            x_step = np.column_stack([x_step.values, test_exog[t:t+1]])
+            x_step = np.column_stack([x_step.values, test_exog[t : t + 1]])
         else:
             x_step = x_step.values
 
@@ -207,9 +217,10 @@ def recursive_forecast_seasonal(model, train_ts, train_y, test_ts, test_y_actual
 
 # ── Direct Forecast (Seasonal, unified) ──────────────────────────────────
 
-def build_direct_features_seasonal(train_ts, train_y, test_ts,
-                                   train_exog=None, test_exog=None,
-                                   use_residual_target=False):
+
+def build_direct_features_seasonal(
+    train_ts, train_y, test_ts, train_exog=None, test_exog=None, use_residual_target=False
+):
     """Direct features with seasonal cyclical + extended origin summary."""
     n_test = len(test_ts)
     n_train = len(train_y)
@@ -229,8 +240,8 @@ def build_direct_features_seasonal(train_ts, train_y, test_ts,
     origin_std_336 = np.zeros(n_train)
 
     for t in range(min_history, n_train):
-        recent_48 = train_y[max(0, t - 47):t + 1]
-        recent_336 = train_y[max(0, t - 335):t + 1]
+        recent_48 = train_y[max(0, t - 47) : t + 1]
+        recent_336 = train_y[max(0, t - 335) : t + 1]
         origin_last[t] = train_y[t]
         origin_mean_48[t] = np.mean(recent_48)
         origin_std_48[t] = np.std(recent_48) if len(recent_48) > 1 else 0
@@ -248,12 +259,18 @@ def build_direct_features_seasonal(train_ts, train_y, test_ts,
         targets = origins + h
         cyc = all_cyc[targets]
         h_col = np.full((len(origins), 1), h / 336.0)
-        h2_col = h_col ** 2
-        of = np.column_stack([
-            origin_last[origins], origin_mean_48[origins], origin_std_48[origins],
-            origin_lag_48[origins], origin_lag_336[origins],
-            origin_mean_336[origins], origin_std_336[origins],
-        ])
+        h2_col = h_col**2
+        of = np.column_stack(
+            [
+                origin_last[origins],
+                origin_mean_48[origins],
+                origin_std_48[origins],
+                origin_lag_48[origins],
+                origin_lag_336[origins],
+                origin_mean_336[origins],
+                origin_std_336[origins],
+            ]
+        )
         x = np.column_stack([cyc, h_col, h2_col, of])
         if has_exog:
             x = np.column_stack([x, train_exog[targets]])
@@ -270,16 +287,22 @@ def build_direct_features_seasonal(train_ts, train_y, test_ts,
     test_cyc = build_seasonal_cyclical(test_ts).values
     recent_48 = train_y[-48:]
     recent_336 = train_y[-336:] if len(train_y) >= 336 else train_y
-    of_test = np.array([[
-        train_y[-1],
-        np.mean(recent_48), np.std(recent_48),
-        train_y[-48] if len(train_y) >= 48 else train_y[0],
-        train_y[-336] if len(train_y) >= 336 else train_y[0],
-        np.mean(recent_336), np.std(recent_336),
-    ]])
+    of_test = np.array(
+        [
+            [
+                train_y[-1],
+                np.mean(recent_48),
+                np.std(recent_48),
+                train_y[-48] if len(train_y) >= 48 else train_y[0],
+                train_y[-336] if len(train_y) >= 336 else train_y[0],
+                np.mean(recent_336),
+                np.std(recent_336),
+            ]
+        ]
+    )
     of_test = np.tile(of_test, (n_test, 1))
     h_vals = np.arange(1, n_test + 1).reshape(-1, 1) / 336.0
-    X_test = np.column_stack([test_cyc, h_vals, h_vals ** 2, of_test])
+    X_test = np.column_stack([test_cyc, h_vals, h_vals**2, of_test])
     if has_exog:
         X_test = np.column_stack([X_test, test_exog])
 
@@ -288,6 +311,7 @@ def build_direct_features_seasonal(train_ts, train_y, test_ts,
 
 # ── Model Runners ────────────────────────────────────────────────────────
 
+
 def _get_model_params(model_name, tuned_params=None):
     """Get model hyperparameters, using tuned params if available."""
     if tuned_params and model_name in tuned_params:
@@ -295,14 +319,12 @@ def _get_model_params(model_name, tuned_params=None):
     # Defaults
     defaults = {
         'Random Forest': dict(n_estimators=200, max_depth=15, random_state=42, n_jobs=-1),
-        'XGBoost': dict(n_estimators=200, max_depth=6, learning_rate=0.1,
-                        random_state=42, verbosity=0, n_jobs=-1),
-        'CatBoost': dict(iterations=200, depth=6, learning_rate=0.1,
-                         random_seed=42, verbose=0),
-        'LightGBM': dict(n_estimators=200, max_depth=6, learning_rate=0.1,
-                         random_state=42, verbose=-1, n_jobs=-1),
-        'Direct-XGBoost': dict(n_estimators=200, max_depth=6, learning_rate=0.1,
-                               random_state=42, verbosity=0, n_jobs=-1),
+        'XGBoost': dict(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1),
+        'CatBoost': dict(iterations=200, depth=6, learning_rate=0.1, random_seed=42, verbose=0),
+        'LightGBM': dict(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbose=-1, n_jobs=-1),
+        'Direct-XGBoost': dict(
+            n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1
+        ),
     }
     return defaults[model_name]
 
@@ -311,22 +333,27 @@ def _create_model(model_name, params):
     """Create a model instance from name and params."""
     if model_name == 'Random Forest':
         from sklearn.ensemble import RandomForestRegressor
+
         return RandomForestRegressor(**params)
     elif model_name in ('XGBoost', 'Direct-XGBoost'):
         from xgboost import XGBRegressor
+
         return XGBRegressor(**params)
     elif model_name == 'CatBoost':
         from catboost import CatBoostRegressor
+
         return CatBoostRegressor(**params)
     elif model_name == 'LightGBM':
         import lightgbm as lgb
+
         return lgb.LGBMRegressor(**params)
     else:
-        raise ValueError(f"Unknown model: {model_name}")
+        raise ValueError(f'Unknown model: {model_name}')
 
 
-def train_predict_seasonal(model_name, train_ts, train_y, test_ts, test_y=None,
-                           train_exog=None, test_exog=None, tuned_params=None):
+def train_predict_seasonal(
+    model_name, train_ts, train_y, test_ts, test_y=None, train_exog=None, test_exog=None, tuned_params=None
+):
     """Unified train/predict using the best variant for each model."""
     t0 = time.time()
     variant = BEST_VARIANTS[model_name]
@@ -334,10 +361,13 @@ def train_predict_seasonal(model_name, train_ts, train_y, test_ts, test_y=None,
 
     if model_name == 'Direct-XGBoost':
         # Direct variant (baseline uses enhanced features, no residual)
-        use_residual = (variant == 'residual')
+        use_residual = variant == 'residual'
         X, y, X_test = build_direct_features_seasonal(
-            train_ts, train_y, test_ts,
-            train_exog=train_exog, test_exog=test_exog,
+            train_ts,
+            train_y,
+            test_ts,
+            train_exog=train_exog,
+            test_exog=test_exog,
             use_residual_target=use_residual,
         )
         max_samples = 500_000
@@ -354,13 +384,18 @@ def train_predict_seasonal(model_name, train_ts, train_y, test_ts, test_y=None,
         return np.clip(preds, 0, 500), time.time() - t0
     else:
         # Recursive variant
-        use_residual = (variant == 'residual')
+        use_residual = variant == 'residual'
         model = _create_model(model_name, params)
         if test_y is None:
             test_y = np.zeros(len(test_ts))
         preds = recursive_forecast_seasonal(
-            model, train_ts, train_y, test_ts, test_y,
-            train_exog=train_exog, test_exog=test_exog,
+            model,
+            train_ts,
+            train_y,
+            test_ts,
+            test_y,
+            train_exog=train_exog,
+            test_exog=test_exog,
             use_residual_target=use_residual,
         )
         return preds, time.time() - t0
@@ -369,7 +404,7 @@ def train_predict_seasonal(model_name, train_ts, train_y, test_ts, test_y=None,
 # ── Feature count for compute_metrics ────────────────────────────────────
 
 N_FEATURES = {
-    'Random Forest': 43,   # 11 cyclical + 21 lags + 8 rolling + 3 weather
+    'Random Forest': 43,  # 11 cyclical + 21 lags + 8 rolling + 3 weather
     'XGBoost': 43,
     'CatBoost': 43,
     'LightGBM': 43,
@@ -379,12 +414,13 @@ N_FEATURES = {
 
 # ── Hyperparameter Tuning ────────────────────────────────────────────────
 
+
 def tune_model(model_name, train_ts, train_y, train_exog=None):
     """TimeSeriesSplit CV tuning with small grid. Returns best params dict."""
     from sklearn.model_selection import TimeSeriesSplit
 
     variant = BEST_VARIANTS[model_name]
-    use_residual = (variant == 'residual')
+    use_residual = variant == 'residual'
 
     # Build features once
     features = build_seasonal_ml_features(train_ts, train_y)
@@ -404,9 +440,7 @@ def tune_model(model_name, train_ts, train_y, train_exog=None):
     # Define parameter grids
     if model_name == 'Random Forest':
         param_grid = [
-            dict(n_estimators=n, max_depth=d, random_state=42, n_jobs=-1)
-            for n in [100, 200, 300]
-            for d in [10, 15, 20]
+            dict(n_estimators=n, max_depth=d, random_state=42, n_jobs=-1) for n in [100, 200, 300] for d in [10, 15, 20]
         ]
     elif model_name == 'CatBoost':
         param_grid = [
@@ -419,16 +453,14 @@ def tune_model(model_name, train_ts, train_y, train_exog=None):
         # XGBoost, LightGBM, Direct-XGBoost
         if model_name == 'LightGBM':
             param_grid = [
-                dict(n_estimators=n, max_depth=d, learning_rate=lr,
-                     random_state=42, verbose=-1, n_jobs=-1)
+                dict(n_estimators=n, max_depth=d, learning_rate=lr, random_state=42, verbose=-1, n_jobs=-1)
                 for n in [100, 200, 300]
                 for d in [4, 6, 8]
                 for lr in [0.05, 0.1]
             ]
         else:
             param_grid = [
-                dict(n_estimators=n, max_depth=d, learning_rate=lr,
-                     random_state=42, verbosity=0, n_jobs=-1)
+                dict(n_estimators=n, max_depth=d, learning_rate=lr, random_state=42, verbosity=0, n_jobs=-1)
                 for n in [100, 200, 300]
                 for d in [4, 6, 8]
                 for lr in [0.05, 0.1]
@@ -438,7 +470,7 @@ def tune_model(model_name, train_ts, train_y, train_exog=None):
     best_mae = float('inf')
     best_params = param_grid[0]
 
-    print(f"      Tuning {model_name} ({len(param_grid)} configs)...", end=' ', flush=True)
+    print(f'      Tuning {model_name} ({len(param_grid)} configs)...', end=' ', flush=True)
     t0 = time.time()
 
     for params in param_grid:
@@ -454,11 +486,12 @@ def tune_model(model_name, train_ts, train_y, train_exog=None):
             best_params = params
 
     elapsed = time.time() - t0
-    print(f"best MAE={best_mae:.2f} ({elapsed:.1f}s)")
+    print(f'best MAE={best_mae:.2f} ({elapsed:.1f}s)')
     return best_params
 
 
 # ── Training Window Logic ────────────────────────────────────────────────
+
 
 def get_training_windows(df_region, split_date, requested_windows):
     """Return list of (window_name, train_df) for the requested windows."""
@@ -483,6 +516,7 @@ def get_training_windows(df_region, split_date, requested_windows):
 
 # ── Visualization ────────────────────────────────────────────────────────
 
+
 def generate_comparison_chart(results_by_window, output_path):
     """MAE bar chart per training window."""
     window_names = list(results_by_window.keys())
@@ -502,8 +536,7 @@ def generate_comparison_chart(results_by_window, output_path):
         for bar in bars:
             h = bar.get_height()
             if h > 0:
-                ax.text(bar.get_x() + bar.get_width() / 2, h + 0.3,
-                        f'{h:.1f}', ha='center', va='bottom', fontsize=7)
+                ax.text(bar.get_x() + bar.get_width() / 2, h + 0.3, f'{h:.1f}', ha='center', va='bottom', fontsize=7)
 
     ax.set_xlabel('Model')
     ax.set_ylabel('MAE (gCO2/kWh)')
@@ -514,7 +547,7 @@ def generate_comparison_chart(results_by_window, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
@@ -524,8 +557,7 @@ def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
 
     colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']
     for (name, preds), color in zip(all_preds.items(), colors):
-        ax.plot(test_ts[:len(preds)], preds, '-', color=color, linewidth=1,
-                label=name, alpha=0.7)
+        ax.plot(test_ts[: len(preds)], preds, '-', color=color, linewidth=1, label=name, alpha=0.7)
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Carbon Intensity (gCO2/kWh)')
@@ -535,7 +567,7 @@ def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_importance_chart(importance_dicts, output_path):
@@ -562,14 +594,13 @@ def generate_importance_chart(importance_dicts, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
-def extract_feature_importance(model_name, train_ts, train_y, train_exog=None,
-                               tuned_params=None):
+def extract_feature_importance(model_name, train_ts, train_y, train_exog=None, tuned_params=None):
     """Train model and return feature importances."""
     variant = BEST_VARIANTS[model_name]
-    use_residual = (variant == 'residual')
+    use_residual = variant == 'residual'
     params = _get_model_params(model_name, tuned_params)
 
     train_features = build_seasonal_ml_features(train_ts, train_y)
@@ -596,6 +627,7 @@ def extract_feature_importance(model_name, train_ts, train_y, train_exog=None,
 
 
 # ── Report Generation ────────────────────────────────────────────────────
+
 
 def generate_report(all_results, output_path):
     """Generate markdown comparison report."""
@@ -639,12 +671,8 @@ def generate_report(all_results, output_path):
     for window_name in sorted(all_windows):
         lines.append(f'### {window_name}')
         lines.append('')
-        lines.append('| Model | Variant | ' +
-                     ' | '.join(sorted(all_results.keys())) +
-                     ' | Cross-Region Avg |')
-        lines.append('|-------|---------|' +
-                     '|'.join(['-------'] * len(all_results)) +
-                     '|----------------|')
+        lines.append('| Model | Variant | ' + ' | '.join(sorted(all_results.keys())) + ' | Cross-Region Avg |')
+        lines.append('|-------|---------|' + '|'.join(['-------'] * len(all_results)) + '|----------------|')
 
         for model_name in MODELS:
             variant = BEST_VARIANTS[model_name]
@@ -703,22 +731,27 @@ def generate_report(all_results, output_path):
     lines.append('')
 
     output_path.write_text('\n'.join(lines))
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Seasonal Data Expansion Benchmark')
-    parser.add_argument('--tune', action='store_true',
-                        help='Run hyperparameter tuning before benchmarking')
-    parser.add_argument('--windows', nargs='+', default=['full_year'],
-                        choices=['full_year', '6_months', '3_months'],
-                        help='Training windows to compare')
+    parser.add_argument('--tune', action='store_true', help='Run hyperparameter tuning before benchmarking')
+    parser.add_argument(
+        '--windows',
+        nargs='+',
+        default=['full_year'],
+        choices=['full_year', '6_months', '3_months'],
+        help='Training windows to compare',
+    )
     return parser.parse_args()
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
+
 
 def main():
     args = parse_args()
@@ -727,39 +760,39 @@ def main():
     df = load_data(DB_PATH)
     regions = sorted(df['region'].unique())
     total_days = (df['ts'].max() - df['ts'].min()).days
-    print(f"Regions: {regions}")
-    print(f"Date range: {df['ts'].min()} -> {df['ts'].max()} ({total_days} days)")
+    print(f'Regions: {regions}')
+    print(f'Date range: {df["ts"].min()} -> {df["ts"].max()} ({total_days} days)')
 
     if total_days < 30:
-        print("ERROR: Not enough data. Run: python3 carbon_collector.py backfill 365")
+        print('ERROR: Not enough data. Run: python3 carbon_collector.py backfill 365')
         sys.exit(1)
 
     # Fetch weather data (may need chunking for long ranges)
     date_min = df['ts'].min().strftime('%Y-%m-%d')
     date_max = df['ts'].max().strftime('%Y-%m-%d')
-    print("\nFetching weather data...")
+    print('\nFetching weather data...')
 
     # Chunk weather requests if range > 90 days to avoid Open-Meteo limits
     date_range_days = (pd.Timestamp(date_max) - pd.Timestamp(date_min)).days
     if date_range_days > 90:
-        print(f"  Date range is {date_range_days} days, fetching weather in 90-day chunks...")
+        print(f'  Date range is {date_range_days} days, fetching weather in 90-day chunks...')
         weather_chunks = []
         chunk_start = pd.Timestamp(date_min)
         chunk_end_final = pd.Timestamp(date_max)
         while chunk_start < chunk_end_final:
             chunk_end = min(chunk_start + pd.Timedelta(days=89), chunk_end_final)
             try:
-                wdf = fetch_weather_data(regions,
-                                         chunk_start.strftime('%Y-%m-%d'),
-                                         chunk_end.strftime('%Y-%m-%d'))
+                wdf = fetch_weather_data(regions, chunk_start.strftime('%Y-%m-%d'), chunk_end.strftime('%Y-%m-%d'))
                 if len(wdf) > 0:
                     weather_chunks.append(wdf)
             except Exception as e:
-                print(f"  WARNING: Weather chunk {chunk_start} to {chunk_end} failed: {e}")
+                print(f'  WARNING: Weather chunk {chunk_start} to {chunk_end} failed: {e}')
             chunk_start = chunk_end + pd.Timedelta(days=1)
         if weather_chunks:
             weather_df = pd.concat(weather_chunks, ignore_index=True)
-            weather_df = weather_df.drop_duplicates(subset=['region', 'ts']).sort_values(['region', 'ts']).reset_index(drop=True)
+            weather_df = (
+                weather_df.drop_duplicates(subset=['region', 'ts']).sort_values(['region', 'ts']).reset_index(drop=True)
+            )
         else:
             weather_df = pd.DataFrame()
     else:
@@ -767,23 +800,23 @@ def main():
 
     has_weather = len(weather_df) > 0
     if has_weather:
-        print(f"Weather data: {len(weather_df)} points")
+        print(f'Weather data: {len(weather_df)} points')
     else:
-        print("WARNING: No weather data -- running without exogenous features")
+        print('WARNING: No weather data -- running without exogenous features')
 
     split_date = df['ts'].max() - pd.Timedelta(days=TEST_DAYS)
 
     # Optional tuning
     tuned_params = None
     if args.tune:
-        print("\n" + "=" * 70)
-        print("HYPERPARAMETER TUNING")
-        print("=" * 70)
+        print('\n' + '=' * 70)
+        print('HYPERPARAMETER TUNING')
+        print('=' * 70)
 
         # Load existing tuned params if available
         if TUNED_PARAMS_PATH.exists():
             tuned_params = json.loads(TUNED_PARAMS_PATH.read_text())
-            print(f"Loaded existing tuned params from {TUNED_PARAMS_PATH}")
+            print(f'Loaded existing tuned params from {TUNED_PARAMS_PATH}')
         else:
             tuned_params = {}
 
@@ -792,7 +825,7 @@ def main():
             rdf = df[df['region'] == region].copy().reset_index(drop=True)
             train = rdf[rdf['ts'] <= split_date].reset_index(drop=True)
             if len(train) >= 2000:
-                print(f"\nTuning on {region} (n={len(train)})...")
+                print(f'\nTuning on {region} (n={len(train)})...')
 
                 # Build weather exog for tuning
                 tune_exog = None
@@ -811,13 +844,12 @@ def main():
                 for model_name in tune_order:
                     if model_name not in tuned_params:
                         try:
-                            best = tune_model(model_name,
-                                              train['ts'].reset_index(drop=True),
-                                              train['actual'].values,
-                                              tune_exog)
+                            best = tune_model(
+                                model_name, train['ts'].reset_index(drop=True), train['actual'].values, tune_exog
+                            )
                             tuned_params[model_name] = best
                         except Exception as e:
-                            print(f"      Tuning {model_name} failed: {e}")
+                            print(f'      Tuning {model_name} failed: {e}')
 
                 break  # only tune on first suitable region
 
@@ -825,11 +857,12 @@ def main():
         # Convert numpy types to Python types for JSON serialization
         serializable = {}
         for k, v in tuned_params.items():
-            serializable[k] = {pk: (int(pv) if isinstance(pv, (np.integer,)) else
-                                    float(pv) if isinstance(pv, (np.floating,)) else pv)
-                               for pk, pv in v.items()}
+            serializable[k] = {
+                pk: (int(pv) if isinstance(pv, (np.integer,)) else float(pv) if isinstance(pv, (np.floating,)) else pv)
+                for pk, pv in v.items()
+            }
         TUNED_PARAMS_PATH.write_text(json.dumps(serializable, indent=2))
-        print(f"\nTuned params saved to {TUNED_PARAMS_PATH}")
+        print(f'\nTuned params saved to {TUNED_PARAMS_PATH}')
 
     # Run models
     all_results = {}
@@ -843,7 +876,7 @@ def main():
         test = rdf[rdf['ts'] > split_date].reset_index(drop=True)
 
         if len(test) == 0:
-            print(f"\n{region}: no test data, skipping")
+            print(f'\n{region}: no test data, skipping')
             continue
 
         all_results[region] = {}
@@ -851,14 +884,14 @@ def main():
 
         windows = get_training_windows(rdf, split_date, args.windows)
         if not windows:
-            print(f"\n{region}: no valid training windows, skipping")
+            print(f'\n{region}: no valid training windows, skipping')
             continue
 
         for window_name, train in windows:
             train_days = (train['ts'].max() - train['ts'].min()).days
-            print(f"\n{'=' * 60}")
-            print(f"  {region} [{window_name}]: train={len(train)} ({train_days}d), test={len(test)}")
-            print(f"{'=' * 60}")
+            print(f'\n{"=" * 60}')
+            print(f'  {region} [{window_name}]: train={len(train)} ({train_days}d), test={len(test)}')
+            print(f'{"=" * 60}')
 
             # Build weather exogenous features
             train_exog = None
@@ -883,13 +916,16 @@ def main():
             results = {}
             for model_name in MODELS:
                 variant = BEST_VARIANTS[model_name]
-                print(f"    {model_name} ({variant})...", end=' ', flush=True)
+                print(f'    {model_name} ({variant})...', end=' ', flush=True)
                 try:
                     preds, elapsed = train_predict_seasonal(
                         model_name,
-                        train_ts=train_ts, train_y=train_y,
-                        test_ts=test_ts, test_y=test_y,
-                        train_exog=train_exog, test_exog=test_exog,
+                        train_ts=train_ts,
+                        train_y=train_y,
+                        test_ts=test_ts,
+                        test_y=test_y,
+                        train_exog=train_exog,
+                        test_exog=test_exog,
                         tuned_params=tuned_params,
                     )
                     if len(preds) != len(test_y):
@@ -899,9 +935,8 @@ def main():
                     else:
                         test_y_eval = test_y
 
-                    metrics = compute_metrics(test_y_eval, preds,
-                                              n_features=N_FEATURES[model_name])
-                    print(f"MAE={metrics['MAE']:.2f}  ({elapsed:.2f}s)")
+                    metrics = compute_metrics(test_y_eval, preds, n_features=N_FEATURES[model_name])
+                    print(f'MAE={metrics["MAE"]:.2f}  ({elapsed:.2f}s)')
                     results[model_name] = {
                         'preds': preds.tolist(),
                         'metrics': metrics,
@@ -916,8 +951,9 @@ def main():
                         last_test_y = test_y
 
                 except Exception as e:
-                    print(f"FAILED: {e}")
+                    print(f'FAILED: {e}')
                     import traceback
+
                     traceback.print_exc()
                     results[model_name] = None
 
@@ -949,7 +985,7 @@ def main():
                     )
                     all_importances[imp_name] = imp
                 except Exception as e:
-                    print(f"    Feature importance for {imp_name} failed: {e}")
+                    print(f'    Feature importance for {imp_name} failed: {e}')
 
     # Save results (strip preds for JSON size)
     save_results = {}
@@ -967,10 +1003,10 @@ def main():
                     }
 
     RESULTS_PATH.write_text(json.dumps(save_results, indent=2))
-    print(f"\nResults saved to {RESULTS_PATH}")
+    print(f'\nResults saved to {RESULTS_PATH}')
 
     # Generate visualizations
-    print("\nGenerating visualizations...")
+    print('\nGenerating visualizations...')
 
     # Comparison chart (cross-region average per window)
     results_by_window = {}
@@ -988,28 +1024,27 @@ def main():
             results_by_window[window_name] = window_maes
 
     if results_by_window:
-        generate_comparison_chart(results_by_window,
-                                  DOCS_DIR / 'benchmark_seasonal_comparison.png')
+        generate_comparison_chart(results_by_window, DOCS_DIR / 'benchmark_seasonal_comparison.png')
 
     if last_test_ts is not None and all_preds_for_plot:
-        generate_predictions_chart(last_test_ts, last_test_y, all_preds_for_plot,
-                                   DOCS_DIR / 'benchmark_seasonal_predictions.png')
+        generate_predictions_chart(
+            last_test_ts, last_test_y, all_preds_for_plot, DOCS_DIR / 'benchmark_seasonal_predictions.png'
+        )
 
     if all_importances:
-        generate_importance_chart(all_importances,
-                                  DOCS_DIR / 'benchmark_seasonal_importance.png')
+        generate_importance_chart(all_importances, DOCS_DIR / 'benchmark_seasonal_importance.png')
 
     # Generate report
     generate_report(all_results, DOCS_DIR / 'benchmark_seasonal.md')
 
     # Print summary
-    print("\n" + "=" * 70)
-    print("SEASONAL EXPERIMENT COMPLETE")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('SEASONAL EXPERIMENT COMPLETE')
+    print('=' * 70)
     for window_name in args.windows:
         if window_name not in results_by_window:
             continue
-        print(f"\n--- {window_name} ---")
+        print(f'\n--- {window_name} ---')
         for model_name in MODELS:
             maes = []
             for region in all_results:
@@ -1020,16 +1055,19 @@ def main():
                 avg = np.mean(maes)
                 variant = BEST_VARIANTS[model_name]
                 prior_maes = {
-                    'Random Forest': 46.61, 'XGBoost': 35.44,
-                    'CatBoost': 41.04, 'LightGBM': 39.12,
+                    'Random Forest': 46.61,
+                    'XGBoost': 35.44,
+                    'CatBoost': 41.04,
+                    'LightGBM': 39.12,
                     'Direct-XGBoost': 33.50,
                 }
                 prior = prior_maes[model_name]
                 delta = avg - prior
                 sign = '+' if delta > 0 else ''
-                tag = "improved" if delta < 0 else "worse"
-                print(f"   {model_name:20s} ({variant:8s})  MAE={avg:6.2f}  "
-                      f"vs 90d={prior:.2f}  d={sign}{delta:.2f} {tag}")
+                tag = 'improved' if delta < 0 else 'worse'
+                print(
+                    f'   {model_name:20s} ({variant:8s})  MAE={avg:6.2f}  vs 90d={prior:.2f}  d={sign}{delta:.2f} {tag}'
+                )
 
 
 if __name__ == '__main__':

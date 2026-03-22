@@ -2,9 +2,12 @@
 #define SCHEDULER_SCHEDULER_BASE_HPP
 #pragma once
 
+#include "Calendar.hpp"
 #include "SchedulerAlgo.hpp"
 #include "StatsAPIClient.hpp"
 #include "structs/JobRequest.hpp"
+#include "structs/SchedulerOutput.hpp"
+#include "structs/TimeIntervalParams.hpp"
 #include <string>
 #include <vector>
 
@@ -30,15 +33,33 @@ struct SchedulerData {
     }
 };
 
+/**
+ * @class SchedulerBase
+ * @brief Abstract base class for schedulers, providing common data fetching and
+ * preprocessing logic.
+ *
+ * Schedulers should inherit from this class and implement the doScheduleJob
+ * method following the Non-Virtual Interface pattern.
+ */
 class SchedulerBase {
-  protected:
-    StatsAPIClient stats_api;
 
   public:
+    SchedulerBase(scheduler::calendar::time_point start_time,
+                  scheduler::calendar::time_point end_time)
+        : time_interval({.start = start_time, .end = end_time}) {}
+
+    auto scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput>;
+
     virtual ~SchedulerBase() = default;
 
   protected:
+    StatsAPIClient &stats_api = StatsAPIClient::getInstance();
+    TimeIntervalParams time_interval;
+
     auto fetch_data(const JobRequest &job) -> drogon::Task<SchedulerData>;
+
+    virtual auto doScheduleJob(JobRequest job)
+        -> drogon::Task<SchedulerOutput> = 0;
 };
 
 } // namespace scheduler

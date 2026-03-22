@@ -1,8 +1,9 @@
-#ifndef FORECAST_CONTROLLER
-#define FORECAST_CONTROLLER
-#include <drogon/HttpController.h>
+#ifndef SCHEDULER_FORECAST_CONTROLLER_HPP
+#define SCHEDULER_FORECAST_CONTROLLER_HPP
 #pragma once
 
+#include "structs/TimeIntervalParams.hpp"
+#include <drogon/HttpController.h>
 #include <structs/DatacenterIdentifierParam.hpp>
 
 namespace scheduler::controllers {
@@ -15,10 +16,11 @@ class ForecastController : public drogon::HttpController<ForecastController> {
     METHOD_LIST_END
 
     [[nodiscard]] auto getForecast(drogon::HttpRequestPtr,
-                                   DatacenterIdentifierParam) const
+                                   DatacenterIdentifierParam,
+                                   TimeIntervalParams) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
 
 } // namespace scheduler::controllers
 
-#endif
+#endif // SCHEDULER_FORECAST_CONTROLLER_HPP

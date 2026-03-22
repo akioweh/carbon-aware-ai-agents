@@ -1,7 +1,7 @@
 #include "controllers/ScheduleController.hpp"
 #include "Calendar.hpp"
+#include "Scheduler.hpp"
 #include "SchedulingQueue.hpp"
-#include "StatsAPIClient.hpp"
 #include "TrivialScheduler.hpp"
 #include "structs/DatacenterIdentifierParam.hpp"
 #include "structs/JobRequest.hpp"
@@ -70,7 +70,8 @@ auto ScheduleController::
     calculateSchedule( // NOLINT(readability-convert-member-functions-to-static)
         HttpRequestPtr /*req*/, const JobRequest job_request) const
     -> Task<HttpResponsePtr> {
-    auto output = co_await schedulingQueue.computeSchedule(job_request);
+    auto output =
+        co_await schedulingQueue.computeSchedule<Scheduler>(job_request);
 
     // persist and get the DB-assigned job ID
     const auto schedule_id = co_await calendar::add(output);
@@ -78,7 +79,8 @@ auto ScheduleController::
     auto trivialResult = optional<ScheduleResult>{};
     // Also compute trivial and persist
     try {
-        auto tSched = TrivialScheduler{};
+        auto tSched = TrivialScheduler(job_request.earliest_start,
+                                       job_request.latest_finish);
         auto tOutput = co_await tSched.scheduleJob(job_request);
         co_await calendar::addTrivial(tOutput, schedule_id);
 

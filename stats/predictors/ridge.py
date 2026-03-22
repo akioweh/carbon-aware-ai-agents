@@ -16,18 +16,30 @@ import pandas as pd
 import requests
 from sklearn.linear_model import Ridge
 
+import db_utils
+
 warnings.filterwarnings('ignore', module='sklearn')
 
 logger = logging.getLogger('stats.direct_ridge')
 
-# DC → region name and coordinates (inverse of db_utils.UK_REGION_TO_DC)
-DC_REGION_MAP = {
-    'Data-Center-1': ('London', 51.51, -0.13),
-    'Data-Center-2': ('South East England', 51.27, 0.52),
-    'Data-Center-3': ('South Yorkshire', 53.38, -1.47),
-    'Data-Center-4': ('North West England', 53.48, -2.24),
-    'Data-Center-5': ('North East England', 54.97, -1.61),
-}
+
+# Build DC → (region_name, lat, lon) map from canonical registry in db_utils.
+# This ensures weather coordinates are always aligned with the master datacenter list.
+def _build_dc_region_map():
+    """Build datacenter→region mapping from db_utils registry."""
+    dc_map = {}
+    for dc in db_utils.DEFAULT_DATACENTERS:
+        location_id = dc['location_id']
+        name = dc['name']
+        latitude = dc.get('latitude')
+        longitude = dc.get('longitude')
+        if latitude is not None and longitude is not None:
+            dc_map[location_id] = (name, latitude, longitude)
+    return dc_map
+
+
+DC_REGION_MAP = _build_dc_region_map()
+
 
 WEATHER_FEATURES = ['wind_speed', 'temperature', 'solar_radiation']
 
@@ -67,9 +79,7 @@ def _fetch_weather_archive(lat, lon, start_date, end_date):
         hdf = hdf.set_index('ts').sort_index()
 
         # Interpolate to 30-min
-        full_idx = pd.date_range(
-            hdf.index.min(), hdf.index.max(), freq='30min', tz='UTC'
-        )
+        full_idx = pd.date_range(hdf.index.min(), hdf.index.max(), freq='30min', tz='UTC')
         hdf = hdf.reindex(full_idx).interpolate(method='time').reset_index()
         hdf.columns = ['ts'] + WEATHER_FEATURES
         return hdf
@@ -110,9 +120,7 @@ def _fetch_weather_forecast(lat, lon):
         hdf = hdf.set_index('ts').sort_index()
 
         # Interpolate to 30-min
-        full_idx = pd.date_range(
-            hdf.index.min(), hdf.index.max(), freq='30min', tz='UTC'
-        )
+        full_idx = pd.date_range(hdf.index.min(), hdf.index.max(), freq='30min', tz='UTC')
         hdf = hdf.reindex(full_idx).interpolate(method='time').reset_index()
         hdf.columns = ['ts'] + WEATHER_FEATURES
         return hdf
@@ -142,9 +150,7 @@ def build_cyclical_features(timestamps):
     )
 
 
-def _build_direct_features(
-    train_ts, train_y, train_origin_ts, test_ts, train_exog=None, test_exog=None
-):
+def _build_direct_features(train_ts, train_y, train_origin_ts, test_ts, train_exog=None, test_exog=None):
     """Build feature matrices for direct multi-step forecasting.
 
     Unlike the benchmark version which uses array indices for horizon h,
@@ -194,9 +200,7 @@ def _build_direct_features(
         cyc = all_cyc[targets]
         h_col = np.full((len(origins), 1), h / 336.0)
         h2_col = h_col**2
-        of = np.column_stack(
-            [origin_last[origins], origin_mean[origins], origin_std[origins]]
-        )
+        of = np.column_stack([origin_last[origins], origin_mean[origins], origin_std[origins]])
         x = np.column_stack([cyc, h_col, h2_col, of])
         if has_exog:
             x = np.column_stack([x, train_exog[targets]])
@@ -214,9 +218,7 @@ def _build_direct_features(
 
     # Compute horizon from actual time deltas (30-min steps)
     test_ts_series = pd.Series(test_ts)
-    h_vals = (
-        (test_ts_series - train_origin_ts).dt.total_seconds() / 1800.0
-    ).values.reshape(-1, 1) / 336.0
+    h_vals = ((test_ts_series - train_origin_ts).dt.total_seconds() / 1800.0).values.reshape(-1, 1) / 336.0
 
     X_test = np.column_stack([test_cyc, h_vals, h_vals**2, of_test])
     if has_exog:
@@ -250,16 +252,10 @@ def _predict_carbon_intensity(historical_df, dc_name=None, now=None):
 
     # Use actual discrete observations — no gap interpolation
     series = df[['timestamp', 'carbon_intensity']].dropna(subset=['carbon_intensity'])
-    series = (
-        series.drop_duplicates(subset='timestamp')
-        .sort_values('timestamp')
-        .reset_index(drop=True)
-    )
+    series = series.drop_duplicates(subset='timestamp').sort_values('timestamp').reset_index(drop=True)
 
     if len(series) < 96:  # need at least ~2 days of 30-min data
-        raise ValueError(
-            f'Not enough carbon intensity data for Direct Ridge (need >= 96 points, got {len(series)})'
-        )
+        raise ValueError(f'Not enough carbon intensity data for Direct Ridge (need >= 96 points, got {len(series)})')
 
     train_ts = series['timestamp'].values
     train_y = series['carbon_intensity'].values.astype(float)
@@ -304,9 +300,7 @@ def _predict_carbon_intensity(historical_df, dc_name=None, now=None):
             train_df = series.copy()
             train_df['ts'] = train_df['timestamp'].dt.round('30min')
             archive_wx['ts'] = archive_wx['ts'].dt.round('30min')
-            merged = train_df.merge(
-                archive_wx[['ts'] + WEATHER_FEATURES], on='ts', how='left'
-            )
+            merged = train_df.merge(archive_wx[['ts'] + WEATHER_FEATURES], on='ts', how='left')
             for feat in WEATHER_FEATURES:
                 merged[feat] = merged[feat].fillna(0)
 
@@ -320,9 +314,7 @@ def _predict_carbon_intensity(historical_df, dc_name=None, now=None):
             test_df = pd.DataFrame({'ts': forecast_30min})
             test_df['ts'] = test_df['ts'].dt.round('30min')
             forecast_wx['ts'] = forecast_wx['ts'].dt.round('30min')
-            test_merged = test_df.merge(
-                forecast_wx[['ts'] + WEATHER_FEATURES], on='ts', how='left'
-            )
+            test_merged = test_df.merge(forecast_wx[['ts'] + WEATHER_FEATURES], on='ts', how='left')
             for feat in WEATHER_FEATURES:
                 test_merged[feat] = test_merged[feat].fillna(0)
 
@@ -337,9 +329,7 @@ def _predict_carbon_intensity(historical_df, dc_name=None, now=None):
                 len(test_exog),
             )
         else:
-            logger.info(
-                'Weather data unavailable, predicting without exogenous features'
-            )
+            logger.info('Weather data unavailable, predicting without exogenous features')
 
     # Build features and train
     train_ts_pd = pd.to_datetime(train_ts)

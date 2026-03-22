@@ -4,7 +4,8 @@
 
 #include <chrono>
 
-namespace scheduler::utils {
+namespace scheduler {
+namespace utils {
 
 using FiveMinutes = std::chrono::duration<int, std::ratio<300>>;
 
@@ -63,11 +64,11 @@ class TimeGridder {
     time_point_t start_;
 };
 
-} // namespace scheduler::utils
+} // namespace utils
 
-namespace scheduler {
 // global instance with epoch start, effectively aligning to whole-5-min marks
 static constexpr auto TIME_GRIDDER = utils::TimeGridder{};
+
 } // namespace scheduler
 
 #endif // SCHEDULER_UTILS_TIMEGRINDER_HPP

@@ -5,10 +5,9 @@ const FORECAST_URL = "http://localhost:6969/api/forecast"
 export async function GET(request: NextRequest) {
     try {
         const url = new URL(FORECAST_URL)
-
-        // Pass through the optional datacenter query param
-        const datacenter = request.nextUrl.searchParams.get("datacenter")
-        if (datacenter) url.searchParams.set("datacenter", datacenter)
+        request.nextUrl.searchParams.forEach((value, key) => {
+            url.searchParams.set(key, value)
+        })
 
         const backendRes = await fetch(url.toString(), { method: "GET" })
 

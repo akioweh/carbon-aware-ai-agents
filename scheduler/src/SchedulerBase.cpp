@@ -10,6 +10,11 @@ using namespace std;
 using namespace drogon;
 using namespace scheduler::exceptions;
 
+/**
+ * This method assumes already-validated job request parameters!
+ *
+ * Throws SchedulingException if there are no available data centers (sources).
+ */
 auto SchedulerBase::fetch_data(const JobRequest &job)
     -> drogon::Task<SchedulerData> {
     assert(job.workload_amount >= 0.);
@@ -29,15 +34,15 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
     const auto n_intervals =
         TIME_GRIDDER.toIndexCeil(job.latest_finish) - time_index_offset + 1;
 
-    if (n_intervals <= 0) {
-        throw exceptions::SchedulingException("Time window too narrow");
-    }
-
     const auto time_start = index_to_time(0);
     const auto time_end = index_to_time(n_intervals);
 
+    const auto interval = TimeIntervalParams{.start = job.earliest_start,
+                                             .end = job.latest_finish};
+
     const auto [locations, existing_schedule] = co_await coro::when_all(
-        stats_api.getAllDatacenters(), calendar::get(time_start, time_end));
+        stats_api.getAllDatacenters(job.preferred_datacenter, interval),
+        calendar::get(time_start, time_end));
     const auto n_locations = locations.size();
 
     auto data = SchedulerData{};
@@ -53,7 +58,7 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
         data.location_ids.push_back(loc.id);
 
         // HACK: placeholder dummy value for hardware specification
-        const auto kwh_per_flo = 1.0e-12; // dummy value
+        const auto kwh_per_flo = job.kwh_per_flo;
         data.kwh_per_flo.push_back(kwh_per_flo);
 
         auto load = vector(n_intervals, 0.);
@@ -102,6 +107,28 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
             "No data center locations available for scheduling");
 
     co_return data;
+}
+
+// note that this method itself is NOT a coroutine;
+// we eagerly validate (and reject) the job request eventhough
+// the actual scheduler logic may run later depending on the queue
+auto SchedulerBase::scheduleJob(JobRequest job)
+    -> drogon::Task<SchedulerOutput> {
+    if (job.workload_amount < 0.)
+        throw scheduler::exceptions::ValidationException(
+            "workload_amount cannot be negative");
+    if (job.latest_finish < job.earliest_start)
+        throw scheduler::exceptions::ValidationException(
+            "latest_finish must be after earliest_start");
+
+    // more thourough time gridder window size checking
+    if (scheduler::TIME_GRIDDER.toIndex(job.latest_finish) <=
+        scheduler::TIME_GRIDDER.toIndex(job.earliest_start)) {
+        throw scheduler::exceptions::SchedulingException(
+            "Time window too narrow");
+    }
+
+    return doScheduleJob(std::move(job));
 }
 
 } // namespace scheduler

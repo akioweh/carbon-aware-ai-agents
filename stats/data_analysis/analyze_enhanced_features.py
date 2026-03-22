@@ -11,6 +11,7 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,12 +21,19 @@ from statsmodels.tsa.stattools import acf
 warnings.filterwarnings('ignore')
 
 from benchmark import (
-    DB_PATH, TEST_DAYS, WEATHER_FEATURES,
-    load_data, fetch_weather_data, compute_metrics,
+    DB_PATH,
+    TEST_DAYS,
+    WEATHER_FEATURES,
+    compute_metrics,
+    fetch_weather_data,
+    load_data,
 )
 from benchmark_enhanced_features import (
-    build_enhanced_ml_features, build_enhanced_cyclical,
-    SPARSE_LAGS, ROLLING_CONFIGS, ENHANCED_N_FEATURES,
+    ENHANCED_N_FEATURES,
+    ROLLING_CONFIGS,
+    SPARSE_LAGS,
+    build_enhanced_cyclical,
+    build_enhanced_ml_features,
     recursive_forecast_enhanced,
 )
 
@@ -40,8 +48,7 @@ RECURSIVE_FEATURE_NAMES = (
 )
 
 
-def train_and_get_importance(model, train_ts, train_y, test_ts, test_y,
-                              train_exog=None, test_exog=None):
+def train_and_get_importance(model, train_ts, train_y, test_ts, test_y, train_exog=None, test_exog=None):
     """Train via recursive forecast and return (preds, fitted_model)."""
     n_train = len(train_y)
     n_test = len(test_ts)
@@ -87,7 +94,7 @@ def train_and_get_importance(model, train_ts, train_y, test_ts, test_y,
         lag_df = pd.DataFrame([lag_feats])
         x_step = pd.concat([cyclical.reset_index(drop=True), lag_df.reset_index(drop=True)], axis=1)
         if has_exog:
-            x_step = np.column_stack([x_step.values, test_exog[t:t+1]])
+            x_step = np.column_stack([x_step.values, test_exog[t : t + 1]])
         else:
             x_step = x_step.values
         pred = model.predict(x_step)[0]
@@ -118,7 +125,7 @@ def plot_feature_importance(importances, feature_names, model_name, ax):
 def main():
     df = load_data(DB_PATH)
     regions = sorted(df['region'].unique())
-    print(f"Regions: {regions}")
+    print(f'Regions: {regions}')
 
     date_min = df['ts'].min().strftime('%Y-%m-%d')
     date_max = df['ts'].max().strftime('%Y-%m-%d')
@@ -160,32 +167,36 @@ def main():
                 train_exog = merged[WEATHER_FEATURES].iloc[:n_train].values
                 test_exog = merged[WEATHER_FEATURES].iloc[n_train:].values
 
-        print(f"\n{'='*50}")
-        print(f"  {region}")
-        print(f"{'='*50}")
+        print(f'\n{"=" * 50}')
+        print(f'  {region}')
+        print(f'{"=" * 50}')
 
         # XGBoost
         from xgboost import XGBRegressor
-        print("  XGBoost...", end=' ', flush=True)
-        xgb_model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                                  random_state=42, verbosity=0, n_jobs=-1)
+
+        print('  XGBoost...', end=' ', flush=True)
+        xgb_model = XGBRegressor(
+            n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1
+        )
         xgb_preds, xgb_fitted = train_and_get_importance(
-            xgb_model, train_ts, train_y, test_ts, test_y,
-            train_exog=train_exog, test_exog=test_exog)
+            xgb_model, train_ts, train_y, test_ts, test_y, train_exog=train_exog, test_exog=test_exog
+        )
         xgb_mae = np.mean(np.abs(test_y - xgb_preds))
-        print(f"MAE={xgb_mae:.2f}")
+        print(f'MAE={xgb_mae:.2f}')
         xgb_importances.append(xgb_fitted.feature_importances_)
 
         # LightGBM
         import lightgbm as lgb
-        print("  LightGBM...", end=' ', flush=True)
-        lgbm_model = lgb.LGBMRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                                        random_state=42, verbose=-1, n_jobs=-1)
+
+        print('  LightGBM...', end=' ', flush=True)
+        lgbm_model = lgb.LGBMRegressor(
+            n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbose=-1, n_jobs=-1
+        )
         lgbm_preds, lgbm_fitted = train_and_get_importance(
-            lgbm_model, train_ts, train_y, test_ts, test_y,
-            train_exog=train_exog, test_exog=test_exog)
+            lgbm_model, train_ts, train_y, test_ts, test_y, train_exog=train_exog, test_exog=test_exog
+        )
         lgbm_mae = np.mean(np.abs(test_y - lgbm_preds))
-        print(f"MAE={lgbm_mae:.2f}")
+        print(f'MAE={lgbm_mae:.2f}')
         lgbm_importances.append(lgbm_fitted.feature_importances_)
 
         # ACF diffs
@@ -195,13 +206,23 @@ def main():
         max_acf_lgbm = np.max(acf_diffs_lgbm[1:])
         argmax_xgb = np.argmax(acf_diffs_xgb[1:]) + 1
         argmax_lgbm = np.argmax(acf_diffs_lgbm[1:]) + 1
-        print(f"  Max ACF diff — XGBoost: {max_acf_xgb:.4f} (lag {argmax_xgb})  "
-              f"LightGBM: {max_acf_lgbm:.4f} (lag {argmax_lgbm})")
+        print(
+            f'  Max ACF diff — XGBoost: {max_acf_xgb:.4f} (lag {argmax_xgb})  '
+            f'LightGBM: {max_acf_lgbm:.4f} (lag {argmax_lgbm})'
+        )
         all_acf_diffs[region] = {
-            'xgb': {'max_diff': max_acf_xgb, 'at_lag': int(argmax_xgb),
-                     'acf_actual': acf_act.tolist(), 'acf_pred': acf_xgb.tolist()},
-            'lgbm': {'max_diff': max_acf_lgbm, 'at_lag': int(argmax_lgbm),
-                      'acf_actual': acf_act.tolist(), 'acf_pred': acf_lgbm.tolist()},
+            'xgb': {
+                'max_diff': max_acf_xgb,
+                'at_lag': int(argmax_xgb),
+                'acf_actual': acf_act.tolist(),
+                'acf_pred': acf_xgb.tolist(),
+            },
+            'lgbm': {
+                'max_diff': max_acf_lgbm,
+                'at_lag': int(argmax_lgbm),
+                'acf_actual': acf_act.tolist(),
+                'acf_pred': acf_lgbm.tolist(),
+            },
         }
 
     # Average importances across regions
@@ -216,7 +237,7 @@ def main():
     feature_names = RECURSIVE_FEATURE_NAMES[:n_features]
     # Trim if model has fewer features (no exog)
     if len(avg_xgb_imp) < n_features:
-        feature_names = feature_names[:len(avg_xgb_imp)]
+        feature_names = feature_names[: len(avg_xgb_imp)]
 
     # ── Plot feature importances ──
     fig, axes = plt.subplots(1, 2, figsize=(16, 8))
@@ -226,7 +247,7 @@ def main():
     imp_path = DOCS_DIR / 'benchmark_enhanced_features_importance.png'
     plt.savefig(imp_path, dpi=150)
     plt.close()
-    print(f"\nSaved: {imp_path}")
+    print(f'\nSaved: {imp_path}')
 
     # ── Plot ACF comparison ──
     fig, axes = plt.subplots(len(all_acf_diffs), 2, figsize=(14, 4 * len(all_acf_diffs)))
@@ -255,28 +276,30 @@ def main():
     acf_path = DOCS_DIR / 'benchmark_enhanced_features_acf.png'
     plt.savefig(acf_path, dpi=150)
     plt.close()
-    print(f"Saved: {acf_path}")
+    print(f'Saved: {acf_path}')
 
     # ── Print summary tables ──
-    print("\n" + "=" * 70)
-    print("FEATURE IMPORTANCE (cross-region average, top 10)")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('FEATURE IMPORTANCE (cross-region average, top 10)')
+    print('=' * 70)
 
     for name, imp in [('XGBoost', avg_xgb_imp), ('LightGBM', avg_lgbm_imp)]:
-        print(f"\n  {name}:")
+        print(f'\n  {name}:')
         sorted_idx = np.argsort(imp)[::-1]
         for rank, idx in enumerate(sorted_idx[:10], 1):
-            print(f"    {rank:2d}. {feature_names[idx]:25s} {imp[idx]:.4f}")
+            print(f'    {rank:2d}. {feature_names[idx]:25s} {imp[idx]:.4f}')
 
-    print("\n" + "=" * 70)
-    print("MAX ACF DIFF (lag 1-48)")
-    print("=" * 70)
-    print(f"\n  {'Region':30s} {'XGBoost':>15s} {'LightGBM':>15s}")
-    print(f"  {'-'*30} {'-'*15} {'-'*15}")
+    print('\n' + '=' * 70)
+    print('MAX ACF DIFF (lag 1-48)')
+    print('=' * 70)
+    print(f'\n  {"Region":30s} {"XGBoost":>15s} {"LightGBM":>15s}')
+    print(f'  {"-" * 30} {"-" * 15} {"-" * 15}')
     for region in sorted(all_acf_diffs.keys()):
         d = all_acf_diffs[region]
-        print(f"  {region:30s} {d['xgb']['max_diff']:.4f} (lag {d['xgb']['at_lag']:2d})"
-              f"  {d['lgbm']['max_diff']:.4f} (lag {d['lgbm']['at_lag']:2d})")
+        print(
+            f'  {region:30s} {d["xgb"]["max_diff"]:.4f} (lag {d["xgb"]["at_lag"]:2d})'
+            f'  {d["lgbm"]["max_diff"]:.4f} (lag {d["lgbm"]["at_lag"]:2d})'
+        )
 
 
 if __name__ == '__main__':

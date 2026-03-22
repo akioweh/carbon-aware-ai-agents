@@ -11,8 +11,6 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
-from predictor_linreg import get_next_week_load  # load stays on Ridge
-
 warnings.filterwarnings('ignore', module='statsmodels')
 
 # 48 half-hour slots per day; cap training to last 14 days
@@ -33,10 +31,7 @@ def get_next_week_greenness(historical_greenness_df):
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df = df.sort_values('timestamp').reset_index(drop=True)
 
-    has_ci = (
-        'carbon_intensity' in df.columns
-        and df['carbon_intensity'].notna().any()
-    )
+    has_ci = 'carbon_intensity' in df.columns and df['carbon_intensity'].notna().any()
 
     if has_ci:
         value_col = 'carbon_intensity'

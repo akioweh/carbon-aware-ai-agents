@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'leaflet/dist/leaflet.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -122,4 +123,21 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.leaflet-container {
+  font: inherit;
+}
+
+.leaflet-tooltip {
+  border: 0;
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--card) 94%, white 6%);
+  color: var(--foreground);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14);
+  padding: 0.55rem 0.7rem;
+}
+
+.leaflet-tooltip-top:before {
+  border-top-color: color-mix(in oklab, var(--card) 94%, white 6%);
 }

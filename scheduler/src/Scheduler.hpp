@@ -3,7 +3,6 @@
 #pragma once
 
 #include "SchedulerBase.hpp"
-#include "structs/SchedulerOutput.hpp"
 
 namespace scheduler {
 
@@ -17,7 +16,11 @@ namespace scheduler {
  */
 class Scheduler : public SchedulerBase {
   public:
-    auto scheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput>;
+    using SchedulerBase::SchedulerBase;
+
+  protected:
+    auto doScheduleJob(JobRequest job)
+        -> drogon::Task<SchedulerOutput> override;
 };
 
 } // namespace scheduler

@@ -1,10 +1,8 @@
 #ifndef SCHEDULER_DATACENTER_IDENTIFIER_HPP
 #define SCHEDULER_DATACENTER_IDENTIFIER_HPP
-#include "Calendar.hpp"
-#include "structs/Datacenter.hpp"
 #pragma once
 
-#include "exceptions/ValidationException.hpp"
+#include "Calendar.hpp"
 #include <drogon/HttpRequest.h>
 #include <string>
 

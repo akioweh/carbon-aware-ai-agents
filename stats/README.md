@@ -1,45 +1,33 @@
 # Stats Component
 
-A RESTful API for tracking and retrieving data center load and grid energy
-greenness metrics.
+This API provides historical and forecasted data on:
 
-## Overview
-
-This API provides historical and current data about:
-
-- **Load**: Data center load ranging from 0-50 arbitrary units (50 being
-  capacity)
-- **Greenness**: Energy greenness score from 0-100 (higher values indicate
-  greener energy)
-
-Data is collected at 5-minute intervals and is pattern-based to enable
-forecasting and task scheduling.
+- data center load
+- data center capacity
+- grid energy greenness
 
 ## Getting Started
 
-Use venv (in `.venv`).
+Python 3.14.
 
-### Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-### Generate History Data
-
-Before running the API, optionally generate sample history data:
+You should probably use a virtual environment. Using `uv`:
 
 ```bash
-python generate_history.py
+uv venv .venv
 ```
 
-This will populate the SQLite database (`cache.db`) with 30 days of historical
-data.
+(`uv run` and `uv pip` will auto-activate the venv in the cwd.)
+
+### Install dependencies
+
+```bash
+uv pip install -r requirements.txt
+```
 
 ### Run the API
 
 ```bash
-python app.py
+uv run app.py
 ```
 
 The API will start on `http://localhost:5000` by default.
@@ -47,7 +35,16 @@ The API will start on `http://localhost:5000` by default.
 ...or directly using `uvicorn`:
 
 ```bash
-uvicorn app:app --reload
+uv run uvicorn app:app --reload
+```
+
+### Development Tooling
+
+Use ruff to format and lint (sort imports):
+
+```bash
+ruff check --select I --fix .
+ruff format .
 ```
 
 ## API Documentation
@@ -55,116 +52,32 @@ uvicorn app:app --reload
 An OpenAPI 3.0 specification, [openapi.yaml](./openapi.yaml), is auto-generated
 as per the endpoints every time `app` is ran.
 
-### Endpoints
-
-#### Forecast Endpoints
-
-- `GET /locations/{location}/metrics/forecast_load` - Returns load forecast for
-  the next week
-- `GET /locations/{location}/metrics/forecast_greenness` - Returns greenness
-  forecast for the next week
-
-#### Location Endpoints
-
-- `GET /locations` - Returns a list of available location's names and ids
-
-### Example Responses
-
-#### Load Forecast Response
-
-```json
-{
-  "location_id": "Data-Center-1",
-  "metric": "forecast_load",
-  "unit": "utilization_units",
-  "capacity": {
-    "max_load": 50.0,
-    "total_gpus": 32
-  },
-  "data": [
-    {
-      "timestamp": "2026-01-23T19:00:00",
-      "value": 25.5,
-      "is_forecast": true,
-      "available_gpus": 16
-    }
-  ]
-}
-```
-
-#### Greenness Forecast Response
-
-```json
-{
-  "location_id": "Data-Center-1",
-  "metric": "forecast_greenness",
-  "unit": "greenness_score",
-  "data": [
-    {
-      "timestamp": "2026-01-23T19:00:00",
-      "value": 75.3,
-      "is_forecast": true
-    }
-  ]
-}
-```
-
 ## Testing
 
-The project uses `pytest` and `schemathesis` for property-based API testing.
+The project uses `pytest`.  
+`schemathesis` is used for property-based API testing.
 
-To run the tests:
+Run all tests:
 
-1. **Install dependencies**:
+```bash
+uv run pytest tests
+```
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+Run a specific test suite:
 
-2. **Start the API server** (in a separate terminal):
+```bash
+uv run pytest tests/<test_name>.py
+```
 
-   ```bash
-   python app.py
-   ```
-
-3. **Run the tests**:
-
-   ```bash
-   python -m pytest tests/test_api_schema.py
-   ```
-
-   Note: The tests assume the API server to be running on
-   `http://localhost:5000`.
-
-## Data Generation
-
-The `generate_history.py` script creates synthetic data with complex, realistic
-patterns:
-
-- **Load**: Follows a realistic "workday" vs "weekend" schedule.
-  - **Weekdays**: Feature a morning spike (start of work), a slight lunch dip,
-    sustained afternoon load, and evening activity.
-  - **Weekends**: Smoother, lower overall load peaking in the afternoon.
-  - **Micro-bursts**: Random, short-duration spikes in load (simulating batch
-    jobs or traffic surges).
-  - Values range from 0-50 units.
-
-- **Greenness**: Modeled using a simulated "Weather System" that persists state
-  over time.
-  - **Solar**: Bell curve based on time of day, modulated by dynamic **Cloud
-    Cover**.
-  - **Wind**: Random walk "wind speed" trend that changes slowly over
-    hours/days.
-  - **Grid Baseline**: A slowly fluctuating baseline representing other grid
-    sources.
-  - The final score is a weighted sum of Solar, Wind, and Grid factors.
-  - Values range from 0-100.
+Note: The tests require the API server to be running on `http://localhost:5000`.
 
 ## Service Behavior
 
 - On startup, the service initializes the SQLite database (`cache.db`).
+<!-- (TODO: out of date info?) -->
 - If a legacy `history.json` exists and the database is empty, it migrates the
-  data.
+data.
+<!-- (TODO: out of date info?) -->
 - If the database is empty and no history exists, it generates fresh historical
   data.
 - The service concurrently (in a background thread) computes new predictions

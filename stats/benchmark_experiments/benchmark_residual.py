@@ -20,22 +20,28 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter
 import numpy as np
 import pandas as pd
+from matplotlib.dates import DateFormatter
 
 warnings.filterwarnings('ignore')
 
 from benchmark import (
-    DB_PATH, TEST_DAYS, WEATHER_FEATURES,
-    load_data, fetch_weather_data,
+    DB_PATH,
+    TEST_DAYS,
+    WEATHER_FEATURES,
     compute_metrics,
+    fetch_weather_data,
+    load_data,
 )
 from benchmark_enhanced_features import (
-    SPARSE_LAGS, ROLLING_CONFIGS,
-    build_enhanced_cyclical, build_enhanced_lag_features,
+    ROLLING_CONFIGS,
+    SPARSE_LAGS,
+    build_enhanced_cyclical,
+    build_enhanced_lag_features,
     build_enhanced_ml_features,
 )
 
@@ -57,6 +63,7 @@ N_FEATURES = {
 
 # ── Residual Training Data ───────────────────────────────────────────────
 
+
 def build_residual_training_data(train_features, train_y):
     """Extract lag_1, compute residual target, apply valid mask.
 
@@ -72,8 +79,8 @@ def build_residual_training_data(train_features, train_y):
 
 # ── Recursive Forecast (Residual Target) ─────────────────────────────────
 
-def recursive_forecast_residual(model, train_ts, train_y, test_ts, test_y_actual,
-                                train_exog=None, test_exog=None):
+
+def recursive_forecast_residual(model, train_ts, train_y, test_ts, test_y_actual, train_exog=None, test_exog=None):
     """Recursive multi-step forecast with residual target.
 
     Training target: y - lag_1 (deviation from persistence).
@@ -130,7 +137,7 @@ def recursive_forecast_residual(model, train_ts, train_y, test_ts, test_y_actual
         lag_df = pd.DataFrame([lag_feats])
         x_step = pd.concat([cyclical.reset_index(drop=True), lag_df.reset_index(drop=True)], axis=1)
         if has_exog:
-            x_step = np.column_stack([x_step.values, test_exog[t:t+1]])
+            x_step = np.column_stack([x_step.values, test_exog[t : t + 1]])
         else:
             x_step = x_step.values
 
@@ -146,8 +153,8 @@ def recursive_forecast_residual(model, train_ts, train_y, test_ts, test_y_actual
 
 # ── Direct Forecast (Residual Target) ────────────────────────────────────
 
-def build_direct_features_residual(train_ts, train_y, test_ts,
-                                   train_exog=None, test_exog=None):
+
+def build_direct_features_residual(train_ts, train_y, test_ts, train_exog=None, test_exog=None):
     """Direct features with residual target: y[target] - y[origin]."""
     n_test = len(test_ts)
     n_train = len(train_y)
@@ -167,8 +174,8 @@ def build_direct_features_residual(train_ts, train_y, test_ts,
     origin_std_336 = np.zeros(n_train)
 
     for t in range(min_history, n_train):
-        recent_48 = train_y[max(0, t - 47):t + 1]
-        recent_336 = train_y[max(0, t - 335):t + 1]
+        recent_48 = train_y[max(0, t - 47) : t + 1]
+        recent_336 = train_y[max(0, t - 335) : t + 1]
         origin_last[t] = train_y[t]
         origin_mean_48[t] = np.mean(recent_48)
         origin_std_48[t] = np.std(recent_48) if len(recent_48) > 1 else 0
@@ -186,12 +193,18 @@ def build_direct_features_residual(train_ts, train_y, test_ts,
         targets = origins + h
         cyc = all_cyc[targets]
         h_col = np.full((len(origins), 1), h / 336.0)
-        h2_col = h_col ** 2
-        of = np.column_stack([
-            origin_last[origins], origin_mean_48[origins], origin_std_48[origins],
-            origin_lag_48[origins], origin_lag_336[origins],
-            origin_mean_336[origins], origin_std_336[origins],
-        ])
+        h2_col = h_col**2
+        of = np.column_stack(
+            [
+                origin_last[origins],
+                origin_mean_48[origins],
+                origin_std_48[origins],
+                origin_lag_48[origins],
+                origin_lag_336[origins],
+                origin_mean_336[origins],
+                origin_std_336[origins],
+            ]
+        )
         x = np.column_stack([cyc, h_col, h2_col, of])
         if has_exog:
             x = np.column_stack([x, train_exog[targets]])
@@ -206,16 +219,22 @@ def build_direct_features_residual(train_ts, train_y, test_ts,
     test_cyc = build_enhanced_cyclical(test_ts).values
     recent_48 = train_y[-48:]
     recent_336 = train_y[-336:] if len(train_y) >= 336 else train_y
-    of_test = np.array([[
-        train_y[-1],
-        np.mean(recent_48), np.std(recent_48),
-        train_y[-48] if len(train_y) >= 48 else train_y[0],
-        train_y[-336] if len(train_y) >= 336 else train_y[0],
-        np.mean(recent_336), np.std(recent_336),
-    ]])
+    of_test = np.array(
+        [
+            [
+                train_y[-1],
+                np.mean(recent_48),
+                np.std(recent_48),
+                train_y[-48] if len(train_y) >= 48 else train_y[0],
+                train_y[-336] if len(train_y) >= 336 else train_y[0],
+                np.mean(recent_336),
+                np.std(recent_336),
+            ]
+        ]
+    )
     of_test = np.tile(of_test, (n_test, 1))
     h_vals = np.arange(1, n_test + 1).reshape(-1, 1) / 336.0
-    X_test = np.column_stack([test_cyc, h_vals, h_vals ** 2, of_test])
+    X_test = np.column_stack([test_cyc, h_vals, h_vals**2, of_test])
     if has_exog:
         X_test = np.column_stack([X_test, test_exog])
 
@@ -224,63 +243,69 @@ def build_direct_features_residual(train_ts, train_y, test_ts,
 
 # ── Model Runners ────────────────────────────────────────────────────────
 
+
 def train_predict_rf_residual(train_ts, train_y, test_ts, test_y=None, **kw):
     from sklearn.ensemble import RandomForestRegressor
+
     t0 = time.time()
     model = RandomForestRegressor(n_estimators=200, max_depth=15, random_state=42, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = recursive_forecast_residual(model, train_ts, train_y, test_ts, test_y,
-                                        train_exog=kw.get('train_exog'),
-                                        test_exog=kw.get('test_exog'))
+    preds = recursive_forecast_residual(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_xgb_residual(train_ts, train_y, test_ts, test_y=None, **kw):
     from xgboost import XGBRegressor
+
     t0 = time.time()
-    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                         random_state=42, verbosity=0, n_jobs=-1)
+    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = recursive_forecast_residual(model, train_ts, train_y, test_ts, test_y,
-                                        train_exog=kw.get('train_exog'),
-                                        test_exog=kw.get('test_exog'))
+    preds = recursive_forecast_residual(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_catboost_residual(train_ts, train_y, test_ts, test_y=None, **kw):
     from catboost import CatBoostRegressor
+
     t0 = time.time()
-    model = CatBoostRegressor(iterations=200, depth=6, learning_rate=0.1,
-                              random_seed=42, verbose=0)
+    model = CatBoostRegressor(iterations=200, depth=6, learning_rate=0.1, random_seed=42, verbose=0)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = recursive_forecast_residual(model, train_ts, train_y, test_ts, test_y,
-                                        train_exog=kw.get('train_exog'),
-                                        test_exog=kw.get('test_exog'))
+    preds = recursive_forecast_residual(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_lgbm_residual(train_ts, train_y, test_ts, test_y=None, **kw):
     import lightgbm as lgb
+
     t0 = time.time()
-    model = lgb.LGBMRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                              random_state=42, verbose=-1, n_jobs=-1)
+    model = lgb.LGBMRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbose=-1, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = recursive_forecast_residual(model, train_ts, train_y, test_ts, test_y,
-                                        train_exog=kw.get('train_exog'),
-                                        test_exog=kw.get('test_exog'))
+    preds = recursive_forecast_residual(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_direct_xgb_residual(train_ts, train_y, test_ts, test_y=None, **kw):
     from xgboost import XGBRegressor
+
     t0 = time.time()
     X, y, X_test = build_direct_features_residual(
-        train_ts, train_y, test_ts,
-        train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog'),
+        train_ts,
+        train_y,
+        test_ts,
+        train_exog=kw.get('train_exog'),
+        test_exog=kw.get('test_exog'),
     )
     max_samples = 500_000
     if len(X) > max_samples:
@@ -288,8 +313,7 @@ def train_predict_direct_xgb_residual(train_ts, train_y, test_ts, test_y=None, *
         idx = rng.choice(len(X), max_samples, replace=False)
         X = X[idx]
         y = y[idx]
-    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                         random_state=42, verbosity=0, n_jobs=-1)
+    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1)
     model.fit(X, y)
     residual_preds = model.predict(X_test)
     # Reconstruct raw: origin (last training value) + predicted residual
@@ -307,6 +331,7 @@ RESIDUAL_FUNCS = {
 
 
 # ── Feature Importance ───────────────────────────────────────────────────
+
 
 def extract_feature_importance(model, train_ts, train_y, train_exog=None):
     """Train model on residual target and return feature importances."""
@@ -326,6 +351,7 @@ def extract_feature_importance(model, train_ts, train_y, train_exog=None):
 
 # ── Visualization ────────────────────────────────────────────────────────
 
+
 def generate_comparison_chart(baseline_maes, enhanced_maes, residual_maes, output_path):
     """3-way bar chart: baseline vs enhanced vs residual."""
     models = [m for m in MODELS if m in baseline_maes or m in enhanced_maes or m in residual_maes]
@@ -333,12 +359,9 @@ def generate_comparison_chart(baseline_maes, enhanced_maes, residual_maes, outpu
     width = 0.25
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.bar(x - width, [baseline_maes.get(m, 0) for m in models], width,
-           label='Baseline', color='#4a90d9')
-    ax.bar(x, [enhanced_maes.get(m, 0) for m in models], width,
-           label='Enhanced', color='#e74c3c')
-    ax.bar(x + width, [residual_maes.get(m, 0) for m in models], width,
-           label='Residual', color='#2ecc71')
+    ax.bar(x - width, [baseline_maes.get(m, 0) for m in models], width, label='Baseline', color='#4a90d9')
+    ax.bar(x, [enhanced_maes.get(m, 0) for m in models], width, label='Enhanced', color='#e74c3c')
+    ax.bar(x + width, [residual_maes.get(m, 0) for m in models], width, label='Residual', color='#2ecc71')
 
     ax.set_xlabel('Model')
     ax.set_ylabel('MAE (gCO2/kWh)')
@@ -351,13 +374,12 @@ def generate_comparison_chart(baseline_maes, enhanced_maes, residual_maes, outpu
         for bar in bars:
             h = bar.get_height()
             if h > 0:
-                ax.text(bar.get_x() + bar.get_width()/2, h + 0.3,
-                        f'{h:.1f}', ha='center', va='bottom', fontsize=7)
+                ax.text(bar.get_x() + bar.get_width() / 2, h + 0.3, f'{h:.1f}', ha='center', va='bottom', fontsize=7)
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
@@ -367,8 +389,7 @@ def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
 
     colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']
     for (name, preds), color in zip(all_preds.items(), colors):
-        ax.plot(test_ts[:len(preds)], preds, '-', color=color, linewidth=1,
-                label=name, alpha=0.7)
+        ax.plot(test_ts[: len(preds)], preds, '-', color=color, linewidth=1, label=name, alpha=0.7)
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Carbon Intensity (gCO2/kWh)')
@@ -378,7 +399,7 @@ def generate_predictions_chart(test_ts, test_y, all_preds, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_importance_chart(importance_dicts, output_path):
@@ -405,7 +426,7 @@ def generate_importance_chart(importance_dicts, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 def generate_acf_chart(test_y, all_preds, output_path, nlags=50):
@@ -436,10 +457,11 @@ def generate_acf_chart(test_y, all_preds, output_path, nlags=50):
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 # ── Report ───────────────────────────────────────────────────────────────
+
 
 def generate_report(baseline_results, enhanced_results, residual_results, output_path):
     """Generate markdown comparison report (baseline vs enhanced vs residual)."""
@@ -460,10 +482,8 @@ def generate_report(baseline_results, enhanced_results, residual_results, output
 
     lines.append(f'### {window_name} Training Window')
     lines.append('')
-    lines.append('| Model | Baseline MAE | Enhanced MAE | Residual MAE '
-                 '| Δ vs Baseline | Δ vs Enhanced |')
-    lines.append('|-------|-------------|-------------|-------------|'
-                 '--------------|--------------|')
+    lines.append('| Model | Baseline MAE | Enhanced MAE | Residual MAE | Δ vs Baseline | Δ vs Enhanced |')
+    lines.append('|-------|-------------|-------------|-------------|--------------|--------------|')
 
     for model_name in MODELS:
         base_maes = []
@@ -503,8 +523,7 @@ def generate_report(baseline_results, enhanced_results, residual_results, output
         else:
             d2_str = 'N/A'
 
-        lines.append(f'| {model_name} | {base_str} | {enh_str} | {avg_res:.2f} '
-                     f'| {d1_str} | {d2_str} |')
+        lines.append(f'| {model_name} | {base_str} | {enh_str} | {avg_res:.2f} | {d1_str} | {d2_str} |')
 
     lines.append('')
     lines.append('## Analysis')
@@ -513,39 +532,40 @@ def generate_report(baseline_results, enhanced_results, residual_results, output
     lines.append('')
 
     output_path.write_text('\n'.join(lines))
-    print(f"Saved: {output_path}")
+    print(f'Saved: {output_path}')
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
+
 
 def main():
     # Load prior results for comparison
     baseline_results = {}
     if TREE_RESULTS_PATH.exists():
         baseline_results = json.loads(TREE_RESULTS_PATH.read_text())
-        print(f"Loaded baseline results from {TREE_RESULTS_PATH}")
+        print(f'Loaded baseline results from {TREE_RESULTS_PATH}')
 
     enhanced_results = {}
     if ENHANCED_RESULTS_PATH.exists():
         enhanced_results = json.loads(ENHANCED_RESULTS_PATH.read_text())
-        print(f"Loaded enhanced results from {ENHANCED_RESULTS_PATH}")
+        print(f'Loaded enhanced results from {ENHANCED_RESULTS_PATH}')
 
     # Load data
     df = load_data(DB_PATH)
     regions = sorted(df['region'].unique())
-    print(f"Regions: {regions}")
-    print(f"Date range: {df['ts'].min()} -> {df['ts'].max()}")
+    print(f'Regions: {regions}')
+    print(f'Date range: {df["ts"].min()} -> {df["ts"].max()}')
 
     # Fetch weather data
     date_min = df['ts'].min().strftime('%Y-%m-%d')
     date_max = df['ts'].max().strftime('%Y-%m-%d')
-    print("\nFetching weather data...")
+    print('\nFetching weather data...')
     weather_df = fetch_weather_data(regions, date_min, date_max)
     has_weather = len(weather_df) > 0
     if has_weather:
-        print(f"Weather data: {len(weather_df)} points")
+        print(f'Weather data: {len(weather_df)} points')
     else:
-        print("WARNING: No weather data — running without exogenous features")
+        print('WARNING: No weather data — running without exogenous features')
 
     split_date = df['ts'].max() - pd.Timedelta(days=TEST_DAYS)
 
@@ -561,7 +581,7 @@ def main():
         test = rdf[rdf['ts'] > split_date].reset_index(drop=True)
 
         if len(test) == 0:
-            print(f"\n{region}: no test data, skipping")
+            print(f'\n{region}: no test data, skipping')
             continue
 
         all_results[region] = {}
@@ -569,13 +589,13 @@ def main():
         train = rdf[rdf['ts'] <= split_date].reset_index(drop=True)
 
         if len(train) < 400:
-            print(f"\n{region}: insufficient training data ({len(train)} < 400), skipping")
+            print(f'\n{region}: insufficient training data ({len(train)} < 400), skipping')
             continue
 
         train_days = (train['ts'].max() - train['ts'].min()).days
-        print(f"\n{'='*60}")
-        print(f"  {region} [Full backfill]: train={len(train)} ({train_days}d), test={len(test)}")
-        print(f"{'='*60}")
+        print(f'\n{"=" * 60}')
+        print(f'  {region} [Full backfill]: train={len(train)} ({train_days}d), test={len(test)}')
+        print(f'{"=" * 60}')
 
         # Weather exogenous features
         train_exog = None
@@ -599,13 +619,16 @@ def main():
 
         results = {}
         for model_name in MODELS:
-            print(f"    {model_name}...", end=' ', flush=True)
+            print(f'    {model_name}...', end=' ', flush=True)
             func = RESIDUAL_FUNCS[model_name]
             try:
                 preds, elapsed = func(
-                    train_ts=train_ts, train_y=train_y,
-                    test_ts=test_ts, test_y=test_y,
-                    train_exog=train_exog, test_exog=test_exog,
+                    train_ts=train_ts,
+                    train_y=train_y,
+                    test_ts=test_ts,
+                    test_y=test_y,
+                    train_exog=train_exog,
+                    test_exog=test_exog,
                 )
                 if len(preds) != len(test_y):
                     min_len = min(len(preds), len(test_y))
@@ -614,9 +637,8 @@ def main():
                 else:
                     test_y_eval = test_y
 
-                metrics = compute_metrics(test_y_eval, preds,
-                                          n_features=N_FEATURES[model_name])
-                print(f"MAE={metrics['MAE']:.2f}  ({elapsed:.2f}s)")
+                metrics = compute_metrics(test_y_eval, preds, n_features=N_FEATURES[model_name])
+                print(f'MAE={metrics["MAE"]:.2f}  ({elapsed:.2f}s)')
                 results[model_name] = {
                     'preds': preds.tolist(),
                     'metrics': metrics,
@@ -628,37 +650,39 @@ def main():
                 last_test_y = test_y
 
             except Exception as e:
-                print(f"FAILED: {e}")
+                print(f'FAILED: {e}')
                 import traceback
+
                 traceback.print_exc()
                 results[model_name] = None
 
         all_results[region]['Full backfill'] = results
 
         # Feature importance for XGBoost and LightGBM (on last region)
-        for imp_name, imp_cls_path in [('XGBoost', 'xgboost.XGBRegressor'),
-                                        ('LightGBM', 'lightgbm.LGBMRegressor')]:
+        for imp_name, imp_cls_path in [('XGBoost', 'xgboost.XGBRegressor'), ('LightGBM', 'lightgbm.LGBMRegressor')]:
             try:
                 module, cls_name = imp_cls_path.rsplit('.', 1)
                 mod = __import__(module)
                 cls = getattr(mod, cls_name)
                 if imp_name == 'XGBoost':
-                    model = cls(n_estimators=200, max_depth=6, learning_rate=0.1,
-                                random_state=42, verbosity=0, n_jobs=-1)
+                    model = cls(
+                        n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1
+                    )
                 else:
-                    model = cls(n_estimators=200, max_depth=6, learning_rate=0.1,
-                                random_state=42, verbose=-1, n_jobs=-1)
+                    model = cls(
+                        n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbose=-1, n_jobs=-1
+                    )
                 imp = extract_feature_importance(model, train_ts, train_y, train_exog)
                 all_importances[imp_name] = imp
             except Exception as e:
-                print(f"    Feature importance for {imp_name} failed: {e}")
+                print(f'    Feature importance for {imp_name} failed: {e}')
 
     # Save results
     RESULTS_PATH.write_text(json.dumps(all_results, indent=2))
-    print(f"\nResults saved to {RESULTS_PATH}")
+    print(f'\nResults saved to {RESULTS_PATH}')
 
     # Generate visualizations
-    print("\nGenerating visualizations...")
+    print('\nGenerating visualizations...')
 
     # 3-way comparison chart (cross-region average)
     baseline_avg = {}
@@ -684,29 +708,28 @@ def main():
             residual_avg[model_name] = np.mean(r)
 
     if residual_avg:
-        generate_comparison_chart(baseline_avg, enhanced_avg, residual_avg,
-                                  DOCS_DIR / 'benchmark_residual_comparison.png')
+        generate_comparison_chart(
+            baseline_avg, enhanced_avg, residual_avg, DOCS_DIR / 'benchmark_residual_comparison.png'
+        )
 
     if last_test_ts is not None and all_preds_for_plot:
-        generate_predictions_chart(last_test_ts, last_test_y, all_preds_for_plot,
-                                   DOCS_DIR / 'benchmark_residual_predictions.png')
+        generate_predictions_chart(
+            last_test_ts, last_test_y, all_preds_for_plot, DOCS_DIR / 'benchmark_residual_predictions.png'
+        )
 
     if all_importances:
-        generate_importance_chart(all_importances,
-                                  DOCS_DIR / 'benchmark_residual_importance.png')
+        generate_importance_chart(all_importances, DOCS_DIR / 'benchmark_residual_importance.png')
 
     if last_test_y is not None and all_preds_for_plot:
-        generate_acf_chart(last_test_y, all_preds_for_plot,
-                           DOCS_DIR / 'benchmark_residual_acf.png')
+        generate_acf_chart(last_test_y, all_preds_for_plot, DOCS_DIR / 'benchmark_residual_acf.png')
 
     # Generate report
-    generate_report(baseline_results, enhanced_results, all_results,
-                    DOCS_DIR / 'benchmark_residual.md')
+    generate_report(baseline_results, enhanced_results, all_results, DOCS_DIR / 'benchmark_residual.md')
 
     # Print summary
-    print("\n" + "=" * 70)
-    print("RESIDUAL TARGET EXPERIMENT COMPLETE")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('RESIDUAL TARGET EXPERIMENT COMPLETE')
+    print('=' * 70)
     for model_name in MODELS:
         r_maes = []
         b_maes = []
@@ -723,20 +746,20 @@ def main():
                 e_maes.append(enh['metrics']['MAE'])
         if r_maes:
             avg_r = np.mean(r_maes)
-            parts = [f"Residual={avg_r:6.2f}"]
+            parts = [f'Residual={avg_r:6.2f}']
             if b_maes:
                 avg_b = np.mean(b_maes)
                 d = avg_r - avg_b
                 s = '+' if d > 0 else ''
-                tag = "improved" if d < 0 else "worse"
-                parts.append(f"Baseline={avg_b:6.2f}  dB={s}{d:.2f} {tag}")
+                tag = 'improved' if d < 0 else 'worse'
+                parts.append(f'Baseline={avg_b:6.2f}  dB={s}{d:.2f} {tag}')
             if e_maes:
                 avg_e = np.mean(e_maes)
                 d = avg_r - avg_e
                 s = '+' if d > 0 else ''
-                tag = "improved" if d < 0 else "worse"
-                parts.append(f"Enhanced={avg_e:6.2f}  dE={s}{d:.2f} {tag}")
-            print(f"   {model_name:20s} {'  '.join(parts)}")
+                tag = 'improved' if d < 0 else 'worse'
+                parts.append(f'Enhanced={avg_e:6.2f}  dE={s}{d:.2f} {tag}')
+            print(f'   {model_name:20s} {"  ".join(parts)}')
 
 
 if __name__ == '__main__':

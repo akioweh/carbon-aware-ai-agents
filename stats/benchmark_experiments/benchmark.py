@@ -44,17 +44,18 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from matplotlib.dates import DateFormatter
 import numpy as np
 import pandas as pd
+from matplotlib.dates import DateFormatter
 from sklearn.linear_model import Ridge
+from statsmodels.stats.diagnostic import acorr_ljungbox
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.stattools import acf
-from statsmodels.stats.diagnostic import acorr_ljungbox
 
 warnings.filterwarnings('ignore')
 
@@ -65,12 +66,24 @@ DOCS_DIR = Path(__file__).resolve().parent.parent / 'docs'
 TEST_DAYS = 7
 
 MODEL_NAMES = [
-    'Ridge', 'SARIMAX', 'ARIMA(d=1)', 'Seasonal Naive', 'Fourier',
-    'Holt-Winters', 'Direct-Ridge',
+    'Ridge',
+    'SARIMAX',
+    'ARIMA(d=1)',
+    'Seasonal Naive',
+    'Fourier',
+    'Holt-Winters',
+    'Direct-Ridge',
     'Direct-XGBoost',
-    'Random Forest', 'XGBoost', 'CatBoost', 'LightGBM',
-    'Transformer-1K', 'Transformer-5K', 'Transformer-10K',
-    'Chronos-Tiny', 'N-BEATS', 'N-HiTS',
+    'Random Forest',
+    'XGBoost',
+    'CatBoost',
+    'LightGBM',
+    'Transformer-1K',
+    'Transformer-5K',
+    'Transformer-10K',
+    'Chronos-Tiny',
+    'N-BEATS',
+    'N-HiTS',
 ]
 
 # Tree models run in a separate process (benchmark_trees.py) to avoid
@@ -83,45 +96,45 @@ TREE_RESULTS_PATH = Path(__file__).parent / 'tree_results.json'
 NEW_RESULTS_PATH = Path(__file__).parent / 'new_model_results.json'
 
 MODEL_COLORS = {
-    'Ridge':          '#F44336',
-    'SARIMAX':        '#4CAF50',
+    'Ridge': '#F44336',
+    'SARIMAX': '#4CAF50',
     'Seasonal Naive': '#9C27B0',
-    'Fourier':        '#FF9800',
-    'Holt-Winters':   '#00BCD4',
-    'Random Forest':  '#795548',
-    'XGBoost':        '#E91E63',
-    'CatBoost':       '#3F51B5',
-    'LightGBM':       '#8BC34A',
-    'Transformer-1K':  '#607D8B',
-    'Transformer-5K':  '#009688',
+    'Fourier': '#FF9800',
+    'Holt-Winters': '#00BCD4',
+    'Random Forest': '#795548',
+    'XGBoost': '#E91E63',
+    'CatBoost': '#3F51B5',
+    'LightGBM': '#8BC34A',
+    'Transformer-1K': '#607D8B',
+    'Transformer-5K': '#009688',
     'Transformer-10K': '#FF5722',
-    'ARIMA(d=1)':      '#673AB7',
-    'Direct-Ridge':    '#CDDC39',
-    'Direct-XGBoost':  '#1B5E20',
-    'Chronos-Tiny':    '#FF6F00',
-    'N-BEATS':         '#00695C',
-    'N-HiTS':          '#AD1457',
+    'ARIMA(d=1)': '#673AB7',
+    'Direct-Ridge': '#CDDC39',
+    'Direct-XGBoost': '#1B5E20',
+    'Chronos-Tiny': '#FF6F00',
+    'N-BEATS': '#00695C',
+    'N-HiTS': '#AD1457',
 }
 
 MODEL_LINESTYLES = {
-    'Ridge':          '--',
-    'SARIMAX':        '-.',
+    'Ridge': '--',
+    'SARIMAX': '-.',
     'Seasonal Naive': ':',
-    'Fourier':        '--',
-    'Holt-Winters':   '-.',
-    'Random Forest':  '-',
-    'XGBoost':        '-',
-    'CatBoost':       '-',
-    'LightGBM':       '-',
-    'Transformer-1K':  '-',
-    'Transformer-5K':  '-',
+    'Fourier': '--',
+    'Holt-Winters': '-.',
+    'Random Forest': '-',
+    'XGBoost': '-',
+    'CatBoost': '-',
+    'LightGBM': '-',
+    'Transformer-1K': '-',
+    'Transformer-5K': '-',
     'Transformer-10K': '-',
-    'ARIMA(d=1)':      '-.',
-    'Direct-Ridge':    '--',
-    'Direct-XGBoost':  '--',
-    'Chronos-Tiny':    '-',
-    'N-BEATS':         '-',
-    'N-HiTS':          '-',
+    'ARIMA(d=1)': '-.',
+    'Direct-Ridge': '--',
+    'Direct-XGBoost': '--',
+    'Chronos-Tiny': '-',
+    'N-BEATS': '-',
+    'N-HiTS': '-',
 }
 
 WEATHER_FEATURES = ['wind_speed', 'temperature', 'solar_radiation']
@@ -130,36 +143,41 @@ WEATHER_CACHE_PATH = Path(__file__).parent / 'weather_cache.json'
 
 # Approximate coordinates for UK Carbon Intensity API regions
 REGION_COORDS = {
-    'London':              (51.51, -0.13),
-    'South East England':  (51.27,  0.52),
-    'South Yorkshire':     (53.38, -1.47),
-    'North West England':  (53.48, -2.24),
-    'North East England':  (54.97, -1.61),
+    'London': (51.51, -0.13),
+    'South East England': (51.27, 0.52),
+    'South Yorkshire': (53.38, -1.47),
+    'North West England': (53.48, -2.24),
+    'North East England': (54.97, -1.61),
 }
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Carbon Intensity Prediction Benchmark')
-    parser.add_argument('--backfill', type=int, default=0,
-                        help='Backfill N days of data from UK Carbon Intensity API before running')
+    parser.add_argument(
+        '--backfill', type=int, default=0, help='Backfill N days of data from UK Carbon Intensity API before running'
+    )
     return parser.parse_args()
 
 
 # ── Section 1: Data Loading ─────────────────────────────────────────────
 
+
 def load_data(db_path: Path) -> pd.DataFrame:
     """Load carbon intensity readings from SQLite."""
     if not db_path.exists():
-        print(f"ERROR: Database not found: {db_path}")
+        print(f'ERROR: Database not found: {db_path}')
         sys.exit(1)
 
     conn = sqlite3.connect(db_path)
-    df = pd.read_sql_query("""
+    df = pd.read_sql_query(
+        """
         SELECT r.name AS region, cr.timestamp_from AS ts, cr.actual
         FROM carbon_readings cr
         JOIN regions r ON cr.region_id = r.region_id
         WHERE cr.actual IS NOT NULL
-    """, conn)
+    """,
+        conn,
+    )
     conn.close()
 
     df['ts'] = pd.to_datetime(df['ts'])
@@ -183,7 +201,7 @@ def fetch_weather_data(regions: list, date_min: str, date_max: str) -> pd.DataFr
             if cache.get('date_min') == date_min and cache.get('date_max') == date_max:
                 cached_regions = set(cache.get('regions', []))
                 if set(regions).issubset(cached_regions):
-                    print(f"  Using cached weather data from {WEATHER_CACHE_PATH.name}")
+                    print(f'  Using cached weather data from {WEATHER_CACHE_PATH.name}')
                     wdf = pd.DataFrame(cache['data'])
                     wdf['ts'] = pd.to_datetime(wdf['ts'], utc=True)
                     return wdf[wdf['region'].isin(regions)].reset_index(drop=True)
@@ -193,16 +211,16 @@ def fetch_weather_data(regions: list, date_min: str, date_max: str) -> pd.DataFr
     all_rows = []
     for region in regions:
         if region not in REGION_COORDS:
-            print(f"  WARNING: No coordinates for {region}, skipping weather")
+            print(f'  WARNING: No coordinates for {region}, skipping weather')
             continue
         lat, lon = REGION_COORDS[region]
         url = (
-            f"https://archive-api.open-meteo.com/v1/archive"
-            f"?latitude={lat}&longitude={lon}"
-            f"&start_date={date_min}&end_date={date_max}"
-            f"&hourly=temperature_2m,wind_speed_10m,shortwave_radiation"
+            f'https://archive-api.open-meteo.com/v1/archive'
+            f'?latitude={lat}&longitude={lon}'
+            f'&start_date={date_min}&end_date={date_max}'
+            f'&hourly=temperature_2m,wind_speed_10m,shortwave_radiation'
         )
-        print(f"  Fetching weather for {region} ({lat}, {lon})...")
+        print(f'  Fetching weather for {region} ({lat}, {lon})...')
         try:
             resp = requests.get(url, timeout=30)
             resp.raise_for_status()
@@ -214,16 +232,18 @@ def fetch_weather_data(regions: list, date_min: str, date_max: str) -> pd.DataFr
             solar = hourly.get('shortwave_radiation', [])
 
             if not times:
-                print(f"    No weather data returned for {region}")
+                print(f'    No weather data returned for {region}')
                 continue
 
             # Build hourly DataFrame (Open-Meteo returns UTC times)
-            hdf = pd.DataFrame({
-                'ts': pd.to_datetime(times, utc=True),
-                'temperature': temps,
-                'wind_speed': winds,
-                'solar_radiation': solar,
-            })
+            hdf = pd.DataFrame(
+                {
+                    'ts': pd.to_datetime(times, utc=True),
+                    'temperature': temps,
+                    'wind_speed': winds,
+                    'solar_radiation': solar,
+                }
+            )
             hdf = hdf.set_index('ts').sort_index()
 
             # Interpolate to 30-minute intervals
@@ -232,9 +252,9 @@ def fetch_weather_data(regions: list, date_min: str, date_max: str) -> pd.DataFr
             hdf.columns = ['ts'] + WEATHER_FEATURES
             hdf['region'] = region
             all_rows.append(hdf)
-            print(f"    Got {len(hdf)} points ({hdf['ts'].min()} to {hdf['ts'].max()})")
+            print(f'    Got {len(hdf)} points ({hdf["ts"].min()} to {hdf["ts"].max()})')
         except Exception as e:
-            print(f"    ERROR fetching weather for {region}: {e}")
+            print(f'    ERROR fetching weather for {region}: {e}')
 
     if not all_rows:
         return pd.DataFrame()
@@ -251,12 +271,13 @@ def fetch_weather_data(regions: list, date_min: str, date_max: str) -> pd.DataFr
     # Convert Timestamps to strings for JSON serialization
     cache_data['data']['ts'] = [str(t) for t in cache_data['data']['ts']]
     WEATHER_CACHE_PATH.write_text(json.dumps(cache_data))
-    print(f"  Cached weather data to {WEATHER_CACHE_PATH.name}")
+    print(f'  Cached weather data to {WEATHER_CACHE_PATH.name}')
 
     return weather_df
 
 
 # ── Section 2: Feature Engineering ───────────────────────────────────────
+
 
 def build_cyclical_features(timestamps: pd.Series) -> pd.DataFrame:
     """Build sin/cos features for hour, day-of-week, and minute-of-day."""
@@ -264,14 +285,16 @@ def build_cyclical_features(timestamps: pd.Series) -> pd.DataFrame:
     hour = ts.dt.hour + ts.dt.minute / 60.0
     dow = ts.dt.dayofweek
     minute_of_day = ts.dt.hour * 60 + ts.dt.minute
-    return pd.DataFrame({
-        'hour_sin': np.sin(2 * np.pi * hour / 24),
-        'hour_cos': np.cos(2 * np.pi * hour / 24),
-        'dow_sin':  np.sin(2 * np.pi * dow / 7),
-        'dow_cos':  np.cos(2 * np.pi * dow / 7),
-        'min_sin':  np.sin(2 * np.pi * minute_of_day / 1440),
-        'min_cos':  np.cos(2 * np.pi * minute_of_day / 1440),
-    })
+    return pd.DataFrame(
+        {
+            'hour_sin': np.sin(2 * np.pi * hour / 24),
+            'hour_cos': np.cos(2 * np.pi * hour / 24),
+            'dow_sin': np.sin(2 * np.pi * dow / 7),
+            'dow_cos': np.cos(2 * np.pi * dow / 7),
+            'min_sin': np.sin(2 * np.pi * minute_of_day / 1440),
+            'min_cos': np.cos(2 * np.pi * minute_of_day / 1440),
+        }
+    )
 
 
 def build_lag_features(series: np.ndarray, n_lags: int = 48) -> pd.DataFrame:
@@ -294,6 +317,7 @@ def build_ml_features(timestamps: pd.Series, values: np.ndarray) -> pd.DataFrame
 
 
 # ── Section 3: Model Definitions ────────────────────────────────────────
+
 
 def train_predict_ridge(train_ts, train_y, test_ts, **kw):
     t0 = time.time()
@@ -446,8 +470,11 @@ def train_predict_direct_ridge(train_ts, train_y, test_ts, **kw):
     """
     t0 = time.time()
     X, y, X_test = _build_direct_features(
-        train_ts, train_y, test_ts,
-        train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog'),
+        train_ts,
+        train_y,
+        test_ts,
+        train_exog=kw.get('train_exog'),
+        test_exog=kw.get('test_exog'),
     )
     model = Ridge(alpha=1.0)
     model.fit(X, y)
@@ -473,7 +500,7 @@ def _build_direct_features(train_ts, train_y, test_ts, train_exog=None, test_exo
     origin_mean = np.zeros(n_train)
     origin_std = np.zeros(n_train)
     for t in range(min_history, n_train):
-        recent = train_y[max(0, t - 47):t + 1]
+        recent = train_y[max(0, t - 47) : t + 1]
         origin_last[t] = train_y[t]
         origin_mean[t] = np.mean(recent)
         origin_std[t] = np.std(recent) if len(recent) > 1 else 0
@@ -487,7 +514,7 @@ def _build_direct_features(train_ts, train_y, test_ts, train_exog=None, test_exo
         targets = origins + h
         cyc = all_cyc[targets]
         h_col = np.full((len(origins), 1), h / 336.0)
-        h2_col = h_col ** 2
+        h2_col = h_col**2
         of = np.column_stack([origin_last[origins], origin_mean[origins], origin_std[origins]])
         x = np.column_stack([cyc, h_col, h2_col, of])
         if has_exog:
@@ -503,7 +530,7 @@ def _build_direct_features(train_ts, train_y, test_ts, train_exog=None, test_exo
     of_test = np.array([[train_y[-1], np.mean(recent), np.std(recent)]])
     of_test = np.tile(of_test, (n_test, 1))
     h_vals = np.arange(1, n_test + 1).reshape(-1, 1) / 336.0
-    X_test = np.column_stack([test_cyc, h_vals, h_vals ** 2, of_test])
+    X_test = np.column_stack([test_cyc, h_vals, h_vals**2, of_test])
     if has_exog:
         X_test = np.column_stack([X_test, test_exog])
 
@@ -515,11 +542,15 @@ def train_predict_direct_xgboost(train_ts, train_y, test_ts, **kw):
     trees. No recursive error compounding — each horizon predicted independently.
     """
     from xgboost import XGBRegressor
+
     t0 = time.time()
 
     X, y, X_test = _build_direct_features(
-        train_ts, train_y, test_ts,
-        train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog'),
+        train_ts,
+        train_y,
+        test_ts,
+        train_exog=kw.get('train_exog'),
+        test_exog=kw.get('test_exog'),
     )
 
     # Subsample for large datasets (XGBoost is slower than Ridge)
@@ -530,15 +561,13 @@ def train_predict_direct_xgboost(train_ts, train_y, test_ts, **kw):
         X = X[idx]
         y = y[idx]
 
-    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                         random_state=42, verbosity=0, n_jobs=-1)
+    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1)
     model.fit(X, y)
     preds = model.predict(X_test)
     return np.clip(preds, 0, 500), time.time() - t0
 
 
-def _recursive_forecast_tree(model, train_ts, train_y, test_ts, test_y_actual,
-                             train_exog=None, test_exog=None):
+def _recursive_forecast_tree(model, train_ts, train_y, test_ts, test_y_actual, train_exog=None, test_exog=None):
     """Recursive multi-step forecast for tree models.
 
     Train once on training set. At each test step t, build lag features
@@ -594,7 +623,7 @@ def _recursive_forecast_tree(model, train_ts, train_y, test_ts, test_y_actual,
         lag_df = pd.DataFrame([lag_feats])
         x_step = pd.concat([cyclical.reset_index(drop=True), lag_df.reset_index(drop=True)], axis=1)
         if has_exog:
-            x_step = np.column_stack([x_step.values, test_exog[t:t+1]])
+            x_step = np.column_stack([x_step.values, test_exog[t : t + 1]])
         else:
             x_step = x_step.values
         pred = model.predict(x_step)[0]
@@ -606,52 +635,53 @@ def _recursive_forecast_tree(model, train_ts, train_y, test_ts, test_y_actual,
 
 def train_predict_random_forest(train_ts, train_y, test_ts, test_y=None, **kw):
     from sklearn.ensemble import RandomForestRegressor
+
     t0 = time.time()
     model = RandomForestRegressor(n_estimators=200, max_depth=15, random_state=42, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = _recursive_forecast_tree(model, train_ts, train_y, test_ts, test_y,
-                                     train_exog=kw.get('train_exog'),
-                                     test_exog=kw.get('test_exog'))
+    preds = _recursive_forecast_tree(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_xgboost(train_ts, train_y, test_ts, test_y=None, **kw):
     from xgboost import XGBRegressor
+
     t0 = time.time()
-    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                         random_state=42, verbosity=0, n_jobs=-1)
+    model = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbosity=0, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = _recursive_forecast_tree(model, train_ts, train_y, test_ts, test_y,
-                                     train_exog=kw.get('train_exog'),
-                                     test_exog=kw.get('test_exog'))
+    preds = _recursive_forecast_tree(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_catboost(train_ts, train_y, test_ts, test_y=None, **kw):
     from catboost import CatBoostRegressor
+
     t0 = time.time()
-    model = CatBoostRegressor(iterations=200, depth=6, learning_rate=0.1,
-                              random_seed=42, verbose=0)
+    model = CatBoostRegressor(iterations=200, depth=6, learning_rate=0.1, random_seed=42, verbose=0)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = _recursive_forecast_tree(model, train_ts, train_y, test_ts, test_y,
-                                     train_exog=kw.get('train_exog'),
-                                     test_exog=kw.get('test_exog'))
+    preds = _recursive_forecast_tree(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_lightgbm(train_ts, train_y, test_ts, test_y=None, **kw):
     import lightgbm as lgb
+
     t0 = time.time()
-    model = lgb.LGBMRegressor(n_estimators=200, max_depth=6, learning_rate=0.1,
-                              random_state=42, verbose=-1, n_jobs=-1)
+    model = lgb.LGBMRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42, verbose=-1, n_jobs=-1)
     if test_y is None:
         test_y = np.zeros(len(test_ts))
-    preds = _recursive_forecast_tree(model, train_ts, train_y, test_ts, test_y,
-                                     train_exog=kw.get('train_exog'),
-                                     test_exog=kw.get('test_exog'))
+    preds = _recursive_forecast_tree(
+        model, train_ts, train_y, test_ts, test_y, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
@@ -663,6 +693,7 @@ def _compute_transformer_d_model(target_params, input_size, n_layers=1, nhead=2)
     Total = 12*L*d² + (13*L + I + 2)*d + 1
     """
     import math
+
     a = 12 * n_layers
     b = 13 * n_layers + input_size + 2
     c = 1 - target_params
@@ -673,8 +704,10 @@ def _compute_transformer_d_model(target_params, input_size, n_layers=1, nhead=2)
     # Try both floor and ceil multiples of nhead, pick closer to target
     d_lo = max(nhead, (int(d_raw) // nhead) * nhead)
     d_hi = d_lo + nhead
+
     def _params(d):
         return a * d * d + b * d + 1
+
     if abs(_params(d_hi) - target_params) < abs(_params(d_lo) - target_params):
         return d_hi
     return d_lo
@@ -682,6 +715,7 @@ def _compute_transformer_d_model(target_params, input_size, n_layers=1, nhead=2)
 
 def _build_transformer_model(input_size, d_model, nhead=2, n_layers=1, seq_len=48):
     import math
+
     import torch
     import torch.nn as nn
 
@@ -696,7 +730,7 @@ def _build_transformer_model(input_size, d_model, nhead=2, n_layers=1, seq_len=4
             self.register_buffer('pe', pe.unsqueeze(0))
 
         def forward(self, x):
-            return x + self.pe[:, :x.size(1)]
+            return x + self.pe[:, : x.size(1)]
 
     class CarbonTransformer(nn.Module):
         def __init__(self, input_size, d_model, nhead, n_layers, seq_len):
@@ -704,8 +738,11 @@ def _build_transformer_model(input_size, d_model, nhead=2, n_layers=1, seq_len=4
             self.input_proj = nn.Linear(input_size, d_model)
             self.pos_enc = SinusoidalPE(d_model, max_len=seq_len)
             enc_layer = nn.TransformerEncoderLayer(
-                d_model=d_model, nhead=nhead, dim_feedforward=4 * d_model,
-                dropout=0.0, batch_first=True,
+                d_model=d_model,
+                nhead=nhead,
+                dim_feedforward=4 * d_model,
+                dropout=0.0,
+                batch_first=True,
             )
             self.encoder = nn.TransformerEncoder(enc_layer, num_layers=n_layers)
             self.output_proj = nn.Linear(d_model, 1)
@@ -718,8 +755,7 @@ def _build_transformer_model(input_size, d_model, nhead=2, n_layers=1, seq_len=4
     return CarbonTransformer(input_size, d_model, nhead, n_layers, seq_len)
 
 
-def _recursive_forecast_transformer(train_ts, train_y, test_ts, target_params,
-                                    train_exog=None, test_exog=None, **kw):
+def _recursive_forecast_transformer(train_ts, train_y, test_ts, target_params, train_exog=None, test_exog=None, **kw):
     """Train a small transformer and do recursive multi-step forecasting."""
     import torch
     import torch.nn as nn
@@ -757,7 +793,7 @@ def _recursive_forecast_transformer(train_ts, train_y, test_ts, target_params,
 
     model = _build_transformer_model(input_size, d_model, seq_len=seq_len)
     n_params = sum(p.numel() for p in model.parameters())
-    print(f"[{n_params} params, d={d_model}]", end=' ', flush=True)
+    print(f'[{n_params} params, d={d_model}]', end=' ', flush=True)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     loss_fn = nn.MSELoss()
@@ -770,7 +806,7 @@ def _recursive_forecast_transformer(train_ts, train_y, test_ts, target_params,
         for epoch in range(20):
             perm = torch.randperm(len(X_tensor))
             for start in range(0, len(X_tensor), batch_size):
-                idx = perm[start:start + batch_size]
+                idx = perm[start : start + batch_size]
                 xb, yb = X_tensor[idx], y_tensor[idx]
                 pred = model(xb)
                 loss = loss_fn(pred, yb)
@@ -789,7 +825,7 @@ def _recursive_forecast_transformer(train_ts, train_y, test_ts, target_params,
         preds = np.zeros(n_test)
         with torch.no_grad():
             for t in range(n_test):
-                x_in = buf[t:t + seq_len].unsqueeze(0)  # view, no copy
+                x_in = buf[t : t + seq_len].unsqueeze(0)  # view, no copy
                 pred_norm = model(x_in).item()
                 preds[t] = pred_norm * y_std + y_mean
                 buf[seq_len + t, 0] = pred_norm
@@ -802,48 +838,49 @@ def _recursive_forecast_transformer(train_ts, train_y, test_ts, target_params,
 
 def train_predict_transformer_1k(train_ts, train_y, test_ts, **kw):
     t0 = time.time()
-    preds = _recursive_forecast_transformer(train_ts, train_y, test_ts, 1000,
-                                            train_exog=kw.get('train_exog'),
-                                            test_exog=kw.get('test_exog'))
+    preds = _recursive_forecast_transformer(
+        train_ts, train_y, test_ts, 1000, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_transformer_5k(train_ts, train_y, test_ts, **kw):
     t0 = time.time()
-    preds = _recursive_forecast_transformer(train_ts, train_y, test_ts, 5000,
-                                            train_exog=kw.get('train_exog'),
-                                            test_exog=kw.get('test_exog'))
+    preds = _recursive_forecast_transformer(
+        train_ts, train_y, test_ts, 5000, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 def train_predict_transformer_10k(train_ts, train_y, test_ts, **kw):
     t0 = time.time()
-    preds = _recursive_forecast_transformer(train_ts, train_y, test_ts, 10000,
-                                            train_exog=kw.get('train_exog'),
-                                            test_exog=kw.get('test_exog'))
+    preds = _recursive_forecast_transformer(
+        train_ts, train_y, test_ts, 10000, train_exog=kw.get('train_exog'), test_exog=kw.get('test_exog')
+    )
     return preds, time.time() - t0
 
 
 MODEL_FUNCS = {
-    'Ridge':              train_predict_ridge,
-    'SARIMAX':            train_predict_sarimax,
-    'ARIMA(d=1)':         train_predict_arima_d1,
-    'Seasonal Naive':     train_predict_seasonal_naive,
-    'Fourier':            train_predict_fourier,
-    'Holt-Winters':       train_predict_holt_winters,
-    'Direct-Ridge':       train_predict_direct_ridge,
-    'Direct-XGBoost':     train_predict_direct_xgboost,
-    'Random Forest':      train_predict_random_forest,
-    'XGBoost':            train_predict_xgboost,
-    'CatBoost':           train_predict_catboost,
-    'LightGBM':           train_predict_lightgbm,
-    'Transformer-1K':     train_predict_transformer_1k,
-    'Transformer-5K':     train_predict_transformer_5k,
-    'Transformer-10K':    train_predict_transformer_10k,
+    'Ridge': train_predict_ridge,
+    'SARIMAX': train_predict_sarimax,
+    'ARIMA(d=1)': train_predict_arima_d1,
+    'Seasonal Naive': train_predict_seasonal_naive,
+    'Fourier': train_predict_fourier,
+    'Holt-Winters': train_predict_holt_winters,
+    'Direct-Ridge': train_predict_direct_ridge,
+    'Direct-XGBoost': train_predict_direct_xgboost,
+    'Random Forest': train_predict_random_forest,
+    'XGBoost': train_predict_xgboost,
+    'CatBoost': train_predict_catboost,
+    'LightGBM': train_predict_lightgbm,
+    'Transformer-1K': train_predict_transformer_1k,
+    'Transformer-5K': train_predict_transformer_5k,
+    'Transformer-10K': train_predict_transformer_10k,
 }
 
 
 # ── Section 4: Metrics ──────────────────────────────────────────────────
+
 
 def ljung_box_pvalue(residuals: np.ndarray, n_lags: int = 48) -> float:
     """Ljung-Box test p-value for residual autocorrelation.
@@ -882,10 +919,10 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray, n_features: int = 0)
     n = len(y_true)
 
     mae = float(np.mean(np.abs(residuals)))
-    mse = float(np.mean(residuals ** 2))
+    mse = float(np.mean(residuals**2))
     rmse = float(np.sqrt(mse))
 
-    ss_res = np.sum(residuals ** 2)
+    ss_res = np.sum(residuals**2)
     ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
     if ss_tot == 0:
         r2 = 0.0
@@ -936,8 +973,10 @@ MODEL_N_FEATURES = {
 
 # ── Section 5: Experiment Runner ─────────────────────────────────────────
 
-def run_experiment(region: str, train_df: pd.DataFrame, test_df: pd.DataFrame,
-                   exp_name: str, train_exog=None, test_exog=None) -> dict:
+
+def run_experiment(
+    region: str, train_df: pd.DataFrame, test_df: pd.DataFrame, exp_name: str, train_exog=None, test_exog=None
+) -> dict:
     """Run statistical + transformer models (tree models run via benchmark_trees.py)."""
     results = {}
     train_ts = train_df['ts'].reset_index(drop=True)
@@ -946,7 +985,7 @@ def run_experiment(region: str, train_df: pd.DataFrame, test_df: pd.DataFrame,
     test_y = test_df['actual'].values
 
     for model_name in MODEL_RUN_NAMES:
-        print(f"    {model_name}...", end=' ', flush=True)
+        print(f'    {model_name}...', end=' ', flush=True)
         func = MODEL_FUNCS[model_name]
         try:
             preds, elapsed = func(
@@ -966,20 +1005,21 @@ def run_experiment(region: str, train_df: pd.DataFrame, test_df: pd.DataFrame,
                 test_y_eval = test_y
 
             metrics = compute_metrics(test_y_eval, preds, n_features=MODEL_N_FEATURES[model_name])
-            print(f"MAE={metrics['MAE']:.2f}  ({elapsed:.2f}s)")
+            print(f'MAE={metrics["MAE"]:.2f}  ({elapsed:.2f}s)')
             results[model_name] = {
                 'preds': preds,
                 'metrics': metrics,
                 'time': elapsed,
             }
         except Exception as e:
-            print(f"FAILED: {e}")
+            print(f'FAILED: {e}')
             results[model_name] = None
 
     return results
 
 
 # ── Section 6: Graphs ───────────────────────────────────────────────────
+
 
 def plot_raw_data(df: pd.DataFrame, regions: list):
     """Plot raw carbon intensity data for all regions."""
@@ -1000,37 +1040,39 @@ def plot_raw_data(df: pd.DataFrame, regions: list):
     path = DOCS_DIR / 'benchmark_raw_data.png'
     fig.savefig(path, dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print(f"  Saved: {path}")
+    print(f'  Saved: {path}')
 
 
-def plot_predictions(all_results: dict, regions: list, window_name: str,
-                     test_dfs: dict):
+def plot_predictions(all_results: dict, regions: list, window_name: str, test_dfs: dict):
     """Overlay all model predictions on actual for each region."""
     active_regions = [r for r in regions if r in all_results and window_name in all_results[r]]
     if not active_regions:
         return
-    fig, axes = plt.subplots(len(active_regions), 1,
-                             figsize=(18, 4.5 * len(active_regions)), sharex=True)
+    fig, axes = plt.subplots(len(active_regions), 1, figsize=(18, 4.5 * len(active_regions)), sharex=True)
     if len(active_regions) == 1:
         axes = [axes]
 
     for ax, region in zip(axes, active_regions):
         res = all_results[region][window_name]
         test = test_dfs[region]
-        ax.plot(test['ts'].values, test['actual'].values,
-                linewidth=1.5, color='#2196F3', label='Actual', zorder=10)
+        ax.plot(test['ts'].values, test['actual'].values, linewidth=1.5, color='#2196F3', label='Actual', zorder=10)
 
         for model_name in MODEL_NAMES:
             if res.get(model_name) is None:
                 continue
             r = res[model_name]
             preds = r['preds']
-            ts = test['ts'].values[:len(preds)]
+            ts = test['ts'].values[: len(preds)]
             mae = r['metrics']['MAE']
-            ax.plot(ts, preds, linewidth=0.9,
-                    color=MODEL_COLORS[model_name],
-                    linestyle=MODEL_LINESTYLES[model_name],
-                    label=f"{model_name} ({mae:.1f})", alpha=0.8)
+            ax.plot(
+                ts,
+                preds,
+                linewidth=0.9,
+                color=MODEL_COLORS[model_name],
+                linestyle=MODEL_LINESTYLES[model_name],
+                label=f'{model_name} ({mae:.1f})',
+                alpha=0.8,
+            )
 
         ax.set_ylabel('gCO2/kWh')
         ax.set_title(region)
@@ -1044,11 +1086,10 @@ def plot_predictions(all_results: dict, regions: list, window_name: str,
     path = DOCS_DIR / f'benchmark_predictions_{wlabel}.png'
     fig.savefig(path, dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print(f"  Saved: {path}")
+    print(f'  Saved: {path}')
 
 
-def plot_zoom_48h(all_results: dict, regions: list, window_name: str,
-                  test_dfs: dict):
+def plot_zoom_48h(all_results: dict, regions: list, window_name: str, test_dfs: dict):
     """Zoomed 48-hour detail — top 5 models by MAE only."""
     active_regions = [r for r in regions if r in all_results and window_name in all_results[r]]
     if not active_regions:
@@ -1064,8 +1105,7 @@ def plot_zoom_48h(all_results: dict, regions: list, window_name: str,
     avg_maes = {m: np.mean(v) if v else 1e9 for m, v in model_maes.items()}
     top5 = sorted(avg_maes, key=avg_maes.get)[:5]
 
-    fig, axes = plt.subplots(len(active_regions), 1,
-                             figsize=(16, 4 * len(active_regions)), sharex=False)
+    fig, axes = plt.subplots(len(active_regions), 1, figsize=(16, 4 * len(active_regions)), sharex=False)
     if len(active_regions) == 1:
         axes = [axes]
 
@@ -1074,23 +1114,33 @@ def plot_zoom_48h(all_results: dict, regions: list, window_name: str,
         test = test_dfs[region]
         n_48h = min(96, len(test))  # 48h at 30min intervals
 
-        ax.plot(test['ts'].values[:n_48h], test['actual'].values[:n_48h],
-                linewidth=2, color='#2196F3', label='Actual', zorder=10)
+        ax.plot(
+            test['ts'].values[:n_48h],
+            test['actual'].values[:n_48h],
+            linewidth=2,
+            color='#2196F3',
+            label='Actual',
+            zorder=10,
+        )
 
         for model_name in top5:
             if res.get(model_name) is None:
                 continue
             r = res[model_name]
             preds = r['preds'][:n_48h]
-            ts = test['ts'].values[:len(preds)]
+            ts = test['ts'].values[: len(preds)]
             mae = r['metrics']['MAE']
-            ax.plot(ts, preds, linewidth=1.2,
-                    color=MODEL_COLORS[model_name],
-                    linestyle=MODEL_LINESTYLES[model_name],
-                    label=f"{model_name} ({mae:.1f})")
+            ax.plot(
+                ts,
+                preds,
+                linewidth=1.2,
+                color=MODEL_COLORS[model_name],
+                linestyle=MODEL_LINESTYLES[model_name],
+                label=f'{model_name} ({mae:.1f})',
+            )
 
         ax.set_ylabel('gCO2/kWh')
-        ax.set_title(f"{region} — First 48 Hours")
+        ax.set_title(f'{region} — First 48 Hours')
         ax.legend(loc='upper right', fontsize=8)
         ax.grid(True, alpha=0.3)
         ax.xaxis.set_major_formatter(DateFormatter('%b %d %H:%M'))
@@ -1101,7 +1151,7 @@ def plot_zoom_48h(all_results: dict, regions: list, window_name: str,
     path = DOCS_DIR / f'benchmark_zoom_48h_{wlabel}.png'
     fig.savefig(path, dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print(f"  Saved: {path}")
+    print(f'  Saved: {path}')
 
 
 def plot_heatmap(all_results: dict, regions: list, window_name: str):
@@ -1183,12 +1233,11 @@ def plot_heatmap(all_results: dict, regions: list, window_name: str):
         for j in range(n_metrics):
             val = data_arr[i, j]
             if np.isfinite(val):
-                text = f"{val:.2f}" if abs(val) < 100 else f"{val:.0f}"
+                text = f'{val:.2f}' if abs(val) < 100 else f'{val:.0f}'
                 # Pick text color based on background brightness
                 bg_val = norm_arr[i, j]
                 text_color = 'white' if 0.3 < bg_val < 0.7 else 'black'
-                ax.text(j, i, text, ha='center', va='center', fontsize=7,
-                        color=text_color)
+                ax.text(j, i, text, ha='center', va='center', fontsize=7, color=text_color)
 
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
     cbar.set_label('Rank (green=best, red=worst)', fontsize=9)
@@ -1198,7 +1247,7 @@ def plot_heatmap(all_results: dict, regions: list, window_name: str):
     path = DOCS_DIR / f'benchmark_heatmap_{wlabel}.png'
     fig.savefig(path, dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print(f"  Saved: {path}")
+    print(f'  Saved: {path}')
 
 
 def plot_training_comparison(all_results: dict, regions: list, windows: list):
@@ -1216,8 +1265,7 @@ def plot_training_comparison(all_results: dict, regions: list, windows: list):
             if maes:
                 model_window_mae[window_name][model_name] = np.mean(maes)
 
-    active_models = [m for m in MODEL_NAMES
-                     if any(m in model_window_mae[w] for w in windows)]
+    active_models = [m for m in MODEL_NAMES if any(m in model_window_mae[w] for w in windows)]
     if not active_models:
         return
 
@@ -1228,12 +1276,17 @@ def plot_training_comparison(all_results: dict, regions: list, windows: list):
     for i, window_name in enumerate(windows):
         vals = [model_window_mae[window_name].get(m, 0) for m in active_models]
         offset = (i - (len(windows) - 1) / 2) * width
-        bars = ax.bar(x + offset, vals, width, label=window_name,
-                      color=f'C{i}', alpha=0.8)
+        bars = ax.bar(x + offset, vals, width, label=window_name, color=f'C{i}', alpha=0.8)
         for bar, val in zip(bars, vals):
             if val > 0:
-                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
-                        f'{val:.1f}', ha='center', va='bottom', fontsize=7)
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.5,
+                    f'{val:.1f}',
+                    ha='center',
+                    va='bottom',
+                    fontsize=7,
+                )
 
     ax.set_ylabel('MAE (gCO2/kWh)')
     ax.set_title('MAE by Model — Training Window Comparison')
@@ -1245,11 +1298,10 @@ def plot_training_comparison(all_results: dict, regions: list, windows: list):
     path = DOCS_DIR / 'benchmark_training_comparison.png'
     fig.savefig(path, dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print(f"  Saved: {path}")
+    print(f'  Saved: {path}')
 
 
-def plot_residuals(all_results: dict, regions: list, window_name: str,
-                   test_dfs: dict):
+def plot_residuals(all_results: dict, regions: list, window_name: str, test_dfs: dict):
     """Max |ACF| bar chart + residual ACF for top models."""
     active_regions = [r for r in regions if r in all_results and window_name in all_results[r]]
     if not active_regions:
@@ -1288,9 +1340,7 @@ def plot_residuals(all_results: dict, regions: list, window_name: str,
     # Bar chart of Max |ACF| (lower is better — sorted ascending)
     sorted_models = sorted(model_max_acf, key=model_max_acf.get)
     colors = [MODEL_COLORS.get(m, 'gray') for m in sorted_models]
-    ax1.barh(range(len(sorted_models)),
-             [model_max_acf[m] for m in sorted_models],
-             color=colors, alpha=0.8)
+    ax1.barh(range(len(sorted_models)), [model_max_acf[m] for m in sorted_models], color=colors, alpha=0.8)
     ax1.set_yticks(range(len(sorted_models)))
     ax1.set_yticklabels(sorted_models, fontsize=9)
     ax1.set_xlabel('Max |ACF| at lags 1-48 (lower = better)')
@@ -1308,16 +1358,12 @@ def plot_residuals(all_results: dict, regions: list, window_name: str,
             if res.get(model_name) is None:
                 continue
             preds = res[model_name]['preds']
-            residuals = test_y[:len(preds)] - preds
+            residuals = test_y[: len(preds)] - preds
             acf_vals = acf(residuals, nlags=n_lags_acf, fft=True)
-            ax2.plot(range(n_lags_acf + 1), acf_vals,
-                     color=MODEL_COLORS[model_name],
-                     label=model_name, linewidth=1.2)
+            ax2.plot(range(n_lags_acf + 1), acf_vals, color=MODEL_COLORS[model_name], label=model_name, linewidth=1.2)
         ax2.axhline(0, color='gray', linewidth=0.5)
-        ax2.axhline(1.96 / np.sqrt(len(test_y)), color='gray', linestyle='--',
-                     linewidth=0.5, alpha=0.5)
-        ax2.axhline(-1.96 / np.sqrt(len(test_y)), color='gray', linestyle='--',
-                     linewidth=0.5, alpha=0.5)
+        ax2.axhline(1.96 / np.sqrt(len(test_y)), color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+        ax2.axhline(-1.96 / np.sqrt(len(test_y)), color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
         ax2.set_xlabel('Lag (30-min intervals)')
         ax2.set_ylabel('ACF')
         ax2.set_title(f'Residual ACF — {region}')
@@ -1330,83 +1376,85 @@ def plot_residuals(all_results: dict, regions: list, window_name: str,
     path = DOCS_DIR / f'benchmark_residuals_{wlabel}.png'
     fig.savefig(path, dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print(f"  Saved: {path}")
+    print(f'  Saved: {path}')
 
 
 # ── Section 7: Report Generation ─────────────────────────────────────────
 
-def generate_report(all_results: dict, regions: list, data_info: dict,
-                    windows: list, noexog_results: dict = None) -> str:
+
+def generate_report(
+    all_results: dict, regions: list, data_info: dict, windows: list, noexog_results: dict = None
+) -> str:
     """Generate markdown report from benchmark results."""
     lines = []
-    lines.append("# Carbon Intensity Prediction Benchmark")
-    lines.append("")
-    lines.append("## Overview")
-    lines.append("")
+    lines.append('# Carbon Intensity Prediction Benchmark')
+    lines.append('')
+    lines.append('## Overview')
+    lines.append('')
     lines.append(
-        "This report compares 18 forecasting models (7 statistical + 1 direct ML + 4 tree-based + 3 transformer "
-        "+ 1 foundation + 2 deep forecasting) on real UK carbon intensity data (gCO2/kWh). Models "
-        "are evaluated on 7 metrics that measure both point accuracy and residual structure. Where "
-        "applicable, models use lag-1 weather data (wind speed, temperature, solar radiation) from "
-        "Open-Meteo as exogenous features. The benchmark tests different training window sizes "
-        "to assess the effect of data volume on prediction quality."
+        'This report compares 18 forecasting models (7 statistical + 1 direct ML + 4 tree-based + 3 transformer '
+        '+ 1 foundation + 2 deep forecasting) on real UK carbon intensity data (gCO2/kWh). Models '
+        'are evaluated on 7 metrics that measure both point accuracy and residual structure. Where '
+        'applicable, models use lag-1 weather data (wind speed, temperature, solar radiation) from '
+        'Open-Meteo as exogenous features. The benchmark tests different training window sizes '
+        'to assess the effect of data volume on prediction quality.'
     )
-    lines.append("")
+    lines.append('')
 
     # Test setup
-    lines.append("## Test Setup")
-    lines.append("")
-    lines.append("| Parameter | Value |")
-    lines.append("|-----------|-------|")
-    lines.append(f"| **Data source** | `carbon_intensity.db` (UK Carbon Intensity API) |")
-    lines.append(f"| **Regions** | {', '.join(regions)} |")
-    lines.append(f"| **Date range** | {data_info['date_min']} to {data_info['date_max']} |")
-    lines.append(f"| **Total readings** | {data_info['total_rows']} |")
-    lines.append(f"| **Frequency** | 30-minute intervals |")
-    lines.append(f"| **Test set** | Last {TEST_DAYS} days |")
+    lines.append('## Test Setup')
+    lines.append('')
+    lines.append('| Parameter | Value |')
+    lines.append('|-----------|-------|')
+    lines.append(f'| **Data source** | `carbon_intensity.db` (UK Carbon Intensity API) |')
+    lines.append(f'| **Regions** | {", ".join(regions)} |')
+    lines.append(f'| **Date range** | {data_info["date_min"]} to {data_info["date_max"]} |')
+    lines.append(f'| **Total readings** | {data_info["total_rows"]} |')
+    lines.append(f'| **Frequency** | 30-minute intervals |')
+    lines.append(f'| **Test set** | Last {TEST_DAYS} days |')
     for w in windows:
-        lines.append(f"| **Training ({w})** | {data_info.get(f'train_info_{w}', 'N/A')} |")
-    lines.append("")
+        lines.append(f'| **Training ({w})** | {data_info.get(f"train_info_{w}", "N/A")} |')
+    lines.append('')
 
     # Raw data graph
-    lines.append("## Raw Data")
-    lines.append("")
-    lines.append("![Raw Data](benchmark_raw_data.png)")
-    lines.append("")
+    lines.append('## Raw Data')
+    lines.append('')
+    lines.append('![Raw Data](benchmark_raw_data.png)')
+    lines.append('')
 
     # Metrics explanation
-    lines.append("## Metrics Explained")
-    lines.append("")
-    lines.append("| Metric | Purpose |")
-    lines.append("|--------|---------|")
-    lines.append("| **MAE** | Mean Absolute Error — primary accuracy in gCO2/kWh |")
-    lines.append("| **MSE** | Mean Squared Error — penalizes large errors quadratically |")
-    lines.append("| **RMSE** | Root MSE — same scale as MAE, sensitive to outliers |")
-    lines.append("| **R-squared** | Fraction of variance explained; negative = worse than predicting the mean |")
-    lines.append("| **Adjusted R-squared** | R-squared penalized by number of model features |")
+    lines.append('## Metrics Explained')
+    lines.append('')
+    lines.append('| Metric | Purpose |')
+    lines.append('|--------|---------|')
+    lines.append('| **MAE** | Mean Absolute Error — primary accuracy in gCO2/kWh |')
+    lines.append('| **MSE** | Mean Squared Error — penalizes large errors quadratically |')
+    lines.append('| **RMSE** | Root MSE — same scale as MAE, sensitive to outliers |')
+    lines.append('| **R-squared** | Fraction of variance explained; negative = worse than predicting the mean |')
+    lines.append('| **Adjusted R-squared** | R-squared penalized by number of model features |')
     lines.append(
-        "| **Ljung-Box p-value** | Ljung-Box test at lag 48 (24h). "
-        "High p-value (> 0.05) = residuals consistent with white noise (good). "
-        "Low = significant autocorrelation remains (model missed structure) |"
+        '| **Ljung-Box p-value** | Ljung-Box test at lag 48 (24h). '
+        'High p-value (> 0.05) = residuals consistent with white noise (good). '
+        'Low = significant autocorrelation remains (model missed structure) |'
     )
     lines.append(
-        "| **Max \\|ACF\\|** | Maximum absolute autocorrelation at lags 1-48. "
-        "Lower is better — near 0 means no predictable structure left in residuals |"
+        '| **Max \\|ACF\\|** | Maximum absolute autocorrelation at lags 1-48. '
+        'Lower is better — near 0 means no predictable structure left in residuals |'
     )
-    lines.append("")
+    lines.append('')
 
     # Results per window
     for window_name in windows:
         wlabel = window_name.replace(' ', '_').lower()
-        lines.append(f"## Results: {window_name}")
-        lines.append("")
+        lines.append(f'## Results: {window_name}')
+        lines.append('')
 
         # Accuracy table
-        lines.append("### Accuracy Table")
-        lines.append("")
+        lines.append('### Accuracy Table')
+        lines.append('')
         metric_cols = ['MAE', 'RMSE', 'R2', 'LjungBox_pval', 'Max_ACF']
-        header = "| Model | " + " | ".join(metric_cols) + " | Time (s) |"
-        sep = "|-------|" + "|".join(["-------"] * len(metric_cols)) + "|----------|"
+        header = '| Model | ' + ' | '.join(metric_cols) + ' | Time (s) |'
+        sep = '|-------|' + '|'.join(['-------'] * len(metric_cols)) + '|----------|'
         lines.append(header)
         lines.append(sep)
 
@@ -1433,173 +1481,171 @@ def generate_report(all_results: dict, regions: list, data_info: dict,
             for metric in metric_cols:
                 v = avg_metrics[metric]
                 if np.isnan(v):
-                    vals_str.append("N/A")
+                    vals_str.append('N/A')
                 elif abs(v) < 10:
-                    vals_str.append(f"{v:.3f}")
+                    vals_str.append(f'{v:.3f}')
                 else:
-                    vals_str.append(f"{v:.2f}")
+                    vals_str.append(f'{v:.2f}')
 
-            t_str = f"{np.mean(avg_time):.2f}" if avg_time else "N/A"
-            row = f"| {model_name} | " + " | ".join(vals_str) + f" | {t_str} |"
+            t_str = f'{np.mean(avg_time):.2f}' if avg_time else 'N/A'
+            row = f'| {model_name} | ' + ' | '.join(vals_str) + f' | {t_str} |'
             lines.append(row)
 
-        lines.append("")
-        lines.append(f"*Averaged across {len(active_regions)} regions. Lower MAE/RMSE/Max_ACF is better. Higher R2/LjungBox_pval is better.*")
-        lines.append("")
+        lines.append('')
+        lines.append(
+            f'*Averaged across {len(active_regions)} regions. Lower MAE/RMSE/Max_ACF is better. Higher R2/LjungBox_pval is better.*'
+        )
+        lines.append('')
 
         # Graphs
-        lines.append("### Predictions vs Actual")
-        lines.append("")
-        lines.append(f"![Predictions {window_name}](benchmark_predictions_{wlabel}.png)")
-        lines.append("")
-        lines.append("### Zoomed 48-Hour Detail")
-        lines.append("")
-        lines.append(f"![48h Detail {window_name}](benchmark_zoom_48h_{wlabel}.png)")
-        lines.append("")
+        lines.append('### Predictions vs Actual')
+        lines.append('')
+        lines.append(f'![Predictions {window_name}](benchmark_predictions_{wlabel}.png)')
+        lines.append('')
+        lines.append('### Zoomed 48-Hour Detail')
+        lines.append('')
+        lines.append(f'![48h Detail {window_name}](benchmark_zoom_48h_{wlabel}.png)')
+        lines.append('')
 
     # Training comparison
     if len(windows) > 1:
-        lines.append("## Training Data Volume Comparison")
-        lines.append("")
-        lines.append("![Training Comparison](benchmark_training_comparison.png)")
-        lines.append("")
+        lines.append('## Training Data Volume Comparison')
+        lines.append('')
+        lines.append('![Training Comparison](benchmark_training_comparison.png)')
+        lines.append('')
         lines.append(
-            "This chart compares MAE across training windows. Models that improve "
-            "significantly with more data have learned meaningful temporal patterns. "
-            "Models that stay flat or get worse may be overfitting or are insensitive "
-            "to training volume."
+            'This chart compares MAE across training windows. Models that improve '
+            'significantly with more data have learned meaningful temporal patterns. '
+            'Models that stay flat or get worse may be overfitting or are insensitive '
+            'to training volume.'
         )
-        lines.append("")
+        lines.append('')
 
     # Residual analysis
     for window_name in windows:
         wlabel = window_name.replace(' ', '_').lower()
-        lines.append(f"## Residual Analysis — {window_name}")
-        lines.append("")
-        lines.append(f"![Residuals {window_name}](benchmark_residuals_{wlabel}.png)")
-        lines.append("")
+        lines.append(f'## Residual Analysis — {window_name}')
+        lines.append('')
+        lines.append(f'![Residuals {window_name}](benchmark_residuals_{wlabel}.png)')
+        lines.append('')
         lines.append(
             "**Max |ACF|** near 0 means the model's residuals look like white noise —"
-            "it captured all the periodic structure in the data. Higher values suggest the model"
-            "missed recurring patterns. The **ACF plot** shows autocorrelation in residuals;"
-            " significant spikes at lag 48 (1 day) or lag 336 (1 week) indicate unmodelled seasonality."
+            'it captured all the periodic structure in the data. Higher values suggest the model'
+            'missed recurring patterns. The **ACF plot** shows autocorrelation in residuals;'
+            ' significant spikes at lag 48 (1 day) or lag 336 (1 week) indicate unmodelled seasonality.'
         )
-        lines.append("")
+        lines.append('')
 
     # Heatmaps
     for window_name in windows:
         wlabel = window_name.replace(' ', '_').lower()
-        lines.append(f"## Metrics Heatmap — {window_name}")
-        lines.append("")
-        lines.append(f"![Heatmap {window_name}](benchmark_heatmap_{wlabel}.png)")
-        lines.append("")
+        lines.append(f'## Metrics Heatmap — {window_name}')
+        lines.append('')
+        lines.append(f'![Heatmap {window_name}](benchmark_heatmap_{wlabel}.png)')
+        lines.append('')
 
     # Model details
-    lines.append("## Model Details")
-    lines.append("")
-    lines.append("### Statistical Models")
-    lines.append("")
+    lines.append('## Model Details')
+    lines.append('')
+    lines.append('### Statistical Models')
+    lines.append('')
     lines.append(
-        "- **Ridge Regression**: Ridge(alpha=1.0) with cyclical sin/cos features for hour, "
-        "day-of-week, minute-of-day. Fast, interpretable, but limited to capturing smooth seasonality."
+        '- **Ridge Regression**: Ridge(alpha=1.0) with cyclical sin/cos features for hour, '
+        'day-of-week, minute-of-day. Fast, interpretable, but limited to capturing smooth seasonality.'
     )
     lines.append(
-        "- **SARIMAX**: SARIMAX(1,0,1)(1,0,1,48) with training capped at 14 days. "
-        "Captures autoregressive momentum and seasonal patterns. Uses d=0 (no differencing). Slower to fit."
+        '- **SARIMAX**: SARIMAX(1,0,1)(1,0,1,48) with training capped at 14 days. '
+        'Captures autoregressive momentum and seasonal patterns. Uses d=0 (no differencing). Slower to fit.'
     )
     lines.append(
-        "- **ARIMA(d=1)**: SARIMAX(1,1,1)(1,0,1,48) — same as SARIMAX but with first differencing "
-        "(d=1). Models changes rather than levels, making the series stationary. Addresses "
-        "the persistence structure that d=0 misses."
+        '- **ARIMA(d=1)**: SARIMAX(1,1,1)(1,0,1,48) — same as SARIMAX but with first differencing '
+        '(d=1). Models changes rather than levels, making the series stationary. Addresses '
+        'the persistence structure that d=0 misses.'
     )
     lines.append(
-        "- **Seasonal Naive**: Repeats the last 7 days of training data. Zero parameters, "
-        "instant. Strong baseline when weekly patterns dominate."
+        '- **Seasonal Naive**: Repeats the last 7 days of training data. Zero parameters, '
+        'instant. Strong baseline when weekly patterns dominate.'
     )
     lines.append(
-        "- **Fourier Regression**: 3 daily + 2 weekly harmonics solved via OLS (numpy.linalg.lstsq). "
+        '- **Fourier Regression**: 3 daily + 2 weekly harmonics solved via OLS (numpy.linalg.lstsq). '
         "Prophet's core math without the overhead."
     )
     lines.append(
-        "- **Holt-Winters**: Triple exponential smoothing with additive trend and seasonality "
-        "(seasonal_periods=48). Struggles with noisy, multi-seasonal data."
+        '- **Holt-Winters**: Triple exponential smoothing with additive trend and seasonality '
+        '(seasonal_periods=48). Struggles with noisy, multi-seasonal data.'
     )
     lines.append(
-        "- **Direct-Ridge**: Direct multi-step Ridge regression. Instead of recursive forecasting "
-        "(predict t+1, feed back, repeat), trains a single Ridge model with the forecast horizon h "
-        "as a feature. Each test point is predicted independently from real historical data — "
-        "no error compounding. Features: cyclical time features, h/h-squared, recent history summary."
+        '- **Direct-Ridge**: Direct multi-step Ridge regression. Instead of recursive forecasting '
+        '(predict t+1, feed back, repeat), trains a single Ridge model with the forecast horizon h '
+        'as a feature. Each test point is predicted independently from real historical data — '
+        'no error compounding. Features: cyclical time features, h/h-squared, recent history summary.'
     )
     lines.append(
-        "- **Direct-XGBoost**: Same direct multi-step approach as Direct-Ridge but using "
-        "XGBRegressor(n_estimators=200, max_depth=6, lr=0.1). Gradient-boosted trees can "
-        "capture nonlinear horizon-dependent patterns that Ridge cannot. Subsampled to 500K "
-        "training pairs for efficiency."
+        '- **Direct-XGBoost**: Same direct multi-step approach as Direct-Ridge but using '
+        'XGBRegressor(n_estimators=200, max_depth=6, lr=0.1). Gradient-boosted trees can '
+        'capture nonlinear horizon-dependent patterns that Ridge cannot. Subsampled to 500K '
+        'training pairs for efficiency.'
     )
-    lines.append("")
-    lines.append("### ML Tree-Based Models")
-    lines.append("")
+    lines.append('')
+    lines.append('### ML Tree-Based Models')
+    lines.append('')
     lines.append(
-        "- **Random Forest**: RF(n_estimators=200, max_depth=15) with lag + cyclical features. "
-        "Walk-forward evaluation using actual history for lag computation."
-    )
-    lines.append(
-        "- **XGBoost**: XGB(n_estimators=200, max_depth=6, lr=0.1). Gradient-boosted trees "
-        "with the same feature set and walk-forward evaluation."
+        '- **Random Forest**: RF(n_estimators=200, max_depth=15) with lag + cyclical features. '
+        'Walk-forward evaluation using actual history for lag computation.'
     )
     lines.append(
-        "- **CatBoost**: CB(iterations=200, depth=6, lr=0.1). Ordered boosting with "
-        "symmetric trees. Walk-forward evaluation."
+        '- **XGBoost**: XGB(n_estimators=200, max_depth=6, lr=0.1). Gradient-boosted trees '
+        'with the same feature set and walk-forward evaluation.'
     )
     lines.append(
-        "- **LightGBM**: LGBM(n_estimators=200, max_depth=6, lr=0.1). Histogram-based "
-        "gradient boosting. Walk-forward evaluation."
-    )
-    lines.append("")
-    lines.append("### Transformer Models")
-    lines.append("")
-    lines.append(
-        "- **Transformer-1K**: Small transformer encoder (~1K parameters). "
-        "Input projection + sinusoidal positional encoding + 1-layer TransformerEncoder "
-        "(dim_feedforward=4*d_model, no dropout) + linear head on last position. "
-        "Trained on sliding windows (seq_len=48, 50 epochs, Adam lr=0.001, grad clip=1.0). "
-        "Recursive multi-step forecasting with Z-score normalization."
+        '- **CatBoost**: CB(iterations=200, depth=6, lr=0.1). Ordered boosting with '
+        'symmetric trees. Walk-forward evaluation.'
     )
     lines.append(
-        "- **Transformer-5K**: Same architecture (~5K parameters), larger d_model."
+        '- **LightGBM**: LGBM(n_estimators=200, max_depth=6, lr=0.1). Histogram-based '
+        'gradient boosting. Walk-forward evaluation.'
     )
+    lines.append('')
+    lines.append('### Transformer Models')
+    lines.append('')
     lines.append(
-        "- **Transformer-10K**: Same architecture (~10K parameters), largest d_model."
+        '- **Transformer-1K**: Small transformer encoder (~1K parameters). '
+        'Input projection + sinusoidal positional encoding + 1-layer TransformerEncoder '
+        '(dim_feedforward=4*d_model, no dropout) + linear head on last position. '
+        'Trained on sliding windows (seq_len=48, 50 epochs, Adam lr=0.001, grad clip=1.0). '
+        'Recursive multi-step forecasting with Z-score normalization.'
     )
-    lines.append("")
-    lines.append("### Foundation Models")
-    lines.append("")
+    lines.append('- **Transformer-5K**: Same architecture (~5K parameters), larger d_model.')
+    lines.append('- **Transformer-10K**: Same architecture (~10K parameters), largest d_model.')
+    lines.append('')
+    lines.append('### Foundation Models')
+    lines.append('')
     lines.append(
         "- **Chronos-Tiny**: Amazon's pre-trained time series foundation model (Chronos-T5-Tiny, "
-        "~8M parameters). Zero-shot forecasting — no training on local data. Tokenizes the "
-        "historical series and generates predictions autoregressively using a T5 language model "
-        "backbone trained on millions of diverse time series. Median of 20 sample trajectories."
+        '~8M parameters). Zero-shot forecasting — no training on local data. Tokenizes the '
+        'historical series and generates predictions autoregressively using a T5 language model '
+        'backbone trained on millions of diverse time series. Median of 20 sample trajectories.'
     )
-    lines.append("")
-    lines.append("### Deep Forecasting Models")
-    lines.append("")
+    lines.append('')
+    lines.append('### Deep Forecasting Models')
+    lines.append('')
     lines.append(
-        "- **N-BEATS**: Neural Basis Expansion Analysis for Time Series (Oreshkin et al., 2019). "
-        "Direct multi-horizon forecasting — predicts all h steps at once, avoiding recursive error "
-        "compounding. Decomposes forecast into interpretable trend and seasonality basis functions. "
-        "Trained from scratch on local data (300 steps, input_size=96)."
+        '- **N-BEATS**: Neural Basis Expansion Analysis for Time Series (Oreshkin et al., 2019). '
+        'Direct multi-horizon forecasting — predicts all h steps at once, avoiding recursive error '
+        'compounding. Decomposes forecast into interpretable trend and seasonality basis functions. '
+        'Trained from scratch on local data (300 steps, input_size=96).'
     )
     lines.append(
-        "- **N-HiTS**: Neural Hierarchical Interpolation for Time Series (Challu et al., 2022). "
-        "Improved N-BEATS with multi-rate signal sampling — uses hierarchical interpolation at "
-        "different temporal scales. Direct multi-horizon output, no recursive forecasting. "
-        "Trained from scratch (300 steps, input_size=96)."
+        '- **N-HiTS**: Neural Hierarchical Interpolation for Time Series (Challu et al., 2022). '
+        'Improved N-BEATS with multi-rate signal sampling — uses hierarchical interpolation at '
+        'different temporal scales. Direct multi-horizon output, no recursive forecasting. '
+        'Trained from scratch (300 steps, input_size=96).'
     )
-    lines.append("")
+    lines.append('')
 
     # Key findings
-    lines.append("## Key Findings")
-    lines.append("")
+    lines.append('## Key Findings')
+    lines.append('')
 
     # Compute best model per window
     for window_name in windows:
@@ -1616,106 +1662,106 @@ def generate_report(all_results: dict, regions: list, data_info: dict,
 
         if best_mae:
             sorted_models = sorted(best_mae, key=best_mae.get)
-            lines.append(f"**{window_name}** — Top 3 by MAE:")
+            lines.append(f'**{window_name}** — Top 3 by MAE:')
             for i, m in enumerate(sorted_models[:3]):
-                lines.append(f"{i+1}. {m}: MAE = {best_mae[m]:.2f} gCO2/kWh")
-            lines.append("")
+                lines.append(f'{i + 1}. {m}: MAE = {best_mae[m]:.2f} gCO2/kWh')
+            lines.append('')
 
     lines.append(
-        "**Residual structure**: Models with high Ljung-Box p-values and low Max |ACF| "
+        '**Residual structure**: Models with high Ljung-Box p-values and low Max |ACF| '
         "leave no predictable structure in their residuals — they've captured the signal fully. "
-        "Tree-based models with lag features tend to score well here because they can "
-        "replicate recent patterns."
+        'Tree-based models with lag features tend to score well here because they can '
+        'replicate recent patterns.'
     )
-    lines.append("")
+    lines.append('')
     lines.append(
-        "**Training volume effect**: More training data generally helps autoregressive "
-        "models (SARIMAX, tree models) but has diminishing returns for models that only "
-        "use time-of-day features (Ridge, Fourier)."
+        '**Training volume effect**: More training data generally helps autoregressive '
+        'models (SARIMAX, tree models) but has diminishing returns for models that only '
+        'use time-of-day features (Ridge, Fourier).'
     )
-    lines.append("")
+    lines.append('')
     lines.append(
-        "**Speed/accuracy tradeoffs**: Ridge and Fourier are near-instant. SARIMAX and "
-        "tree models take seconds. For production use, the best model depends on whether "
-        "you need sub-second predictions or can afford batch computation."
+        '**Speed/accuracy tradeoffs**: Ridge and Fourier are near-instant. SARIMAX and '
+        'tree models take seconds. For production use, the best model depends on whether '
+        'you need sub-second predictions or can afford batch computation.'
     )
-    lines.append("")
+    lines.append('')
 
     # Methodology
-    lines.append("## Methodology Notes")
-    lines.append("")
+    lines.append('## Methodology Notes')
+    lines.append('')
     lines.append(
-        "- **Walk-forward evaluation** for tree models: trained once, then at each test step "
-        "lag features are built from actual historical values (not predictions). This simulates "
-        "production usage where recent actuals are available."
+        '- **Walk-forward evaluation** for tree models: trained once, then at each test step '
+        'lag features are built from actual historical values (not predictions). This simulates '
+        'production usage where recent actuals are available.'
     )
     lines.append(
-        "- **SARIMAX training cap**: Limited to 14 days to avoid excessive fit time. "
-        "This is consistent with the production predictor."
+        '- **SARIMAX training cap**: Limited to 14 days to avoid excessive fit time. '
+        'This is consistent with the production predictor.'
     )
     lines.append(
-        "- **No hyperparameter tuning**: All models use reasonable defaults. Results could "
-        "improve with tuning, but the comparison is fair since no model was optimized."
+        '- **No hyperparameter tuning**: All models use reasonable defaults. Results could '
+        'improve with tuning, but the comparison is fair since no model was optimized.'
     )
     lines.append(
-        "- **Ljung-Box test**: Tests whether residual autocorrelations at lags 1-48 are "
-        "jointly zero. A p-value > 0.05 means residuals are consistent with white noise. "
-        "This directly measures whether the model left predictable structure."
+        '- **Ljung-Box test**: Tests whether residual autocorrelations at lags 1-48 are '
+        'jointly zero. A p-value > 0.05 means residuals are consistent with white noise. '
+        'This directly measures whether the model left predictable structure.'
     )
     lines.append(
-        "- **Max |ACF|**: The worst-case autocorrelation at any single lag from 1 to 48. "
-        "A complementary diagnostic to Ljung-Box — pinpoints the lag where the most "
-        "structure remains."
+        '- **Max |ACF|**: The worst-case autocorrelation at any single lag from 1 to 48. '
+        'A complementary diagnostic to Ljung-Box — pinpoints the lag where the most '
+        'structure remains.'
     )
     lines.append(
-        "- **Weather features (exogenous)**: Lag-1 weather data (wind speed at 10m, temperature "
-        "at 2m, shortwave solar radiation) from the Open-Meteo archive API is used as exogenous "
-        "features for Ridge, Fourier, tree-based, and transformer models. SARIMAX, Seasonal Naive, "
-        "and Holt-Winters do not support exogenous inputs. The lag-1 shift ensures no data "
+        '- **Weather features (exogenous)**: Lag-1 weather data (wind speed at 10m, temperature '
+        'at 2m, shortwave solar radiation) from the Open-Meteo archive API is used as exogenous '
+        'features for Ridge, Fourier, tree-based, and transformer models. SARIMAX, Seasonal Naive, '
+        'and Holt-Winters do not support exogenous inputs. The lag-1 shift ensures no data '
         "leakage — at each prediction step, only the previous step's weather is visible. "
-        "Weather is a true exogenous variable: it influences carbon intensity indirectly "
-        "(via renewable generation capacity) but is independently forecastable.\n"
-        "- **Why not generation mix?**: We considered using lag-1 generation mix (gas, wind, solar, "
-        "nuclear, biomass, imports) as features. However, carbon intensity is directly *computed from* "
-        "the fuel mix — providing test-period generation mix data essentially provides the answer. "
-        "In production, future generation mix is unknown and would itself need forecasting, making "
-        "it an invalid exogenous feature for a forecasting benchmark."
+        'Weather is a true exogenous variable: it influences carbon intensity indirectly '
+        '(via renewable generation capacity) but is independently forecastable.\n'
+        '- **Why not generation mix?**: We considered using lag-1 generation mix (gas, wind, solar, '
+        'nuclear, biomass, imports) as features. However, carbon intensity is directly *computed from* '
+        'the fuel mix — providing test-period generation mix data essentially provides the answer. '
+        'In production, future generation mix is unknown and would itself need forecasting, making '
+        'it an invalid exogenous feature for a forecasting benchmark.'
     )
     lines.append(
-        "- **Direct multi-step forecasting**: Direct-Ridge trains a single model with the forecast "
-        "horizon h as a feature. Each test point is predicted independently from real historical "
-        "data — no recursive error compounding. This contrasts with recursive approaches (tree models, "
-        "transformers) where prediction errors feed forward into subsequent steps."
+        '- **Direct multi-step forecasting**: Direct-Ridge trains a single model with the forecast '
+        'horizon h as a feature. Each test point is predicted independently from real historical '
+        'data — no recursive error compounding. This contrasts with recursive approaches (tree models, '
+        'transformers) where prediction errors feed forward into subsequent steps.'
     )
     lines.append(
-        "- **Foundation model (Chronos)**: Zero-shot inference — no training on local data. "
-        "The model was pre-trained on hundreds of millions of time series from diverse domains. "
-        "Uses the smallest variant (Chronos-T5-Tiny, ~8M params) for benchmarking speed."
+        '- **Foundation model (Chronos)**: Zero-shot inference — no training on local data. '
+        'The model was pre-trained on hundreds of millions of time series from diverse domains. '
+        'Uses the smallest variant (Chronos-T5-Tiny, ~8M params) for benchmarking speed.'
     )
     lines.append(
-        "- **N-BEATS / N-HiTS**: Direct multi-horizon deep learning models from the neuralforecast "
-        "library. They predict all h steps simultaneously (no recursive step), using learned basis "
-        "expansions. Require input_size + h training points, so may fail on short training windows."
+        '- **N-BEATS / N-HiTS**: Direct multi-horizon deep learning models from the neuralforecast '
+        'library. They predict all h steps simultaneously (no recursive step), using learned basis '
+        'expansions. Require input_size + h training points, so may fail on short training windows.'
     )
-    lines.append("")
+    lines.append('')
 
     # Ablation: with vs without exogenous features
     if noexog_results:
-        lines.append("## Ablation: With vs Without Weather Features")
-        lines.append("")
+        lines.append('## Ablation: With vs Without Weather Features')
+        lines.append('')
         lines.append(
-            "To measure the impact of weather features, all models were run both with "
-            "and without lag-1 weather data (wind speed, temperature, solar radiation). "
+            'To measure the impact of weather features, all models were run both with '
+            'and without lag-1 weather data (wind speed, temperature, solar radiation). '
             "Models that don't use exogenous features (SARIMAX, Seasonal Naive, Holt-Winters) "
-            "are unchanged."
+            'are unchanged.'
         )
-        lines.append("")
+        lines.append('')
 
         for window_name in windows:
-            lines.append(f"### {window_name}")
-            lines.append("")
-            lines.append("| Model | MAE (with weather) | MAE (no weather) | Delta |")
-            lines.append("|-------|-------------------|-----------------|-------|")
+            lines.append(f'### {window_name}')
+            lines.append('')
+            lines.append('| Model | MAE (with weather) | MAE (no weather) | Delta |')
+            lines.append('|-------|-------------------|-----------------|-------|')
 
             active_regions = [r for r in regions if r in all_results and window_name in all_results[r]]
             noexog_regions = [r for r in regions if r in noexog_results and window_name in noexog_results[r]]
@@ -1738,33 +1784,33 @@ def generate_report(all_results: dict, regions: list, data_info: dict,
                     avg_with = np.mean(maes_with)
                     avg_without = np.mean(maes_without)
                     delta = avg_with - avg_without
-                    sign = "+" if delta > 0 else ""
-                    lines.append(
-                        f"| {model_name} | {avg_with:.2f} | {avg_without:.2f} | {sign}{delta:.2f} |"
-                    )
+                    sign = '+' if delta > 0 else ''
+                    lines.append(f'| {model_name} | {avg_with:.2f} | {avg_without:.2f} | {sign}{delta:.2f} |')
                 elif maes_with:
-                    lines.append(f"| {model_name} | {np.mean(maes_with):.2f} | — | — |")
+                    lines.append(f'| {model_name} | {np.mean(maes_with):.2f} | — | — |')
 
-            lines.append("")
+            lines.append('')
 
         lines.append(
-            "Negative delta means weather features helped (lower MAE). "
+            'Negative delta means weather features helped (lower MAE). '
             "Models that don't accept exogenous features show no change."
         )
-        lines.append("")
+        lines.append('')
 
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
 # ── Section 8: Main ─────────────────────────────────────────────────────
+
 
 def main():
     args = parse_args()
 
     # Optionally backfill
     if args.backfill > 0:
-        print(f"Backfilling {args.backfill} days of data...")
-        from carbon_collector import init_database, backfill
+        print(f'Backfilling {args.backfill} days of data...')
+        from carbon_collector import backfill, init_database
+
         conn = init_database(DB_PATH)
         backfill(conn, args.backfill)
         conn.close()
@@ -1773,27 +1819,29 @@ def main():
     # Load data
     df = load_data(DB_PATH)
     regions = sorted(df['region'].unique())
-    print(f"Regions: {regions}")
-    print(f"Date range: {df['ts'].min()} -> {df['ts'].max()}")
-    print(f"Total rows: {len(df)}")
+    print(f'Regions: {regions}')
+    print(f'Date range: {df["ts"].min()} -> {df["ts"].max()}')
+    print(f'Total rows: {len(df)}')
 
     total_days = (df['ts'].max() - df['ts'].min()).days
-    print(f"Total span: {total_days} days")
+    print(f'Total span: {total_days} days')
 
     if total_days < 14:
-        print(f"\nWARNING: Only {total_days} days of data. Need >= 14 days for meaningful "
-              "full backfill experiment. Use --backfill N to collect more data.")
+        print(
+            f'\nWARNING: Only {total_days} days of data. Need >= 14 days for meaningful '
+            'full backfill experiment. Use --backfill N to collect more data.'
+        )
 
     # Fetch weather data (exogenous features)
     date_min = df['ts'].min().strftime('%Y-%m-%d')
     date_max = df['ts'].max().strftime('%Y-%m-%d')
-    print("\nFetching weather data...")
+    print('\nFetching weather data...')
     weather_df = fetch_weather_data(regions, date_min, date_max)
     has_weather = len(weather_df) > 0
     if has_weather:
-        print(f"Weather data: {len(weather_df)} points across {weather_df['region'].nunique()} regions")
+        print(f'Weather data: {len(weather_df)} points across {weather_df["region"].nunique()} regions')
     else:
-        print("WARNING: No weather data available — running without exogenous features")
+        print('WARNING: No weather data available — running without exogenous features')
 
     # Determine training windows
     split_date = df['ts'].max() - pd.Timedelta(days=TEST_DAYS)
@@ -1814,7 +1862,7 @@ def main():
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Plot raw data
-    print("\nGenerating raw data plot...")
+    print('\nGenerating raw data plot...')
     plot_raw_data(df, regions)
 
     # Run experiments
@@ -1826,7 +1874,7 @@ def main():
         test = rdf[rdf['ts'] > split_date].reset_index(drop=True)
 
         if len(test) == 0:
-            print(f"\n{region}: no test data, skipping")
+            print(f'\n{region}: no test data, skipping')
             continue
 
         test_dfs[region] = test
@@ -1839,14 +1887,14 @@ def main():
                 train = rdf[rdf['ts'] <= split_date].reset_index(drop=True)
 
             if len(train) < 48:
-                print(f"\n{region} [{window_name}]: insufficient training data ({len(train)} points), skipping")
+                print(f'\n{region} [{window_name}]: insufficient training data ({len(train)} points), skipping')
                 continue
 
             train_days = (train['ts'].max() - train['ts'].min()).days
-            data_info[f'train_info_{window_name}'] = f"{len(train)} points ({train_days} days)"
-            print(f"\n{'='*60}")
-            print(f"  {region} [{window_name}]: train={len(train)} ({train_days}d), test={len(test)}")
-            print(f"{'='*60}")
+            data_info[f'train_info_{window_name}'] = f'{len(train)} points ({train_days} days)'
+            print(f'\n{"=" * 60}')
+            print(f'  {region} [{window_name}]: train={len(train)} ({train_days}d), test={len(test)}')
+            print(f'{"=" * 60}')
 
             # Build lag-1 exogenous features from weather data
             train_exog = None
@@ -1867,14 +1915,18 @@ def main():
                     test_exog = merged[WEATHER_FEATURES].iloc[n_train:].values
 
             all_results[region][window_name] = run_experiment(
-                region, train, test, window_name,
-                train_exog=train_exog, test_exog=test_exog,
+                region,
+                train,
+                test,
+                window_name,
+                train_exog=train_exog,
+                test_exog=test_exog,
             )
 
     # ── Ablation: run without exogenous features ──
-    print("\n" + "=" * 70)
-    print("  ABLATION: Running models WITHOUT exogenous weather features")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('  ABLATION: Running models WITHOUT exogenous weather features')
+    print('=' * 70)
     noexog_results = {}
 
     for region in regions:
@@ -1893,17 +1945,21 @@ def main():
                 continue
 
             train_days = (train['ts'].max() - train['ts'].min()).days
-            print(f"\n  {region} [{window_name}] (no exog): train={len(train)} ({train_days}d), test={len(test)}")
+            print(f'\n  {region} [{window_name}] (no exog): train={len(train)} ({train_days}d), test={len(test)}')
 
             noexog_results[region][window_name] = run_experiment(
-                region, train, test, window_name,
-                train_exog=None, test_exog=None,
+                region,
+                train,
+                test,
+                window_name,
+                train_exog=None,
+                test_exog=None,
             )
 
     # Merge no-exog tree results
     noexog_tree_path = Path(__file__).parent / 'tree_results_noexog.json'
     if noexog_tree_path.exists():
-        print("\nMerging no-exog tree results...")
+        print('\nMerging no-exog tree results...')
         tree_data = json.loads(noexog_tree_path.read_text())
         for region in tree_data:
             if region not in noexog_results:
@@ -1918,7 +1974,7 @@ def main():
 
     # Merge tree model results (from benchmark_trees.py)
     if TREE_RESULTS_PATH.exists():
-        print("\nMerging tree model results from tree_results.json...")
+        print('\nMerging tree model results from tree_results.json...')
         tree_data = json.loads(TREE_RESULTS_PATH.read_text())
         for region in tree_data:
             if region not in all_results:
@@ -1930,14 +1986,16 @@ def main():
                     if res is not None:
                         res['preds'] = np.array(res['preds'])
                         all_results[region][window_name][model_name] = res
-                        print(f"    {region}/{window_name}/{model_name}: MAE={res['metrics']['MAE']:.2f}")
+                        print(f'    {region}/{window_name}/{model_name}: MAE={res["metrics"]["MAE"]:.2f}')
     else:
-        print(f"\nNOTE: No tree results found ({TREE_RESULTS_PATH.name}). "
-              "Run benchmark_trees.py first to include tree models.")
+        print(
+            f'\nNOTE: No tree results found ({TREE_RESULTS_PATH.name}). '
+            'Run benchmark_trees.py first to include tree models.'
+        )
 
     # Merge new model results (from benchmark_new_models.py)
     if NEW_RESULTS_PATH.exists():
-        print("\nMerging new model results from new_model_results.json...")
+        print('\nMerging new model results from new_model_results.json...')
         new_data = json.loads(NEW_RESULTS_PATH.read_text())
         for region in new_data:
             if region not in all_results:
@@ -1949,7 +2007,7 @@ def main():
                     if res is not None:
                         res['preds'] = np.array(res['preds'])
                         all_results[region][window_name][model_name] = res
-                        print(f"    {region}/{window_name}/{model_name}: MAE={res['metrics']['MAE']:.2f}")
+                        print(f'    {region}/{window_name}/{model_name}: MAE={res["metrics"]["MAE"]:.2f}')
         # New models (Chronos, N-BEATS, N-HiTS) don't use exog — copy into noexog_results
         for region in new_data:
             if region not in noexog_results:
@@ -1965,12 +2023,14 @@ def main():
                             'time': res['time'],
                         }
     else:
-        print(f"\nNOTE: No new model results found ({NEW_RESULTS_PATH.name}). "
-              "Run benchmark_new_models.py first to include Chronos/N-BEATS/N-HiTS.")
+        print(
+            f'\nNOTE: No new model results found ({NEW_RESULTS_PATH.name}). '
+            'Run benchmark_new_models.py first to include Chronos/N-BEATS/N-HiTS.'
+        )
 
     # Generate graphs
     window_names = [w[0] for w in windows]
-    print("\nGenerating graphs...")
+    print('\nGenerating graphs...')
 
     for window_name in window_names:
         plot_predictions(all_results, regions, window_name, test_dfs)
@@ -1982,20 +2042,19 @@ def main():
         plot_training_comparison(all_results, regions, window_names)
 
     # Generate report
-    print("\nGenerating report...")
-    report = generate_report(all_results, regions, data_info, window_names,
-                             noexog_results=noexog_results)
+    print('\nGenerating report...')
+    report = generate_report(all_results, regions, data_info, window_names, noexog_results=noexog_results)
     report_path = DOCS_DIR / 'comparison_report.md'
     report_path.write_text(report)
-    print(f"  Saved: {report_path}")
+    print(f'  Saved: {report_path}')
 
     # Summary
-    print("\n" + "=" * 70)
-    print("BENCHMARK COMPLETE")
-    print("=" * 70)
+    print('\n' + '=' * 70)
+    print('BENCHMARK COMPLETE')
+    print('=' * 70)
 
     for window_name in window_names:
-        print(f"\n--- {window_name} ---")
+        print(f'\n--- {window_name} ---')
         active_regions = [r for r in regions if r in all_results and window_name in all_results[r]]
         model_maes = {}
         for model_name in MODEL_NAMES:
@@ -2010,11 +2069,11 @@ def main():
         if model_maes:
             sorted_models = sorted(model_maes, key=model_maes.get)
             for i, m in enumerate(sorted_models):
-                marker = " <-- best" if i == 0 else ""
-                print(f"  {i+1:2d}. {m:<20s} MAE={model_maes[m]:6.2f}{marker}")
+                marker = ' <-- best' if i == 0 else ''
+                print(f'  {i + 1:2d}. {m:<20s} MAE={model_maes[m]:6.2f}{marker}')
 
-    print(f"\nReport: {DOCS_DIR / 'comparison_report.md'}")
-    print(f"Graphs: {DOCS_DIR}/benchmark_*.png")
+    print(f'\nReport: {DOCS_DIR / "comparison_report.md"}')
+    print(f'Graphs: {DOCS_DIR}/benchmark_*.png')
 
 
 if __name__ == '__main__':

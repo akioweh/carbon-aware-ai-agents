@@ -1,10 +1,10 @@
 #ifndef SCHEDULER_EXCEPTION_HANDLER_HPP
 #define SCHEDULER_EXCEPTION_HANDLER_HPP
-#include "exceptions/NetworkException.hpp"
 #pragma once
 
 #include "SchedulingException.hpp"
 #include "ValidationException.hpp"
+#include "exceptions/NetworkException.hpp"
 #include <drogon/HttpAppFramework.h>
 #include <drogon/HttpResponse.h>
 #include <drogon/HttpTypes.h>

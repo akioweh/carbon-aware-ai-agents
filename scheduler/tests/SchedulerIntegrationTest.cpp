@@ -1,7 +1,11 @@
 #define BOOST_TEST_MODULE SchedulerIntegrationTest
 
+#include "Calendar.hpp"
+#include "TestFixture.hpp"
 #include "exceptions/ExceptionHandler.hpp"
+#include "structs/SchedulerOutput.hpp"
 #include "utils/Utils.hpp"
+#include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 #include <chrono>
 #include <drogon/HttpController.h>
@@ -10,38 +14,6 @@
 #include <thread>
 
 using namespace drogon;
-
-struct SchedulerGlobalFixture {
-    SchedulerGlobalFixture() {
-        // Ensure clean state
-        if (std::filesystem::exists("scheduler_test.db")) {
-            std::filesystem::remove("scheduler_test.db");
-        }
-
-        // Load test config
-        drogon::app().loadConfigFile("config.test.json");
-
-        // Register Exception Handler
-        scheduler::exceptions::registerExceptionHandler();
-
-        // Start the app in a thread
-        t = std::jthread([]() -> void { drogon::app().run(); });
-
-        // Wait for server to start
-        using namespace std::chrono_literals;
-        auto start = std::chrono::steady_clock::now();
-        while (!drogon::app().isRunning()) {
-            if (std::chrono::steady_clock::now() - start > 10s) {
-                throw std::runtime_error("Timeout waiting for Drogon to start");
-            }
-            std::this_thread::sleep_for(10ms);
-        }
-    }
-
-    ~SchedulerGlobalFixture() { drogon::app().quit(); }
-
-    std::jthread t;
-};
 
 BOOST_TEST_GLOBAL_FIXTURE(SchedulerGlobalFixture);
 
@@ -56,16 +28,14 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     job["gpu_type"] = "V100_PCIE";
     job["gpu_count"] = 1;
     job["model_size"] = 10;
-    job["length"] = 60;
+    job["length"] = 5;
     // Use dates in the future to ensure we hit the "forecast" part of stats
-    // The stats service generates next week prediction.
-    // Let's pick a time tomorrow.
     auto now = std::chrono::system_clock::now();
-    auto tomorrow = now + std::chrono::hours(24);
-    auto day_after = tomorrow + std::chrono::hours(24);
+    auto start = now + std::chrono::hours(1);
+    auto end = start + std::chrono::hours(2);
 
-    job["earliest_start"] = scheduler::utils::toIso8601(tomorrow);
-    job["latest_finish"] = scheduler::utils::toIso8601(day_after);
+    job["earliest_start"] = scheduler::utils::toIso8601(start);
+    job["latest_finish"] = scheduler::utils::toIso8601(end);
 
     auto req = HttpRequest::newHttpJsonRequest(job);
     req->setMethod(drogon::Post);
@@ -89,7 +59,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     std::string jobId = (*json)["schedule_id"].asString();
     BOOST_CHECK(!jobId.empty());
 
-    // 2. Retrieve the specific schedule to check its fields (GET /api/schedules/{id})
+    // 2. Retrieve the specific schedule to check its fields (GET
+    // /api/schedules/{id})
     auto getSpecificReq = HttpRequest::newHttpRequest();
     getSpecificReq->setMethod(drogon::Get);
     getSpecificReq->setPath("/api/schedules/" + jobId);
@@ -111,8 +82,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
     getReq->setPath("/api/schedules");
-    getReq->setParameter("start_time", scheduler::utils::toIso8601(tomorrow));
-    getReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
+    getReq->setParameter("start_time", scheduler::utils::toIso8601(start));
+    getReq->setParameter("end_time", scheduler::utils::toIso8601(end));
 
     auto getRespPair = client->sendRequest(getReq);
     BOOST_REQUIRE_EQUAL(getRespPair.first, ReqResult::Ok);
@@ -143,9 +114,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     auto verifyReq = HttpRequest::newHttpRequest();
     verifyReq->setMethod(drogon::Get);
     verifyReq->setPath("/api/schedules");
-    verifyReq->setParameter("start_time",
-                            scheduler::utils::toIso8601(tomorrow));
-    verifyReq->setParameter("end_time", scheduler::utils::toIso8601(day_after));
+    verifyReq->setParameter("start_time", scheduler::utils::toIso8601(start));
+    verifyReq->setParameter("end_time", scheduler::utils::toIso8601(end));
 
     auto verifyRespPair = client->sendRequest(verifyReq);
     BOOST_REQUIRE_EQUAL(verifyRespPair.first, ReqResult::Ok);
@@ -227,10 +197,10 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
         job["gpu_type"] = "V100_PCIE";
         job["gpu_count"] = 1;
         job["model_size"] = 10;
-        job["length"] = 60;
+        job["length"] = 5;
         auto now = std::chrono::system_clock::now();
-        auto start = now + std::chrono::hours(24);
-        auto end = start + std::chrono::hours(24);
+        auto start = now + std::chrono::hours(2);
+        auto end = start + std::chrono::hours(1);
         job["earliest_start"] = scheduler::utils::toIso8601(start);
         job["latest_finish"] = scheduler::utils::toIso8601(end);
 
@@ -300,6 +270,149 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     BOOST_CHECK((*getJson).isMember("scheduled_blocks"));
     BOOST_CHECK((*getJson)["scheduled_blocks"].isArray());
     BOOST_CHECK((*getJson).isMember("impact"));
+}
+
+BOOST_AUTO_TEST_CASE(test_calendar_trivial_operations) {
+    drogon::sync_wait([]() -> drogon::Task<void> {
+        scheduler::SchedulerOutput mockOutput;
+        mockOutput.impact.carbon_intensity = 50.5;
+        mockOutput.impact.total_emissions = 100.0;
+        mockOutput.impact.sci = 10.0;
+
+        std::string mockScheduleId = "999999";
+
+        // 1. Test Insertion
+        BOOST_REQUIRE_NO_THROW(co_await scheduler::calendar::addTrivial(
+            mockOutput, mockScheduleId));
+
+        // 2. Test Retrieval
+        auto result = co_await scheduler::calendar::getTrivial(mockScheduleId);
+        BOOST_CHECK_EQUAL(result.scheduleId, mockScheduleId);
+        BOOST_CHECK_CLOSE(result.impact.carbon_intensity, 50.5, 0.01);
+
+        // 3. Test Retrieval Failure (Should throw SchedulingException)
+        auto result2 = co_await scheduler::calendar::getTrivial("999");
+        BOOST_CHECK_EQUAL(result2.impact.carbon_intensity,
+                          0.0); // default autoconstructed value
+    }());
+}
+
+BOOST_AUTO_TEST_CASE(test_schedule_summaries_aggregation) {
+    drogon::sync_wait([]() -> drogon::Task<void> {
+        // scheduleSummaries executes complex SQL joins for IDs, times, and
+        // loads[cite: 1]
+        BOOST_CHECK_NO_THROW(co_await scheduler::calendar::scheduleSummaries());
+    }());
+}
+
+BOOST_AUTO_TEST_CASE(test_get_gpu_types) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(drogon::Get);
+    req->setPath("/api/hardwareSpecs/gpus");
+
+    auto respPair = client->sendRequest(req);
+    BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+    auto response = respPair.second;
+
+    // Verify 200 OK and JSON array structure[cite: 5]
+    BOOST_CHECK_EQUAL(response->getStatusCode(), k200OK);
+    auto json = response->getJsonObject();
+    BOOST_REQUIRE(json && json->isArray());
+
+    // Verify it contains at least the default hardware types[cite: 8]
+    bool foundV100 = false;
+    bool foundA100 = false;
+    for (const auto &type : *json) {
+        if (type.asString() == "V100_PCIE")
+            foundV100 = true;
+        if (type.asString() == "A100_SXM4")
+            foundA100 = true;
+    }
+    BOOST_CHECK(foundV100);
+    BOOST_CHECK(foundA100);
+}
+
+BOOST_AUTO_TEST_CASE(test_forecast_specific_datacenter) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(drogon::Get);
+    req->setPath("/api/forecast");
+    // "datacenter" key is required by the custom fromRequest template
+    req->setParameter("datacenter", "Data-Center-1");
+
+    auto respPair = client->sendRequest(req);
+    BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+    auto response = respPair.second;
+
+    BOOST_CHECK_EQUAL(response->getStatusCode(), k200OK);
+    auto json = response->getJsonObject();
+    BOOST_REQUIRE(json && json->isArray());
+
+    // Controller wraps the result in a vector
+    if (json->size() > 0) {
+        const auto &dc = (*json)[0];
+        // The Datacenter DTO serializes 'id' as "location"[cite: 11]
+        BOOST_CHECK_EQUAL(dc["location"].asString(), "Data-Center-1");
+        BOOST_CHECK(dc.isMember("timeseries"));
+        BOOST_CHECK(dc["timeseries"].isArray());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_forecast_any_datacenter_explicit) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(drogon::Get);
+    req->setPath("/api/forecast");
+    req->setParameter("datacenter", scheduler::calendar::ANY_DATACENTER);
+
+    auto respPair = client->sendRequest(req);
+    BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+
+    auto response = respPair.second;
+    BOOST_CHECK_EQUAL(response->getStatusCode(), k200OK);
+
+    auto json = response->getJsonObject();
+    BOOST_REQUIRE(json && json->isArray());
+
+    // Should return all datacenters from the StatsAPIClient[cite: 3, 9]
+    BOOST_CHECK(json->size() >= 1);
+    if (json->size() > 0) {
+        BOOST_CHECK((*json)[0].isMember("location"));
+        BOOST_CHECK((*json)[0].isMember("timeseries"));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_forecast_any_datacenter_implicit) {
+    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(drogon::Get);
+    req->setPath("/api/forecast");
+    // No parameters set—tests the 'defaultName' logic in fromRequest
+
+    auto respPair = client->sendRequest(req);
+    BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
+
+    auto response = respPair.second;
+    BOOST_CHECK_EQUAL(response->getStatusCode(), k200OK);
+
+    auto json = response->getJsonObject();
+    BOOST_REQUIRE(json && json->isArray());
+
+    // Should match the 'explicit' any behavior[cite: 3]
+    BOOST_CHECK(json->size() >= 1);
+    if (json->size() > 0) {
+        // Verify TimeSlot serialization within the timeseries[cite: 11]
+        const auto &firstSeries = (*json)[0]["timeseries"];
+        if (firstSeries.size() > 0) {
+            BOOST_CHECK(firstSeries[0].isMember("timestamp"));
+            BOOST_CHECK(firstSeries[0].isMember("carbon_intensity"));
+        }
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

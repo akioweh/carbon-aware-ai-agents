@@ -1,14 +1,21 @@
 openapi: 3.1.0
 info:
-  title: Stats API
-  description: Statistics provider for carbon-aware scheduling predictions.
+  title: Carbon-Aware Forecasting Service
+  description: Provides load and carbon intensity forecasts for data center locations.
+    Forecasts are generated using Ridge regression models trained on historical UK
+    Carbon Intensity API data and weather features from Open-Meteo. All forecasts
+    cover a 7-day window at 5-minute resolution (2016 data points).
   version: 1.0.0
 paths:
   /locations/{location}/metrics/forecast_load:
     get:
       tags:
       - Forecasts
-      summary: Get load forecast for next week
+      summary: Load forecast for a location
+      description: Returns load data for the requested time window. Supports optional
+        start_time and end_time query params (ISO 8601). Historical observations have
+        is_forecast=false, predictions have is_forecast=true. Without params, returns
+        a 7-day forecast from now.
       operationId: get_load_forecast_locations__location__metrics_forecast_load_get
       parameters:
       - name: location
@@ -17,6 +24,34 @@ paths:
         schema:
           type: string
           title: Location
+      - name: start_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Start of time window (ISO 8601)
+          title: Start Time
+        description: Start of time window (ISO 8601)
+        examples:
+          default:
+            value: '2026-03-18T00:00:00Z'
+      - name: end_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: End of time window (ISO 8601)
+          title: End Time
+        description: End of time window (ISO 8601)
+        examples:
+          default:
+            value: '2026-03-25T00:00:00Z'
       responses:
         '200':
           description: Successful Response
@@ -24,33 +59,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoadForecastResponse'
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Internal Server Error
-        '404':
-          description: Location not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '422':
-          description: Validation Error
+          description: Invalid time window (e.g. start after end, or exceeds forecast
+            window)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No load data for this location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Prediction generation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /locations/{location}/metrics/forecast_carbon_intensity:
     get:
       tags:
       - Forecasts
-      summary: Get carbon intensity forecast for next week
-      description: 'Returns ML-generated carbon intensity predictions for the next
-        week.
-
-        Results are cached for 5 minutes.'
+      summary: Carbon intensity forecast for a location
+      description: Returns carbon intensity data for the requested time window. Supports
+        optional start_time and end_time query params (ISO 8601). Historical observations
+        have is_forecast=false, predictions have is_forecast=true. Without params,
+        returns a 7-day forecast from now.
       operationId: get_carbon_forecast_locations__location__metrics_forecast_carbon_intensity_get
       parameters:
       - name: location
@@ -59,6 +95,34 @@ paths:
         schema:
           type: string
           title: Location
+      - name: start_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Start of time window (ISO 8601)
+          title: Start Time
+        description: Start of time window (ISO 8601)
+        examples:
+          default:
+            value: '2026-03-18T00:00:00Z'
+      - name: end_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: End of time window (ISO 8601)
+          title: End Time
+        description: End of time window (ISO 8601)
+        examples:
+          default:
+            value: '2026-03-25T00:00:00Z'
       responses:
         '200':
           description: Successful Response
@@ -66,34 +130,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CarbonIntensityForecastResponse'
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Internal Server Error
-        '404':
-          description: Location not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '422':
-          description: Validation Error
+          description: Invalid time window (e.g. start after end, or exceeds forecast
+            window)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No carbon intensity data for this location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Prediction generation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /predictionWindow:
+    get:
+      tags:
+      - Configuration
+      summary: Prediction window length
+      description: Returns the forecast window length in hours. Currently fixed at
+        168 hours (7 days).
+      operationId: handle_get_prediction_window_predictionWindow_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionWindowModel'
   /locations:
     get:
       tags:
       - Locations
-      summary: Get available locations
-      description: Returns a list of available locations.
+      summary: Active locations
+      description: Returns locations that are currently active and visible to the
+        scheduler. Use a location ID from this list to query forecast endpoints.
       operationId: get_locations_locations_get
       responses:
         '200':
-          description: Successful Response
+          description: List of active locations
           content:
             application/json:
               schema:
@@ -112,6 +193,76 @@ paths:
               parameters:
                 location: $response.body#/0/id
               description: Get carbon intensity forecast for a location from the list
+  /datacenters:
+    get:
+      tags:
+      - Datacenters
+      summary: All datacenters
+      description: Returns all known datacenters (active and inactive) with their
+        region metadata and coordinates. Used by the UI for datacenter management.
+      operationId: get_datacenters_datacenters_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Datacenter'
+                type: array
+                title: Response Get Datacenters Datacenters Get
+  /datacenters/{location_id}:
+    patch:
+      tags:
+      - Datacenters
+      summary: Toggle datacenter active state
+      description: Activates or deactivates a datacenter. Active datacenters appear
+        in /locations and receive scheduled forecasts.
+      operationId: patch_datacenter_datacenters__location_id__patch
+      parameters:
+      - name: location_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Location Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatacenterPatchRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datacenter'
+        '400':
+          description: Malformed request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Datacenter not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to reload datacenter after update
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
     BaseForecastDataPoint:
@@ -119,7 +270,9 @@ components:
         timestamp:
           type: string
           title: Timestamp
-          description: ISO format timestamp
+          description: ISO 8601 timestamp
+          examples:
+          - '2026-03-18T12:00:00'
         value:
           type: number
           title: Value
@@ -127,7 +280,7 @@ components:
         is_forecast:
           type: boolean
           title: Is Forecast
-          description: Indicates if this is a forecast
+          description: True for predicted data, False for historical observations
       type: object
       required:
       - timestamp
@@ -140,20 +293,28 @@ components:
           type: string
           title: Location Id
           description: Datacenter identifier
+          examples:
+          - Data-Center-1
         metric:
           type: string
           title: Metric
-          description: Metric name (e.g. forecast_load, forecast_carbon_intensity)
+          description: Metric name
+          examples:
+          - forecast_load
+          - forecast_carbon_intensity
         unit:
           type: string
           title: Unit
           description: Unit of measurement
+          examples:
+          - FLOs
+          - gCO2/kWh
         data:
           items:
             $ref: '#/components/schemas/BaseForecastDataPoint'
           type: array
           title: Data
-          description: Time series data
+          description: Time series data points within the requested window
       type: object
       required:
       - location_id
@@ -161,14 +322,72 @@ components:
       - unit
       - data
       title: CarbonIntensityForecastResponse
-    ErrorResponse:
+    Datacenter:
       properties:
-        error:
+        id:
           type: string
-          title: Error
+          title: Id
+          description: Location identifier
+          examples:
+          - Data-Center-1
+        region_id:
+          type: integer
+          title: Region Id
+          description: UK Carbon Intensity API region ID
+          examples:
+          - 13
+        name:
+          type: string
+          title: Name
+          description: Human-readable region name
+          examples:
+          - London
+        active:
+          type: boolean
+          title: Active
+          description: Whether this datacenter is visible to the scheduler
+        latitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Latitude
+          description: Latitude for weather lookups and map display
+          examples:
+          - 51.51
+        longitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Longitude
+          description: Longitude for weather lookups and map display
+          examples:
+          - -0.13
       type: object
       required:
-      - error
+      - id
+      - region_id
+      - name
+      - active
+      title: Datacenter
+    DatacenterPatchRequest:
+      properties:
+        active:
+          type: boolean
+          title: Active
+          description: New active state for this datacenter
+      type: object
+      required:
+      - active
+      title: DatacenterPatchRequest
+    ErrorResponse:
+      properties:
+        detail:
+          type: string
+          title: Detail
+          description: Error description
+      type: object
+      required:
+      - detail
       title: ErrorResponse
     HTTPValidationError:
       properties:
@@ -184,7 +403,9 @@ components:
         timestamp:
           type: string
           title: Timestamp
-          description: ISO format timestamp
+          description: ISO 8601 timestamp
+          examples:
+          - '2026-03-18T12:00:00'
         value:
           type: number
           title: Value
@@ -192,11 +413,13 @@ components:
         is_forecast:
           type: boolean
           title: Is Forecast
-          description: Indicates if this is a forecast
+          description: True for predicted data, False for historical observations
         capacity:
           type: number
           title: Capacity
-          description: Capacity in FLOs
+          description: Max computational capacity at this interval (FLOs)
+          examples:
+          - 9.84e+17
       type: object
       required:
       - timestamp
@@ -210,20 +433,28 @@ components:
           type: string
           title: Location Id
           description: Datacenter identifier
+          examples:
+          - Data-Center-1
         metric:
           type: string
           title: Metric
-          description: Metric name (e.g. forecast_load, forecast_carbon_intensity)
+          description: Metric name
+          examples:
+          - forecast_load
+          - forecast_carbon_intensity
         unit:
           type: string
           title: Unit
           description: Unit of measurement
+          examples:
+          - FLOs
+          - gCO2/kWh
         data:
           items:
             $ref: '#/components/schemas/LoadForecastDataPoint'
           type: array
           title: Data
-          description: Time series data
+          description: Time series data points within the requested window
       type: object
       required:
       - location_id
@@ -237,15 +468,31 @@ components:
           type: string
           title: Id
           description: Location identifier
+          examples:
+          - Data-Center-1
         name:
           type: string
           title: Name
-          description: Human-readable name
+          description: Human-readable region name
+          examples:
+          - London
       type: object
       required:
       - id
       - name
       title: Location
+    PredictionWindowModel:
+      properties:
+        windowLengthHours:
+          type: integer
+          title: Windowlengthhours
+          description: Forecast window length in hours
+          examples:
+          - 168
+      type: object
+      required:
+      - windowLengthHours
+      title: PredictionWindowModel
     ValidationError:
       properties:
         loc:
