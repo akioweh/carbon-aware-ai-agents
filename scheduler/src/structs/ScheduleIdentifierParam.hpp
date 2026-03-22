@@ -7,6 +7,7 @@
 #include <string>
 
 namespace scheduler {
+
 /**
  * @class JobIdentifier
  * @brief Job ID deserializer from URL parameters.
@@ -27,6 +28,7 @@ struct ScheduleIdentifierParam {
         return scheduleId;
     }
 };
+
 } // namespace scheduler
 
 #endif // SCHEDULER_SCHEDULE_IDENTIFIER_HPP

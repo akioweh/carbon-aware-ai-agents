@@ -1,8 +1,10 @@
-#ifndef HARDWARE_SPECS_CONTROLLER
-#define HARDWARE_SPECS_CONTROLLER
+#ifndef SCHEDULER_HARDWARE_SPECS_CONTROLLER_HPP
+#define SCHEDULER_HARDWARE_SPECS_CONTROLLER_HPP
+#pragma once
 
 #include <drogon/HttpController.h>
 #include <drogon/HttpResponse.h>
+
 namespace scheduler::controllers {
 
 class HardwareSpecsController
@@ -16,6 +18,7 @@ class HardwareSpecsController
     [[nodiscard]] auto getTypesOfGpus(drogon::HttpRequestPtr /*req*/) const
         -> drogon::Task<drogon::HttpResponsePtr>;
 };
+
 } // namespace scheduler::controllers
 
-#endif
+#endif // SCHEDULER_HARDWARE_SPECS_CONTROLLER_HPP

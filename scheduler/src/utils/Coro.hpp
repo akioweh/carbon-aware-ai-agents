@@ -1,8 +1,3 @@
-/*
- * i sure know what i am doing
- * do you now Ken? XD
- */
-
 #ifndef SCHEDULER_CORO_HPP
 #define SCHEDULER_CORO_HPP
 #pragma once
@@ -194,4 +189,5 @@ auto when_all(std::vector<drogon::Task<T>> coros) -> auto {
 }
 
 } // namespace scheduler::coro
+
 #endif // SCHEDULER_CORO_HPP

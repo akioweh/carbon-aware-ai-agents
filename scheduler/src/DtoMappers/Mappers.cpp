@@ -1,10 +1,8 @@
+#include "DtoMappers/Mappers.h"
+#include "structs/ScheduleBlock.hpp"
+#include "structs/ScheduleResult.hpp"
+#include "structs/SchedulerOutput.hpp"
 #include "utils/Utils.hpp"
-#include <DtoMappers/Mappers.h>
-#include <models/Impacts.h>
-#include <models/Jobs.h>
-#include <models/TrivialImpacts.h>
-#include <models/TrivialJobs.h>
-#include <structs/ScheduleBlock.hpp>
 
 namespace scheduler::mappers {
 using namespace scheduler;
@@ -22,7 +20,7 @@ auto f_toDto(const InternalBlock &block, int impactId) -> JobModel {
     job.setAdditionalLoad(block.additionalLoad);
     job.setLocationId(block.location);
     job.setImpactId(impactId);
-    job.setTimeStamp(scheduler::utils::chronoToTrantor(block.timestamp));
+    job.setTimeStamp(utils::chronoToTrantor(block.timestamp));
     return job;
 }
 
@@ -33,17 +31,16 @@ auto f_fromDto(const ImpactModel &impactDto) -> ScheduleImpact {
 }
 
 auto f_fromDto(const JobModel &jobDto) -> ScheduleBlock {
-    auto chronoTimestamp =
-        scheduler::utils::trantorToChrono(jobDto.getValueOfTimeStamp());
-    auto stringId =
-        scheduler::utils::parseIntToStringID(jobDto.getValueOfImpactId());
+    auto chronoTimestamp = utils::trantorToChrono(jobDto.getValueOfTimeStamp());
+    auto stringId = utils::parseIntToStringID(jobDto.getValueOfImpactId());
     return ScheduleBlock{.timestamp = chronoTimestamp,
                          .scheduleId = stringId,
                          .location = jobDto.getValueOfLocationId(),
                          .additionalLoad = jobDto.getValueOfAdditionalLoad()};
 }
 
-auto f_toTrivialDto(const scheduler::ScheduleImpact &impact, int impactId) -> TrivialImpactModel {
+auto f_toTrivialDto(const ScheduleImpact &impact, int impactId)
+    -> TrivialImpactModel {
     TrivialImpactModel impactDB;
     impactDB.setImpactId(impactId);
     impactDB.setCarbonIntensity(impact.carbon_intensity);
@@ -52,26 +49,25 @@ auto f_toTrivialDto(const scheduler::ScheduleImpact &impact, int impactId) -> Tr
     return impactDB;
 }
 
-auto f_toTrivialDto(const scheduler::InternalBlock &block, int trivialImpactId) -> TrivialJobModel {
+auto f_toTrivialDto(const InternalBlock &block, int trivialImpactId)
+    -> TrivialJobModel {
     TrivialJobModel job;
     job.setAdditionalLoad(block.additionalLoad);
     job.setLocationId(block.location);
     job.setTrivialImpactId(trivialImpactId);
-    job.setTimeStamp(scheduler::utils::chronoToTrantor(block.timestamp));
+    job.setTimeStamp(utils::chronoToTrantor(block.timestamp));
     return job;
 }
 
-auto f_fromDto(const TrivialImpactModel &impactDto) -> scheduler::ScheduleImpact {
+auto f_fromDto(const TrivialImpactModel &impactDto) -> ScheduleImpact {
     return {.carbon_intensity = impactDto.getValueOfCarbonIntensity(),
             .total_emissions = impactDto.getValueOfTotalEmissions(),
             .sci = impactDto.getValueOfSci()};
 }
 
-auto f_fromDto(const TrivialJobModel &jobDto, int impactId) -> scheduler::ScheduleBlock {
-    auto chronoTimestamp =
-        scheduler::utils::trantorToChrono(jobDto.getValueOfTimeStamp());
-    auto stringId =
-        scheduler::utils::parseIntToStringID(impactId);
+auto f_fromDto(const TrivialJobModel &jobDto, int impactId) -> ScheduleBlock {
+    auto chronoTimestamp = utils::trantorToChrono(jobDto.getValueOfTimeStamp());
+    auto stringId = utils::parseIntToStringID(impactId);
     return ScheduleBlock{.timestamp = chronoTimestamp,
                          .scheduleId = stringId,
                          .location = jobDto.getValueOfLocationId(),

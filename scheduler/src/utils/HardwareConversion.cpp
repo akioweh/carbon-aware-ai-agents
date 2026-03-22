@@ -1,10 +1,10 @@
+#include "utils/HardwareConversion.hpp"
 #include "exceptions/ValidationException.hpp"
 #include <json/value.h>
-#include <utils/HardwareConversion.hpp>
 
 namespace scheduler::utils {
-
 namespace {
+
 constexpr auto FAN_SURGE_COEFF = 2.5;
 constexpr auto CONTAINER_LOAD_W = 100;
 constexpr auto TRANSFER_EFFICIENCY = 0.45;

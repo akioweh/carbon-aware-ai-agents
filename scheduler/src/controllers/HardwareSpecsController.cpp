@@ -4,6 +4,7 @@
 #include <drogon/HttpResponse.h>
 
 namespace scheduler::controllers {
+
 using namespace drogon;
 auto HardwareSpecsController::
     getTypesOfGpus( // NOLINT(readability-convert-member-functions-to-static)
@@ -12,4 +13,5 @@ auto HardwareSpecsController::
     const auto resp = HttpResponse::newHttpJsonResponse(ret);
     co_return resp;
 }
+
 } // namespace scheduler::controllers
