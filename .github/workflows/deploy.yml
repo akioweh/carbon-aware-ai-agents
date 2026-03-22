@@ -2,7 +2,7 @@ name: Deploy to Azure
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/deploy]
   workflow_dispatch:
 
 # OIDC Permissions
