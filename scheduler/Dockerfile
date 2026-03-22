@@ -30,7 +30,7 @@ COPY . .
 # remember to copy the binary out of the cache mount to persist it
 RUN --mount=type=cache,target=/app/build/arch-rel \
     cmake --preset arch-rel -DUSE_NATIVE_ARCH=OFF -DBUILD_TESTING=OFF && \
-    cmake --build build/arch-rel && \
+    cmake --build build/arch-rel --target scheduler && \
     mkdir -p /app/dist && \
     cp build/arch-rel/scheduler /app/dist/
 

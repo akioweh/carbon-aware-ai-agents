@@ -30,8 +30,12 @@ target_link_libraries(scheduler PRIVATE scheduler_core)
 
 configure_file(config.json ${CMAKE_CURRENT_BINARY_DIR}/config.json COPYONLY)
 
-enable_testing()
-add_subdirectory(tests)
+option(BUILD_TESTING "Build tests" ON)
+
+if(BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 # copy compile_commands.json to root for clangd
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
