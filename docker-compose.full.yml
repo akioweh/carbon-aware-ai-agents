@@ -1,0 +1,28 @@
+# docker-compose.full.yml
+# Use this override to run the local stats service and point other services to it.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.full.yml up
+
+services:
+  stats:
+    profiles: [] # Enable it by default when this file is included
+    build:
+      context: ./stats
+    container_name: stats
+    environment:
+      - STATS_PORT=5000
+      - STATS_HOST=0.0.0.0
+    ports:
+      - "${STATS_HOST_PORT:-5000}:5000"
+
+  scheduler:
+    environment:
+      - STATS_API_URL=http://stats:5000
+    depends_on:
+      stats:
+        condition: service_started
+
+  ui:
+    environment:
+      - STATS_API_URL=http://stats:5000
+    depends_on:
+      - stats

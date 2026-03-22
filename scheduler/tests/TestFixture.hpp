@@ -44,7 +44,7 @@ struct SchedulerGlobalFixture {
     static void seedActiveDatacenters() {
         // Find stats host from env or default
         std::string statsHost = "http://127.0.0.1:5000";
-        if (const char *envHost = std::getenv("STATS_API_HOST")) {
+        if (const char *envHost = std::getenv("STATS_API_URL")) {
             statsHost = envHost;
         }
 
