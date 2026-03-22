@@ -128,8 +128,8 @@ resource schedulerApp 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'STATS_API_URL', value: statsApiUrl }
           ]
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json('4')
+            memory: '8Gi'
           }
         }
       ]
@@ -178,8 +178,8 @@ resource uiApp 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'STATS_API_URL', value: statsApiUrl }
           ]
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json('2')
+            memory: '4Gi'
           }
         }
       ]
