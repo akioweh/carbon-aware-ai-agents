@@ -6,44 +6,38 @@ import { ScheduleResult } from "@/components/schedule-result"
 import { WorkloadCalendar } from "@/components/workload-calendar"
 import { PreviousJobs } from "@/components/previous-jobs"
 import { DataCentreConfig } from "@/components/datacenter-config"
-import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { History, Globe } from "lucide-react"
 
 export default function Home() {
   const [scheduleResult, setScheduleResult] = useState<any>(null)
   const [unoptimizedResult, setUnoptimizedResult] = useState<any>(null)
   const [timeRange, setTimeRange] = useState<{ earliestStart: string; latestFinish: string } | null>(null)
-  const [showCalendar, setShowCalendar] = useState(false)
-  const [showPreviousJobs, setShowPreviousJobs] = useState(false)
   const [showConfig, setShowConfig] = useState(false)
   const [source, setSource] = useState<"form" | "history">("form")
+  const [activeTab, setActiveTab] = useState<"form" | "workload" | "history">("form")
 
   const handleScheduleComplete = (result: any, unoptimizedResult: any, earliestStart: string, latestFinish: string) => {
     setScheduleResult(result)
     setUnoptimizedResult(unoptimizedResult)
     setTimeRange({ earliestStart, latestFinish })
-    setShowCalendar(false)
-    setShowPreviousJobs(false)
     setShowConfig(false)
     setSource("form")
+    setActiveTab("form")
   }
 
   const handleBack = () => {
     setScheduleResult(null)
     setUnoptimizedResult(null)
     setTimeRange(null)
-    if (source === "history") {
-      setShowPreviousJobs(true)
-    }
+    if (source === "history") setActiveTab("history")
   }
 
   const handleCancel = () => {
     setScheduleResult(null)
     setUnoptimizedResult(null)
     setTimeRange(null)
-    if (source === "history") {
-      setShowPreviousJobs(true)
-    }
+    if (source === "history") setActiveTab("history")
   }
 
   const handleSelectJob = (job: any) => {
@@ -53,9 +47,9 @@ export default function Home() {
     setScheduleResult(job)
     setUnoptimizedResult(unopt) // Pass it directly
     setTimeRange({ earliestStart: job.start_time, latestFinish: job.end_time })
-    setShowPreviousJobs(false)
     setShowConfig(false)
     setSource("history")
+    setActiveTab("history")
   }
 
   return (
@@ -73,47 +67,58 @@ export default function Home() {
 
         {/* Main Content */}
         <main>
-          {showCalendar ? (
-            <WorkloadCalendar onClose={() => setShowCalendar(false)} scheduleId={scheduleResult?.schedule_id} />
-          ) : showPreviousJobs ? (
-            <PreviousJobs onClose={() => setShowPreviousJobs(false)} onSelectJob={handleSelectJob} />
-          ) : showConfig ? (
-            <DataCentreConfig onClose={() => setShowConfig(false)} />
-          ) : scheduleResult ? (
-            <ScheduleResult
-              result={scheduleResult}
-              unoptimizedResult={unoptimizedResult}
-              earliestStart={timeRange?.earliestStart}
-              latestFinish={timeRange?.latestFinish}
-              onBack={handleBack}
-              onCancel={handleCancel}
-            />
-          ) : (
-            <div className="space-y-4">
-              <div className="flex justify-end gap-3 max-w-2xl mx-auto">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCalendar(true)}
-                  className="gap-2 bg-transparent hover:bg-muted/50"
-                >
-                  <Globe className="h-4 w-4" />
-                  View Global Workload
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowPreviousJobs(true)}
-                  className="gap-2 bg-transparent hover:bg-muted/50"
-                >
-                  <History className="h-4 w-4" />
-                  View Scheduled Jobs
-                </Button>
-              </div>
-              <SchedulingForm
-                onScheduleComplete={handleScheduleComplete}
-                onConfigure={() => setShowConfig(true)}
-              />
-            </div>
-          )}
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "form" | "workload" | "history")}>
+            <TabsList className="mb-4 grid w-full grid-cols-3 max-w-2xl mx-auto h-10">
+              <TabsTrigger value="form">Scheduling Form</TabsTrigger>
+              <TabsTrigger value="workload" className="gap-2">
+                <Globe className="h-4 w-4" />
+                View Global Workload
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-2">
+                <History className="h-4 w-4" />
+                View Scheduled Jobs
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="form">
+              {showConfig ? (
+                <DataCentreConfig onClose={() => setShowConfig(false)} />
+              ) : scheduleResult && source === "form" ? (
+                <ScheduleResult
+                  result={scheduleResult}
+                  unoptimizedResult={unoptimizedResult}
+                  earliestStart={timeRange?.earliestStart}
+                  latestFinish={timeRange?.latestFinish}
+                  onBack={handleBack}
+                  onCancel={handleCancel}
+                />
+              ) : (
+                <SchedulingForm
+                  onScheduleComplete={handleScheduleComplete}
+                  onConfigure={() => setShowConfig(true)}
+                />
+              )}
+            </TabsContent>
+
+            <TabsContent value="workload">
+              <WorkloadCalendar scheduleId={scheduleResult?.schedule_id} />
+            </TabsContent>
+
+            <TabsContent value="history">
+              {scheduleResult && source === "history" ? (
+                <ScheduleResult
+                  result={scheduleResult}
+                  unoptimizedResult={unoptimizedResult}
+                  earliestStart={timeRange?.earliestStart}
+                  latestFinish={timeRange?.latestFinish}
+                  onBack={handleBack}
+                  onCancel={handleCancel}
+                />
+              ) : (
+                <PreviousJobs onSelectJob={handleSelectJob} />
+              )}
+            </TabsContent>
+          </Tabs>
         </main>
 
         {/* Footer */}

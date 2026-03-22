@@ -26,7 +26,7 @@ interface AggregatedInterval {
 }
 
 interface WorkloadCalendarProps {
-  onClose: () => void
+  onClose?: () => void
   scheduleId?: string
 }
 
@@ -184,7 +184,9 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
           <CardTitle className="flex items-center gap-2"><CalendarIcon className="h-5 w-5 text-primary" />Workload Calendar</CardTitle>
           <CardDescription>{hasData ? "Scheduled jobs across data centres" : "No data available"}</CardDescription>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+        {onClose && (
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4 pt-4">
