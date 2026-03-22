@@ -1,5 +1,5 @@
-#ifndef HARDWARE_CONVERSION
-#define HARDWARE_CONVERSION
+#ifndef SCHEDULER_HARDWARE_CONVERSION_HPP
+#define SCHEDULER_HARDWARE_CONVERSION_HPP
 #pragma once
 
 #include <json/value.h>
@@ -8,8 +8,8 @@
 #include <unordered_map>
 
 namespace scheduler::utils {
-
 namespace hardwareConstants {
+
 struct HardwareSpecs {
     int gpu_tdp;
     int gpu_idle;
@@ -40,7 +40,7 @@ const auto HW_LIB =
                                                      .tflops_fp32 = 19.5}}};
 
 inline auto getAvailableGpuTypes() -> std::vector<std::string> {
-    return HW_LIB | std::ranges::views::keys | std::ranges::to<std::vector>();
+    return HW_LIB | std::views::keys | std::ranges::to<std::vector>();
 }
 
 } // namespace hardwareConstants
@@ -50,4 +50,4 @@ auto convertRawJobRequest(const Json::Value &json)
 
 } // namespace scheduler::utils
 
-#endif
+#endif // SCHEDULER_HARDWARE_CONVERSION_HPP

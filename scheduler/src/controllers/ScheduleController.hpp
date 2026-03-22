@@ -1,7 +1,5 @@
 #ifndef SCHEDULER_SCHEDULE_CONTROLLER_HPP
 #define SCHEDULER_SCHEDULE_CONTROLLER_HPP
-#include <drogon/HttpRequest.h>
-#include <drogon/HttpTypes.h>
 #pragma once
 
 #include "structs/DatacenterIdentifierParam.hpp"
@@ -9,7 +7,9 @@
 #include "structs/ScheduleIdentifierParam.hpp"
 #include "structs/TimeIntervalParams.hpp"
 #include <drogon/HttpController.h>
+#include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
+#include <drogon/HttpTypes.h>
 #include <drogon/utils/coroutine.h>
 
 namespace scheduler::controllers {
