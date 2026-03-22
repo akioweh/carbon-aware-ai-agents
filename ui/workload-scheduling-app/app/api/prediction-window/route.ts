@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { STATS_API_HOST } from '@/app/api/apiConfig'
+import { STATS_API_URL } from '@/app/api/apiConfig'
 export async function GET() {
     try {
-        const response = await fetch(`${STATS_API_HOST}/predictionWindow`, {
+        const response = await fetch(`${STATS_API_URL}/predictionWindow`, {
             cache: 'no-store'
         });
 

@@ -14,11 +14,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   if(USE_NATIVE_ARCH)
     add_compile_options(-march=native)
   else()
-    # the standard AVX-512 baseline (F, BW, VL, DQ, etc.)
-    add_compile_options(-march=x86-64-v4)
+    # cloud environments often do not support AVX-512.
+    # x86-64-v3 (AVX2) is a safe baseline for modern cloud.
+    add_compile_options(-march=x86-64-v3)
   endif()
 elseif(MSVC)
-  add_compile_options(/arch:AVX512)
+  add_compile_options(/arch:AVX2)
 endif()
 
 find_package(Drogon CONFIG REQUIRED)
@@ -30,8 +31,12 @@ target_link_libraries(scheduler PRIVATE scheduler_core)
 
 configure_file(config.json ${CMAKE_CURRENT_BINARY_DIR}/config.json COPYONLY)
 
-enable_testing()
-add_subdirectory(tests)
+option(BUILD_TESTING "Build tests" ON)
+
+if(BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 # copy compile_commands.json to root for clangd
 if(CMAKE_EXPORT_COMPILE_COMMANDS)

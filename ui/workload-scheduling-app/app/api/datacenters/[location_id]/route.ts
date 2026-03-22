@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
-import { STATS_API_HOST } from "@/app/api/apiConfig";
+import { STATS_API_URL } from "@/app/api/apiConfig";
 
 async function fetchFromStats(path: string, init?: RequestInit): Promise<Response> {
   let lastError: unknown
   let lastResponse: Response | null = null
 
   try {
-    const response = await fetch(`${STATS_API_HOST}${path}`, init)
+    const response = await fetch(`${STATS_API_URL}${path}`, init)
 
     if (response.ok) {
       return response
     }
 
     lastResponse = response
-    console.warn(`Stats host ${STATS_API_HOST} returned ${response.status} for ${path}; trying next host`)
+    console.warn(`Stats host ${STATS_API_URL} returned ${response.status} for ${path}; trying next host`)
   } catch (err) {
     lastError = err
   }

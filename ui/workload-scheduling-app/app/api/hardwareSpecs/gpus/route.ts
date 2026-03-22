@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { SCHEDULER_API_URL } from "@/app/api/apiConfig"
 
-const BASE_URL = "http://localhost:6969/api/hardwareSpecs/gpus"
+const BASE_URL = `${SCHEDULER_API_URL}/api/hardwareSpecs/gpus`
 
 // ---------------------------------------------------------
 // GET /api/hardwareSpecs/gpus

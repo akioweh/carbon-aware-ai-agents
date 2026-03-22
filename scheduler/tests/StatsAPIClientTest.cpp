@@ -18,7 +18,7 @@ auto scheduler::createFreeStatsAPIClient() -> std::shared_ptr<StatsAPIClient> {
 }
 
 // NOTE: By default, tests run against localhost:5000, but this can be
-// overridden via STATS_API_HOST env var
+// overridden via STATS_API_URL env var
 
 // =============================================================================
 // Test Suite: getLocations
