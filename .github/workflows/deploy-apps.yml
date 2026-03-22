@@ -1,0 +1,100 @@
+name: Deploy Apps
+
+on:
+  push:
+    branches: [main, ci/deploy]
+    paths:
+      - "scheduler/**"
+      - "ui/**"
+      - "stats/**"
+      - ".github/workflows/deploy-apps.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  get-acr:
+    runs-on: ubuntu-latest
+    environment: deployment-azure
+    outputs:
+      acrLoginServer: ${{ steps.acr.outputs.acrLoginServer }}
+      acrName: ${{ steps.acr.outputs.acrName }}
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get ACR Details
+        id: acr
+        run: |
+          # Fetch the full ACR object for the given prefix
+          ACR_JSON=$(az acr list -g ${{ vars.AZURE_RG }} --query "[?contains(name, '${{ vars.AZURE_PREFIX }}')] | [0]" -o json)
+
+          # Extract values
+          ACR_NAME=$(echo "$ACR_JSON" | jq -r '.name')
+          ACR_LOGIN_SERVER=$(echo "$ACR_JSON" | jq -r '.loginServer')
+
+          # Pass to output
+          echo "acrName=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "acrLoginServer=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
+
+  build-apps:
+    needs: get-acr
+    runs-on: ubuntu-latest
+    environment: deployment-azure
+    strategy:
+      matrix:
+        component: [scheduler, ui]
+        include:
+          - component: scheduler
+            context: ./scheduler
+          - component: ui
+            context: ./ui/workload-scheduling-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        run: az acr login --name ${{ needs.get-acr.outputs.acrName }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push ${{ matrix.component }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ needs.get-acr.outputs.acrLoginServer }}/${{ matrix.component }}:${{ github.sha }}
+            ${{ needs.get-acr.outputs.acrLoginServer }}/${{ matrix.component }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  update-apps:
+    needs: [get-acr, build-apps]
+    runs-on: ubuntu-latest
+    environment: deployment-azure
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Container Apps
+        run: |
+          az containerapp update -n ${{ vars.AZURE_PREFIX }}-scheduler -g ${{ vars.AZURE_RG }} --image ${{ needs.get-acr.outputs.acrLoginServer }}/scheduler:${{ github.sha }}
+          az containerapp update -n ${{ vars.AZURE_PREFIX }}-ui -g ${{ vars.AZURE_RG }} --image ${{ needs.get-acr.outputs.acrLoginServer }}/ui:${{ github.sha }}
