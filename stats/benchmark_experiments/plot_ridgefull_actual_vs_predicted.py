@@ -7,7 +7,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from predictor_ridge_v2 import (
+from predictors.ridge_enhanced import (
     load_carbon_from_db, build_direct_features, train_ridge, predict_ridge,
     get_weather, REGIONS, _align_weather, WX_FEATURES
 )

@@ -8,7 +8,7 @@ Reads directly from carbon_intensity.db for full historical data (~1 year).
 Achieves MAE 24.88 — a 24.6% improvement over the v1 Direct-Ridge (32.99).
 
 Import for production:
-    from predictor_ridge_v2 import get_next_week_carbon_intensity
+    from predictors.ridge_enhanced import get_next_week_carbon_intensity
 """
 
 import logging
@@ -24,8 +24,10 @@ import requests
 from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
 
+import db_utils
+
 warnings.filterwarnings('ignore')
-logger = logging.getLogger('stats.ridge_v2')
+logger = logging.getLogger('stats.ridge_enhanced')
 
 # ── Configuration ────────────────────────────────────────────────────────
 
@@ -34,6 +36,7 @@ CARBON_DB = Path(
 )
 WEATHER_CACHE_DIR = Path(__file__).parent / '.weather_cache'
 
+# Benchmark regions (used by plot scripts / experiments only)
 REGIONS = {
     13: ('Data-Center-1', 'London', 51.51, -0.13),
     14: ('Data-Center-2', 'South East England', 51.27, 0.52),
@@ -42,7 +45,23 @@ REGIONS = {
     4:  ('Data-Center-5', 'North East England', 54.97, -1.61),
 }
 
-DC_TO_REGION = {v[0]: (k, v[1], v[2], v[3]) for k, v in REGIONS.items()}
+# Production DC→region mapping — built from the canonical registry in db_utils
+# so it stays aligned with the rest of the system.
+def _build_dc_region_map():
+    """Build datacenter→(region_id, name, lat, lon) mapping from db_utils registry."""
+    dc_map = {}
+    for dc in db_utils.DEFAULT_DATACENTERS:
+        location_id = dc['location_id']
+        region_id = dc['region_id']
+        name = dc['name']
+        latitude = dc.get('latitude')
+        longitude = dc.get('longitude')
+        if latitude is not None and longitude is not None:
+            dc_map[location_id] = (region_id, name, latitude, longitude)
+    return dc_map
+
+
+DC_REGION_MAP = _build_dc_region_map()
 
 OPEN_METEO_HOURLY = (
     'temperature_2m,relative_humidity_2m,dewpoint_2m,pressure_msl,'
@@ -461,8 +480,8 @@ def _predict_ci(series_df, dc_name=None, now=None):
     fc_30 = fc_30.insert(0, start_rounded)
 
     train_wx = test_wx = None
-    if dc_name and dc_name in DC_TO_REGION:
-        rid, _, lat, lon = DC_TO_REGION[dc_name]
+    if dc_name and dc_name in DC_REGION_MAP:
+        rid, _, lat, lon = DC_REGION_MAP[dc_name]
         s_date = df['timestamp'].iloc[0].strftime('%Y-%m-%d')
         e_date = df['timestamp'].iloc[-1].strftime('%Y-%m-%d')
         archive = get_weather(lat, lon, s_date, e_date, cache_key=f'{rid}_archive')
@@ -494,7 +513,7 @@ def get_next_week_carbon_intensity(historical_df, now=None):
     dc_name = None
     if 'location' in historical_df.columns:
         locs = historical_df['location'].dropna().unique()
-        if len(locs) == 1 and locs[0] in DC_TO_REGION:
+        if len(locs) == 1 and locs[0] in DC_REGION_MAP:
             dc_name = locs[0]
     return _predict_ci(historical_df, dc_name=dc_name, now=now)
 
@@ -503,7 +522,7 @@ def get_next_week_greenness(historical_greenness_df):
     dc_name = None
     if 'location' in historical_greenness_df.columns:
         locs = historical_greenness_df['location'].dropna().unique()
-        if len(locs) == 1 and locs[0] in DC_TO_REGION:
+        if len(locs) == 1 and locs[0] in DC_REGION_MAP:
             dc_name = locs[0]
     ci_df = _predict_ci(historical_greenness_df, dc_name=dc_name)
     ci = ci_df['yhat'].values

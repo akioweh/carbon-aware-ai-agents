@@ -463,7 +463,7 @@ retrains on every prediction cycle.
 
 ### What we did
 
-Created `predictor_ridge_v2.py` as the clean production predictor:
+Created `predictors/ridge_enhanced.py` as the clean production predictor:
 
 - Reads directly from `carbon_intensity.db` for full historical data
 - 65-feature engineering pipeline with weather from Open-Meteo
