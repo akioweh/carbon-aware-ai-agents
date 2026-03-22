@@ -1,0 +1,32 @@
+{
+  "name": "Carbon-Aware AI Agents Dev Container",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools-extension-pack",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ],
+      "settings": {
+        "cmake.generator": "Ninja",
+        "cmake.configureSettings": {
+          "USE_NATIVE_ARCH": "OFF"
+        }
+      }
+    }
+  },
+  "remoteUser": "root",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+  ],
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [8080, 6969, 5433],
+  "postCreateCommand": "cd ui/workload-scheduling-app && npm install"
+}
