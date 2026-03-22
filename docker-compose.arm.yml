@@ -1,0 +1,8 @@
+# ARM override — swap scheduler to Ubuntu-based Dockerfile for Apple Silicon.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.full.yml -f docker-compose.arm.yml up --build
+
+services:
+  scheduler:
+    build:
+      context: ./scheduler
+      dockerfile: Dockerfile.arm
