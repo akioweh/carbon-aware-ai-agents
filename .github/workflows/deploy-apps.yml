@@ -19,7 +19,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  call-deploy-infra:
+    uses: ./.github/workflows/deploy-infra.yml
+    secrets: inherit
+
   get-acr:
+    needs: call-deploy-infra
     runs-on: ubuntu-latest
     environment: deployment-azure
     outputs:
