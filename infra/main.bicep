@@ -60,6 +60,16 @@ resource pgFirewall 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@202
   }
 }
 
+// Create the calendar_db database
+resource calendarDb 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-03-01-preview' = {
+  parent: pgServer
+  name: 'calendar_db'
+  properties: {
+    charset: 'utf8'
+    collation: 'en_US.utf8'
+  }
+}
+
 // 3. Container App Environment
 resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: '${prefix}-env'

@@ -38,12 +38,15 @@ FROM archlinux:latest
 RUN pacman-key --init && pacman-key --populate archlinux
 RUN --mount=type=cache,target=/var/cache/pacman \
     pacman -Syu --noconfirm && \
-    pacman -S --noconfirm boost-libs onetbb postgresql-libs jsoncpp c-ares brotli zlib util-linux-libs && \
+    pacman -S --noconfirm boost-libs onetbb postgresql-libs postgresql jsoncpp c-ares brotli zlib util-linux-libs && \
     pacman -Scc --noconfirm
 
 WORKDIR /app
 COPY --from=builder /app/dist/scheduler .
 COPY --from=builder /app/config.json .
+COPY --from=builder /app/sql/init.sql .
+COPY scripts/start.sh .
+RUN chmod +x start.sh
 
 EXPOSE 6969
-CMD ["./scheduler"]
+CMD ["./start.sh"]
