@@ -12,10 +12,10 @@ param pgAdminUser string = 'pgadmin'
 param pgAdminPassword string
 
 @description('The image to use for the scheduler container.')
-param schedulerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param schedulerImage string = 'ealen/echo-server:latest'
 
 @description('The image to use for the ui container.')
-param uiImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param uiImage string = 'ealen/echo-server:latest'
 
 @description('The Stats API URL')
 param statsApiUrl string = 'http://140.238.79.139:5000'

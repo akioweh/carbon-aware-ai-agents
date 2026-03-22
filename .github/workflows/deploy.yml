@@ -30,8 +30,13 @@ jobs:
       - name: Get Current Image Tags
         id: current-images
         run: |
-          SCHEDULER_IMAGE=$(az containerapp show -n ${{ vars.AZURE_PREFIX }}-scheduler -g ${{ vars.AZURE_RG }} --query properties.template.containers[0].image -o tsv 2>/dev/null || echo "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest")
-          UI_IMAGE=$(az containerapp show -n ${{ vars.AZURE_PREFIX }}-ui -g ${{ vars.AZURE_RG }} --query properties.template.containers[0].image -o tsv 2>/dev/null || echo "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest")
+          SCHEDULER_IMAGE=$(az containerapp show -n ${{ vars.AZURE_PREFIX }}-scheduler -g ${{ vars.AZURE_RG }} --query properties.template.containers[0].image -o tsv 2>/dev/null || echo "ealen/echo-server:latest")
+          UI_IMAGE=$(az containerapp show -n ${{ vars.AZURE_PREFIX }}-ui -g ${{ vars.AZURE_RG }} --query properties.template.containers[0].image -o tsv 2>/dev/null || echo "ealen/echo-server:latest")
+          
+          # Replace old failing dummy image if it's currently set
+          if [[ "$SCHEDULER_IMAGE" == "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" ]]; then SCHEDULER_IMAGE="ealen/echo-server:latest"; fi
+          if [[ "$UI_IMAGE" == "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" ]]; then UI_IMAGE="ealen/echo-server:latest"; fi
+          
           echo "schedulerImage=$SCHEDULER_IMAGE" >> $GITHUB_OUTPUT
           echo "uiImage=$UI_IMAGE" >> $GITHUB_OUTPUT
 
