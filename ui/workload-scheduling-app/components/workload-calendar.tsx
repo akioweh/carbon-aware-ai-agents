@@ -259,7 +259,7 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
 
                   return (
                     <div key={dc.id} className="w-full">
-                      <div className="mb-1 text-xs font-semibold text-foreground">{dc.name}</div>
+                      <div className="mb-1 text-xs font-semibold text-foreground sticky left-0 z-20 bg-background pr-2 w-fit">{`${dc.id} - ${dc.name}`}</div>
                       <div className="relative w-full" style={{ height: `${chartHeight}px` }}>
                         <div className="absolute -left-10 top-0 bottom-0 flex flex-col justify-between text-[10px] text-muted-foreground z-10 w-8 text-right pr-2">
                           <span>{dynamicMaxValue}</span><span>0</span>
