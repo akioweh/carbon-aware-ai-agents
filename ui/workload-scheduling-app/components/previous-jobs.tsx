@@ -179,7 +179,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                         {job.impact?.total_emissions && (
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-muted-foreground">Emissions:</span>
-                            <span className="text-xs font-semibold">{job.impact.total_emissions.toFixed(2)} kg CO₂</span>
+                            <span className="text-xs font-semibold">{job.impact.total_emissions.toFixed(2)} g CO₂</span>
                           </div>
                         )}
 
