@@ -113,12 +113,6 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const [fetchedUnoptData, setFetchedUnoptData] = useState<ScheduleData | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!loading && workloadData.length > 0 && scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
-    }
-  }, [loading, workloadData])
-
   const locationToDcId = useMemo(() => {
     const map = new Map<string, string>()
     for (const dc of datacenters) {
@@ -390,6 +384,21 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     // Only show if the closest point is within 5 minutes of now
     return closest && closestDiff < 5 * 60 * 1000 ? closest : null
   }, [workloadData])
+
+  useEffect(() => {
+    if (!loading && workloadData.length > 0 && scrollRef.current) {
+      const container = scrollRef.current
+      let targetScroll = container.scrollWidth
+      if (nowLineValue) {
+        const nowIndex = workloadData.findIndex((d) => d.time === nowLineValue)
+        if (nowIndex !== -1) {
+          const pixelPosition = (nowIndex / workloadData.length) * container.scrollWidth
+          targetScroll = pixelPosition - container.clientWidth / 2
+        }
+      }
+      container.scrollLeft = Math.max(0, targetScroll)
+    }
+  }, [loading, workloadData, nowLineValue])
 
   const usedDatacenterIds = useMemo(() => {
     const activeScheduleId = showTrivial && unoptData ? `${unoptData.schedule_id}_trivial` : result.schedule_id

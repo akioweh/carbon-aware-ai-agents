@@ -44,12 +44,6 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!loading && scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth
-    }
-  }, [loading, blocks, forecasts])
-
-  useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
@@ -175,8 +169,22 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
     return closest && closestDiff < 5 * 60 * 1000 ? closest : null
   }, [sampleIntervals, firstDcId])
 
-  const formatDateShort = (date: Date) => date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+  useEffect(() => {
+    if (!loading && sampleIntervals.length > 0 && scrollContainerRef.current) {
+      const container = scrollContainerRef.current
+      let targetScroll = container.scrollWidth
+      if (nowLineValue) {
+        const nowIndex = sampleIntervals.findIndex((d) => d.time.toISOString() === nowLineValue)
+        if (nowIndex !== -1) {
+          const pixelPosition = (nowIndex / sampleIntervals.length) * container.scrollWidth
+          targetScroll = pixelPosition - container.clientWidth / 2
+        }
+      }
+      container.scrollLeft = Math.max(0, targetScroll)
+    }
+  }, [loading, sampleIntervals, nowLineValue])
 
+  const formatDateShort = (date: Date) => date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
   return (
     <Card className="border-2 shadow-lg">
       <CardHeader className="flex flex-row items-start justify-between">
@@ -266,54 +274,54 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                         </div>
                         <ResponsiveContainer width="100%" height="100%">
                           <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id={`colorScheduled-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#059669" stopOpacity={0.8} /><stop offset="95%" stopColor="#059669" stopOpacity={0.1} />
-                            </linearGradient>
-                            <linearGradient id={`colorOutside-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                          <XAxis
-                            dataKey="time"
-                            tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            interval={11 * 3}
-                            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                            axisLine={false}
-                            tickLine={false}
-                            hide={i !== dataCenters.length - 1}
-                          />
-                          <YAxis yAxisId="left" domain={[0, dynamicMaxValue]} hide={true} />
-                          <YAxis yAxisId="right" orientation="right" hide={true} domain={globalSCIDomain} />
-                          <Tooltip
-                            content={({ active, payload, label }) => {
-                              if (active && payload && payload.length) {
-                                const data = payload[0].payload;
-                                return (
-                                  <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border z-50">
-                                    <p className="font-medium border-b mb-1">{new Date(label).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    {data.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
-                                    {data.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} PFLO</p>}
-                                    {data.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} PFLO</p>}
-                                    <p className="text-muted-foreground mt-1">Job Load: {Number(data.totalLoad).toFixed(2)} PFLO</p>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
-                          <Area yAxisId="left" type="monotone" dataKey="outsideLoadRange" stroke="#3b82f6" fill={`url(#colorOutside-${dc.id})`} fillOpacity={1} isAnimationActive={false} />
-                          <Area yAxisId="left" type="monotone" dataKey="totalLoad" stroke="#059669" fill={`url(#colorScheduled-${dc.id})`} isAnimationActive={false} />
-                          <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
-                          <Line yAxisId="left" type="monotone" dataKey="capacity" stroke="#a855f7" strokeWidth={2} dot={false} isAnimationActive={false} />
+                            <defs>
+                              <linearGradient id={`colorScheduled-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#059669" stopOpacity={0.8} /><stop offset="95%" stopColor="#059669" stopOpacity={0.1} />
+                              </linearGradient>
+                              <linearGradient id={`colorOutside-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                            <XAxis
+                              dataKey="time"
+                              tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              interval={11 * 3}
+                              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                              axisLine={false}
+                              tickLine={false}
+                              hide={i !== dataCenters.length - 1}
+                            />
+                            <YAxis yAxisId="left" domain={[0, dynamicMaxValue]} hide={true} />
+                            <YAxis yAxisId="right" orientation="right" hide={true} domain={globalSCIDomain} />
+                            <Tooltip
+                              content={({ active, payload, label }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  return (
+                                    <div className="bg-popover text-popover-foreground text-xs rounded-md px-3 py-2 shadow-md border z-50">
+                                      <p className="font-medium border-b mb-1">{new Date(label).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                      {data.carbon_intensity != null && <p className="text-red-500 font-semibold">Carbon-Intensity: {Number(data.carbon_intensity).toFixed(2)}</p>}
+                                      {data.capacity != null && <p className="text-purple-600 font-semibold">Capacity: {Number(data.capacity).toFixed(1)} PFLO</p>}
+                                      {data.load != null && <p className="text-blue-500 font-semibold">Outside-Load: {Number(data.load).toFixed(1)} PFLO</p>}
+                                      <p className="text-muted-foreground mt-1">Job Load: {Number(data.totalLoad).toFixed(2)} PFLO</p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Area yAxisId="left" type="monotone" dataKey="outsideLoadRange" stroke="#3b82f6" fill={`url(#colorOutside-${dc.id})`} fillOpacity={1} isAnimationActive={false} />
+                            <Area yAxisId="left" type="monotone" dataKey="totalLoad" stroke="#059669" fill={`url(#colorScheduled-${dc.id})`} isAnimationActive={false} />
+                            <Line yAxisId="right" type="monotone" dataKey="carbon_intensity" stroke="#FF0000" strokeWidth={2} dot={false} isAnimationActive={false} />
+                            <Line yAxisId="left" type="monotone" dataKey="capacity" stroke="#a855f7" strokeWidth={2} dot={false} isAnimationActive={false} />
 
-                          {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
-                            <ReferenceLine key={k} yAxisId="left" x={d.time.toISOString()} stroke="#94a3b8" strokeDasharray="4 4" label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fontSize: 10 } : undefined} />
-                          ))}
-                          {nowLineValue && (
-                            <ReferenceLine yAxisId="left" x={nowLineValue} stroke="#f59e0b" strokeWidth={2} label={i === 0 ? { position: "insideTopRight", value: "Now", fontSize: 11, fontWeight: 600, fill: "#f59e0b" } : undefined} />
-                          )}
+                            {intervals.filter(d => d.time.getHours() === 0 && d.time.getMinutes() === 0).map((d, k) => (
+                              <ReferenceLine key={k} yAxisId="left" x={d.time.toISOString()} stroke="#94a3b8" strokeDasharray="4 4" label={i === 0 ? { position: "insideTopLeft", value: formatDateShort(d.time), fontSize: 10 } : undefined} />
+                            ))}
+                            {nowLineValue && (
+                              <ReferenceLine yAxisId="left" x={nowLineValue} stroke="#f59e0b" strokeWidth={2} label={i === 0 ? { position: "insideTopRight", value: "Now", fontSize: 11, fontWeight: 600, fill: "#f59e0b" } : undefined} />
+                            )}
                           </ComposedChart>
                         </ResponsiveContainer>
                       </div>
