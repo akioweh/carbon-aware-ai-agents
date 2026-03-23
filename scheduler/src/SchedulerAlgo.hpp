@@ -347,22 +347,15 @@ inline auto calc_single(const std::vector<double> &load_f,
         }
     }
 
-    // we made it cache friendly, now back to previous structure
-    auto help_row = vector(tot_work + 1, array{inf, inf});
-    for (int i = 0; i <= tot_work; i++)
-        help_row[i] = {row[0][i], row[1][i]};
-
     auto res = vector<double>{};
     res.reserve(tot_work + 1);
-    for (const auto &[w, costs] : views::enumerate(help_row)) {
-        // other than condensing the dp cost results,
-        // we also want to set the last memo entry based on our choices here
-        // (costs[0] vs costs[1]) for easier reconstruction later
-        if (costs[0] < costs[1]) {
-            res.push_back(costs[0]);
-            memo[n][1][w] = memo[n][0][w];
+    for (const auto w : views::iota(0, tot_work + 1)) {
+        const auto c0 = row[0][w];
+        const auto c1 = row[1][w];
+        if (c0 < c1) {
+            res.push_back(c0);
         } else {
-            res.push_back(costs[1]);
+            res.push_back(c1);
             memo[n][0][w] = memo[n][1][w];
         }
     }
