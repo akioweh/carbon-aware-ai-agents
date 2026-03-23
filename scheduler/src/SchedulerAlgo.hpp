@@ -170,6 +170,8 @@ inline void vectorizeDpTransition(const int w_prev, const int tot_work,
     const int end_wi_extend = std::min(max_wi, tot_work - w_prev);
     transitionAVX(start_wi_extend, end_wi_extend, prev0V, zeros);
 
+    // NOTE: actually, is this clamping correct? could we temporarily take on
+    // negative effective work?
     const int start_wi_new_run = std::max(1, penalty - w_prev);
     const int end_wi_new_run = std::min(max_wi, tot_work + penalty - w_prev);
     transitionAVX(start_wi_new_run, end_wi_new_run, prev1V, ones, penalty);
