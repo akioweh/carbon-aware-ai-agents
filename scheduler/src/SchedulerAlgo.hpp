@@ -86,9 +86,9 @@ struct LocationCost {
     }
 };
 
-// SIMD alignment
+// SIMD lane count
 // 512 bits = 64 bytes.
-constexpr int padding = 512 / 8 / sizeof(double);
+constexpr int VEC_SIZE = 512 / 8 / sizeof(double);
 
 /*
  * Algorithmic Analysis:
@@ -142,7 +142,7 @@ inline void vectorizeDpTransition(const int w_prev, const int tot_work,
     auto transitionAVX = [&](const int start_wi, const int end_wi,
                              auto &&prevxV, auto &&stateV,
                              const int penalty = 0) -> void {
-        for (auto wi = start_wi; wi <= end_wi; wi += padding) {
+        for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
             const auto targetRowIndex = w_prev + wi - penalty;
             const auto add_cost = _mm512_loadu_pd(&cost_table[wi]);
             const auto new_cost = _mm512_add_pd(prevxV, add_cost);
@@ -215,7 +215,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     // p = dp[i][w] = minimum cost to allocate w effective work in the first
     // i blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
-    const int sizeOfDpWithPadding = tot_work + 1 + padding;
+    const int sizeOfDpWithPadding = tot_work + 1 + VEC_SIZE;
     constexpr auto inf = numeric_limits<double>::max() / 2;
     auto row = array{vector(sizeOfDpWithPadding, inf),
                      vector(sizeOfDpWithPadding, inf)};
@@ -230,7 +230,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     for (auto i : capacity)
         max_wi_precomputed = max(max_wi_precomputed, i);
 
-    auto cost_table = vector(max_wi_precomputed + 1 + padding, inf);
+    auto cost_table = vector(max_wi_precomputed + 1 + VEC_SIZE, inf);
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
@@ -245,7 +245,7 @@ inline auto calc_single(const std::vector<double> &load_f,
         for (int wi = 0; wi <= max_wi; wi++) {
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
         }
-        for (int wi = max_wi; wi <= max_wi + padding; wi++)
+        for (int wi = max_wi; wi <= max_wi + VEC_SIZE; wi++)
             cost_table[wi] = inf;
 
         for (const auto w_prev : views::iota(0, tot_work + 1)) {
