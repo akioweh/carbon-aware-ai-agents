@@ -258,13 +258,14 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                   const dynamicMaxValue = Math.ceil(maxDataValue / 10) * 10;
 
                   return (
-                    <div key={dc.id} className="relative w-full" style={{ height: `${chartHeight}px` }}>
-                      <div className="absolute -left-10 top-0 bottom-0 flex flex-col justify-between text-[10px] text-muted-foreground z-10 w-8 text-right pr-2">
-                        <span>{dynamicMaxValue}</span><span>0</span>
-                      </div>
-                      <div className="absolute top-2 left-2 z-20 bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-semibold border shadow-sm">{dc.name}</div>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                    <div key={dc.id} className="w-full">
+                      <div className="mb-1 text-xs font-semibold text-foreground">{dc.name}</div>
+                      <div className="relative w-full" style={{ height: `${chartHeight}px` }}>
+                        <div className="absolute -left-10 top-0 bottom-0 flex flex-col justify-between text-[10px] text-muted-foreground z-10 w-8 text-right pr-2">
+                          <span>{dynamicMaxValue}</span><span>0</span>
+                        </div>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id={`colorScheduled-${dc.id}`} x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#059669" stopOpacity={0.8} /><stop offset="95%" stopColor="#059669" stopOpacity={0.1} />
@@ -313,8 +314,9 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
                           {nowLineValue && (
                             <ReferenceLine yAxisId="left" x={nowLineValue} stroke="#f59e0b" strokeWidth={2} label={i === 0 ? { position: "insideTopRight", value: "Now", fontSize: 11, fontWeight: 600, fill: "#f59e0b" } : undefined} />
                           )}
-                        </ComposedChart>
-                      </ResponsiveContainer>
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   )
                 })}
