@@ -1,4 +1,4 @@
-# Weather-Enriched Features Experiment (Stage 5)
+# Weather-Enriched Features Experiment (Phase 5)
 
 ## Experiment Design
 
@@ -26,7 +26,7 @@ direct_normal_irradiance
 
 | Variant | Weather Features | Count |
 |---------|-----------------|-------|
-| Baseline (Stage 4) | 3 original raw | 3 |
+| Baseline (Phase 4) | 3 original raw | 3 |
 | A: Extended raw | 11 raw | 11 |
 | B: Extended + engineered | 11 raw + 4 engineered | 15 |
 | C: Engineered only | 3 original + 4 engineered | 7 |
@@ -63,7 +63,7 @@ direct_normal_irradiance
 | LightGBM | 35.09 | 18.69 | 24.30 | 40.93 | 34.92 | **30.79** |
 | Direct-XGBoost | 32.04 | 31.95 | 26.77 | 34.47 | 36.31 | **32.31** |
 
-## Comparison with Stage 4 Baseline
+## Comparison with Phase 4 Baseline
 
 | Model | Baseline | Variant A | Variant B | Variant C | Best Delta |
 |-------|----------|-----------|-----------|-----------|------------|

@@ -9,7 +9,7 @@ from config import DEFAULT_CAPACITY
 from data.generate_history import generate_load
 
 from .load import get_next_week_load
-from .ridge import get_next_week_carbon_intensity
+from .ridge_enhanced import get_next_week_carbon_intensity
 
 logger = logging.getLogger('stats.predictors.orchestrator')
 

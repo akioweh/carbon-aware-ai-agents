@@ -1,0 +1,59 @@
+# Temporary ARM-compatible Dockerfile for local testing on Apple Silicon.
+# Uses Fedora (ships GCC 14+ with full C++23 support). Do NOT commit to main.
+
+FROM fedora:41 AS deps
+RUN dnf install -y \
+    gcc-c++ ninja-build git python3-pip \
+    boost-devel tbb-devel libpq-devel \
+    jsoncpp-devel c-ares-devel brotli-devel \
+    zlib-devel libuuid-devel openssl-devel \
+    && dnf clean all
+
+# Fedora 41 ships cmake 3.30 but the scheduler requires cmake >= 4.2
+RUN pip install cmake --break-system-packages 2>/dev/null || pip install cmake
+
+# Build Drogon
+WORKDIR /build-deps
+RUN git clone --depth 1 --branch v1.9.11 https://github.com/drogonframework/drogon.git && \
+    cd drogon && \
+    git submodule update --init && \
+    mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_EXAMPLES=OFF \
+          -DBUILD_TESTING=OFF \
+          -DBUILD_TRANTOR=ON \
+          -DBUILD_REDIS=OFF \
+          -DBUILD_MYSQL=OFF \
+          -DBUILD_SQLITE=OFF \
+          -DBUILD_YAML_CONFIG=OFF \
+          -DCMAKE_INSTALL_PREFIX=/usr/local \
+          -G Ninja .. && \
+    ninja install
+
+FROM deps AS builder
+WORKDIR /app
+COPY . .
+
+# ARM doesn't have immintrin.h (x86 SIMD). The scheduler only uses it behind
+# #ifdef __AVX512F__ guards, so an empty shim is safe.
+RUN mkdir -p /app/shims && touch /app/shims/immintrin.h
+
+RUN cmake --preset arch-rel -DUSE_NATIVE_ARCH=ON -DBUILD_TESTING=OFF \
+        -DCMAKE_CXX_FLAGS="-O3 -isystem /app/shims -include ranges -include chrono" && \
+    cmake --build build/arch-rel --target scheduler
+
+FROM fedora:41
+RUN dnf install -y \
+    boost tbb libpq postgresql \
+    jsoncpp c-ares brotli zlib \
+    && dnf clean all
+
+WORKDIR /app
+COPY --from=builder /app/build/arch-rel/scheduler .
+COPY --from=builder /app/config.json .
+COPY --from=builder /app/sql/init.sql .
+COPY scripts/start.sh .
+RUN chmod +x start.sh
+
+EXPOSE 6969
+CMD ["./start.sh"]
