@@ -326,6 +326,7 @@ inline auto calc_single(const std::vector<double> &load_f,
 
         for (int wi = 0; wi <= max_wi; wi++)
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
+        ranges::fill(cost_table | views::drop(max_wi + 1), inf);
 
         for (const auto w_prev : views::iota(0, tot_work + 1)) {
             const auto &[prev0, prev1] =
