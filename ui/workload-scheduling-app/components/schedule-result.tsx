@@ -391,6 +391,19 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     return closest && closestDiff < 5 * 60 * 1000 ? closest : null
   }, [workloadData])
 
+  const usedDatacenterIds = useMemo(() => {
+    const activeScheduleId = showTrivial && unoptData ? `${unoptData.schedule_id}_trivial` : result.schedule_id
+    const used = new Set<string>()
+
+    for (const block of allBlocks) {
+      if (block?.schedule_id !== activeScheduleId) continue
+      const dcId = locationToDcId(block.location)
+      if (dcId) used.add(dcId)
+    }
+
+    return used
+  }, [allBlocks, locationToDcId, result.schedule_id, showTrivial, unoptData])
+
   const { start: rangeStart, end: rangeEnd } = getTimeRange()
 
   return (
@@ -495,11 +508,23 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
         <CardContent className="space-y-4">
           <Tabs value={selectedDC} onValueChange={setSelectedDC}>
             <TabsList className="w-full flex flex-nowrap overflow-x-auto justify-start gap-1">
-              {datacenters.map((dc) => (
-                <TabsTrigger key={dc.id} value={dc.id} className="text-xs sm:text-sm whitespace-nowrap">{formatDatacenterId(dc.id)}</TabsTrigger>
-              ))}
+              {datacenters.map((dc) => {
+                const hasScheduledBlocks = usedDatacenterIds.has(dc.id)
+                return (
+                  <TabsTrigger
+                    key={dc.id}
+                    value={dc.id}
+                    className={`text-xs sm:text-sm whitespace-nowrap gap-1.5 ${hasScheduledBlocks ? "text-emerald-700 dark:text-emerald-400" : ""}`}
+                  >
+                    {hasScheduledBlocks && <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />}
+                    {formatDatacenterId(dc.id)}
+                  </TabsTrigger>
+                )
+              })}
             </TabsList>
           </Tabs>
+
+          <p className="text-xs text-muted-foreground">Green dot indicates this data centre has scheduled blocks for the current {showTrivial ? "unoptimised" : "optimised"} plan.</p>
 
           <div className="flex flex-wrap items-center gap-6 text-sm">
             <div className="flex items-center gap-2">
