@@ -87,7 +87,8 @@ struct LocationCost {
 };
 
 // SIMD alignment
-constexpr int padding = sizeof(double);
+// 512 bits = 64 bytes.
+constexpr int padding = 512 / 8 / sizeof(double);
 
 /*
  * Algorithmic Analysis:
@@ -124,8 +125,6 @@ constexpr int padding = sizeof(double);
  * Now, we minimize the cost over E instead of sum(w_i).
  *
  */
-
-// depending on whether we are using floats, or doubles.
 inline void vectorizeDpTransition(const int w_prev, const int tot_work,
                                   const std::vector<double> &cost_table,
                                   const double prev0, const double prev1,
