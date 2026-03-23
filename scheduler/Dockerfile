@@ -11,8 +11,8 @@ RUN git clone --depth 1 --branch v1.9.11 https://github.com/drogonframework/drog
     git submodule update --init && \
     mkdir build && cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_CXX_FLAGS="-march=x86-64-v3" \
-          -DCMAKE_C_FLAGS="-march=x86-64-v3" \
+          -DCMAKE_CXX_FLAGS="-march=x86-64" \
+          -DCMAKE_C_FLAGS="-march=x86-64" \
           -DBUILD_EXAMPLES=OFF \
           -DBUILD_TESTING=OFF \
           -DBUILD_TRANTOR=ON \
@@ -31,7 +31,7 @@ COPY . .
 # Use cache mount for the build directory to speed up re-compilation
 # remember to copy the binary out of the cache mount to persist it
 RUN --mount=type=cache,target=/app/build/arch-rel \
-    cmake --preset arch-rel -DUSE_NATIVE_ARCH=OFF -DMICROARCH_LEVEL=x86-64-v3 -DBUILD_TESTING=OFF && \
+    cmake --preset arch-rel -DUSE_NATIVE_ARCH=OFF -DMICROARCH_LEVEL=x86-64 -DBUILD_TESTING=OFF && \
     cmake --build build/arch-rel --target scheduler && \
     mkdir -p /app/dist && \
     cp build/arch-rel/scheduler /app/dist/

@@ -9,7 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_compile_options(-Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
 
 option(USE_NATIVE_ARCH "Optimize for this specific machine" ON)
-set(MICROARCH_LEVEL "x86-64-v3" CACHE STRING "Microarchitecture level to use when USE_NATIVE_ARCH is OFF")
+set(MICROARCH_LEVEL "x86-64" CACHE STRING "Microarchitecture level to use when USE_NATIVE_ARCH is OFF")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   if(USE_NATIVE_ARCH)
@@ -20,8 +20,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 elseif(MSVC)
   if(MICROARCH_LEVEL STREQUAL "x86-64-v4")
     add_compile_options(/arch:AVX512)
-  else()
+  elseif(MICROARCH_LEVEL STREQUAL "x86-64-v3")
     add_compile_options(/arch:AVX2)
+  else()
+    # No AVX flag for baseline x86-64
   endif()
 endif()
 
