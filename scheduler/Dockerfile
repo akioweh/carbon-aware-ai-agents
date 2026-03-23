@@ -11,6 +11,8 @@ RUN git clone --depth 1 --branch v1.9.11 https://github.com/drogonframework/drog
     git submodule update --init && \
     mkdir build && cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_CXX_FLAGS="-march=x86-64-v4" \
+          -DCMAKE_C_FLAGS="-march=x86-64-v4" \
           -DBUILD_EXAMPLES=OFF \
           -DBUILD_TESTING=OFF \
           -DBUILD_TRANTOR=ON \

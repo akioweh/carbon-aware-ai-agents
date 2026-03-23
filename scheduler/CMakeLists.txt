@@ -14,12 +14,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   if(USE_NATIVE_ARCH)
     add_compile_options(-march=native)
   else()
-    # cloud environments often do not support AVX-512.
-    # x86-64-v3 (AVX2) is a safe baseline for modern cloud.
-    add_compile_options(-march=x86-64-v3)
+    add_compile_options(-march=x86-64-v4)
   endif()
 elseif(MSVC)
-  add_compile_options(/arch:AVX2)
+  add_compile_options(/arch:AVX512)
 endif()
 
 find_package(Drogon CONFIG REQUIRED)
