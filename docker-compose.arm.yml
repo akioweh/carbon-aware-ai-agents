@@ -3,6 +3,7 @@
 
 services:
   scheduler:
+    platform: linux/arm64
     build:
       context: ./scheduler
       dockerfile: Dockerfile.arm
