@@ -9,11 +9,25 @@
 #include <cmath>
 #include <execution>
 #include <future>
-#include <immintrin.h>
 #include <limits>
 #include <ranges>
 #include <utility>
 #include <vector>
+
+#if defined(__AVX512F__) || defined(__AVX2__)
+#include <immintrin.h>
+#else
+#warning                                                                       \
+    "AVX2/AVX512 not detected, falling back to slower scalar implementation."
+#endif
+
+#if defined(__AVX512F__)
+constexpr int VEC_SIZE = 64 / sizeof(double);
+#elif defined(__AVX2__)
+constexpr int VEC_SIZE = 32 / sizeof(double);
+#else
+constexpr int VEC_SIZE = 1;
+#endif
 
 namespace scheduler {
 
@@ -86,10 +100,6 @@ struct LocationCost {
     }
 };
 
-// SIMD lane count
-// 512 bits = 64 bytes.
-constexpr int VEC_SIZE = 512 / 8 / sizeof(double);
-
 /*
  * Algorithmic Analysis:
  *
@@ -125,56 +135,116 @@ constexpr int VEC_SIZE = 512 / 8 / sizeof(double);
  * Now, we minimize the cost over E instead of sum(w_i).
  *
  */
-inline void vectorizeDpTransition(const int w_prev, const int tot_work,
-                                  const std::vector<double> &cost_table,
-                                  const double prev0, const double prev1,
-                                  std::vector<double> &row0, auto &memo_entry,
-                                  const int max_wi, const int penalty) {
+inline void calc_single_transition(const int w_prev, const int tot_work,
+                                   const std::vector<double> &cost_table,
+                                   const double prev0, const double prev1,
+                                   std::vector<double> &row0, auto &memo_entry,
+                                   const int max_wi, const int penalty) {
+#if defined(__AVX512F__)
 
     const auto sequence = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-    const auto zeros = _mm256_set1_epi32(0);
-    const auto ones = _mm256_set1_epi32(1);
     const auto w_prevV = _mm256_set1_epi32(w_prev);
-
     const auto prev0V = _mm512_set1_pd(prev0);
     const auto prev1V = _mm512_set1_pd(prev1);
+    const auto zeros = _mm256_set1_epi32(0);
+    const auto ones = _mm256_set1_epi32(1);
 
-    auto transitionAVX = [&](const int start_wi, const int end_wi,
-                             auto &&prevxV, auto &&stateV,
-                             const int penalty = 0) -> void {
+    auto transition_impl = [&](const int start_wi, const int end_wi,
+                               const double /*prev_val*/, const int state_val,
+                               const int penalty = 0) -> void {
+        const auto prevxV = (state_val == 0) ? prev0V : prev1V;
+        const auto stateV = (state_val == 0) ? zeros : ones;
+
         for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
             const auto targetRowIndex = w_prev + wi - penalty;
             const auto add_cost = _mm512_loadu_pd(&cost_table[wi]);
             const auto new_cost = _mm512_add_pd(prevxV, add_cost);
             const auto row0V = _mm512_loadu_pd(&row0[targetRowIndex]);
-            const __mmask8 maskForMemo =
-                _mm512_cmp_pd_mask(new_cost, row0V, _CMP_LT_OS);
+            const auto mmask = _mm512_cmp_pd_mask(new_cost, row0V, _CMP_LT_OS);
 
-            if (maskForMemo) {
-                _mm512_mask_storeu_pd(&row0[targetRowIndex], maskForMemo,
-                                      new_cost);
+            if (mmask) {
+                _mm512_mask_storeu_pd(&row0[targetRowIndex], mmask, new_cost);
 
                 auto wiV = _mm256_set1_epi32(wi);
                 wiV = _mm256_add_epi32(wiV, sequence);
                 _mm256_mask_storeu_epi32(&memo_entry.alloc[targetRowIndex],
-                                         maskForMemo, wiV);
+                                         mmask, wiV);
                 _mm256_mask_storeu_epi32(&memo_entry.prev_state[targetRowIndex],
-                                         maskForMemo, stateV);
+                                         mmask, stateV);
                 _mm256_mask_storeu_epi32(&memo_entry.w_prev[targetRowIndex],
-                                         maskForMemo, w_prevV);
+                                         mmask, w_prevV);
             }
         }
     };
 
-    constexpr int start_wi_extend = 1;
+#elif defined(__AVX2__)
+
+    const auto prev0V = _mm256_set1_pd(prev0);
+    const auto prev1V = _mm256_set1_pd(prev1);
+
+    auto transition_impl = [&](const int start_wi, const int end_wi,
+                               const double /*prev_val*/, const int state_val,
+                               const int penalty = 0) -> void {
+        const auto prevxV = (state_val == 0) ? prev0V : prev1V;
+
+        for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
+            const auto targetRowIndex = w_prev + wi - penalty;
+            const auto add_cost = _mm256_loadu_pd(&cost_table[wi]);
+            const auto new_cost = _mm256_add_pd(prevxV, add_cost);
+            const auto row0V = _mm256_loadu_pd(&row0[targetRowIndex]);
+
+            const auto cmp_mask = _mm256_cmp_pd(new_cost, row0V, _CMP_LT_OS);
+            const int mmask = _mm256_movemask_pd(cmp_mask);
+
+            if (mmask) {
+                // maskstore takes an integer mask containing the bits to write.
+                // We directly cast our double comparisons for the PD store.
+                _mm256_maskstore_pd(&row0[targetRowIndex],
+                                    _mm256_castpd_si256(cmp_mask), new_cost);
+
+                // AVX2 integer masking stores are restrictive across
+                // boundaries... hopefully branch prediction saves us here
+                for (int lane = 0; lane < VEC_SIZE; ++lane) {
+                    if ((mmask >> lane) & 1) {
+                        memo_entry.alloc[targetRowIndex + lane] = wi + lane;
+                        memo_entry.prev_state[targetRowIndex + lane] =
+                            state_val;
+                        memo_entry.w_prev[targetRowIndex + lane] = w_prev;
+                    }
+                }
+            }
+        }
+    };
+
+#else
+
+    auto transition_impl = [&](const int start_wi, const int end_wi,
+                               const double prev_val, const int state_val,
+                               const int penalty = 0) -> void {
+        for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
+            const auto targetRowIndex = w_prev + wi - penalty;
+            const double new_cost = prev_val + cost_table[wi];
+
+            if (new_cost < row0[targetRowIndex]) {
+                row0[targetRowIndex] = new_cost;
+                memo_entry.alloc[targetRowIndex] = wi;
+                memo_entry.prev_state[targetRowIndex] = state_val;
+                memo_entry.w_prev[targetRowIndex] = w_prev;
+            }
+        }
+    };
+
+#endif
+
+    const int start_wi_extend = 1;
     const int end_wi_extend = std::min(max_wi, tot_work - w_prev);
-    transitionAVX(start_wi_extend, end_wi_extend, prev0V, zeros);
+    transition_impl(start_wi_extend, end_wi_extend, prev0, 0);
 
     // NOTE: actually, is this clamping correct? could we temporarily take on
-    // negative effective work?
+    // negative effective work? Code assumes positive wi everywhere.
     const int start_wi_new_run = std::max(1, penalty - w_prev);
     const int end_wi_new_run = std::min(max_wi, tot_work + penalty - w_prev);
-    transitionAVX(start_wi_new_run, end_wi_new_run, prev1V, ones, penalty);
+    transition_impl(start_wi_new_run, end_wi_new_run, prev1, 1, penalty);
 }
 
 inline auto get_e_work(const double tot_work_f, const int resolution)
@@ -261,8 +331,8 @@ inline auto calc_single(const std::vector<double> &load_f,
                 }
             }
             // do some work
-            vectorizeDpTransition(w_prev, tot_work, cost_table, prev0, prev1,
-                                  row[0], memo[i][0], max_wi, penalty);
+            calc_single_transition(w_prev, tot_work, cost_table, prev0, prev1,
+                                   row[0], memo[i][0], max_wi, penalty);
         }
     }
 
@@ -329,8 +399,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     for (const auto i : views::iota(0UZ, m))
         futures.push_back(async(
             launch::async,
-            // wrapped in lambda due to template
-            // instantiation issues with CostFunc
+            // wrapped in lambda as calc_single is a template
             [i, &loads_f, &capacities_f, &costs_f, &penalties_f, tot_work_f,
              resolution]() -> auto {
                 return calc_single(loads_f[i], capacities_f[i], costs_f[i],
