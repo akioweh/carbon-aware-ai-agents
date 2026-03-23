@@ -297,7 +297,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     // p = dp[i][w] = minimum cost to allocate w effective work in the first
     // i blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
-    const int sizeOfDpWithPadding = tot_work + 1 + VEC_SIZE;
+    const auto sizeOfDpWithPadding = tot_work + 1 + VEC_SIZE;
     constexpr auto inf = numeric_limits<double>::max() / 2;
     auto row = array{vector(sizeOfDpWithPadding, inf),
                      vector(sizeOfDpWithPadding, inf)};
@@ -308,7 +308,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     auto memo = vector(n + 1, array{MemoEntryVector(sizeOfDpWithPadding),
                                     MemoEntryVector(sizeOfDpWithPadding)});
 
-    int max_wi_precomputed{0};
+    auto max_wi_precomputed = 0;
     for (auto i : capacity)
         max_wi_precomputed = max(max_wi_precomputed, i);
 
