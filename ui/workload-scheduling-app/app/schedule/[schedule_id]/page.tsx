@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { ScheduleResult } from "@/components/schedule-result"
 import { PageShell } from "../../../components/page-shell"
@@ -8,7 +8,9 @@ import { JobScheduleResponse, ScheduleData } from "@/types/schedule"
 import { Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
-export default function SchedulePage({ params }: { params: { schedule_id: string } }) {
+export default function SchedulePage() {
+  const params = useParams<{ schedule_id?: string }>()
+  const scheduleId = params?.schedule_id
   const router = useRouter()
   const [result, setResult] = useState<JobScheduleResponse | null>(null)
   const [unoptimized, setUnoptimized] = useState<ScheduleData | null>(null)
@@ -17,13 +19,20 @@ export default function SchedulePage({ params }: { params: { schedule_id: string
 
   useEffect(() => {
     const fetchSchedule = async () => {
+      if (!scheduleId) {
+        setError("Invalid schedule id")
+        setLoading(false)
+        return
+      }
+
       try {
-        const res = await fetch(`/api/schedules/${params.schedule_id}`)
+        const encodedId = encodeURIComponent(scheduleId)
+        const res = await fetch(`/api/schedules/${encodedId}`)
         if (!res.ok) throw new Error(`Failed to fetch schedule: ${res.status}`)
         const data = await res.json()
         setResult(data)
 
-        const trivialRes = await fetch(`/api/schedules/${params.schedule_id}/trivial`).catch(() => null)
+        const trivialRes = await fetch(`/api/schedules/${encodedId}/trivial`).catch(() => null)
         if (trivialRes?.ok) {
           const trivialData = await trivialRes.json()
           setUnoptimized(trivialData)
@@ -36,7 +45,7 @@ export default function SchedulePage({ params }: { params: { schedule_id: string
     }
 
     fetchSchedule()
-  }, [params.schedule_id])
+  }, [scheduleId])
 
   if (loading) {
     return (
