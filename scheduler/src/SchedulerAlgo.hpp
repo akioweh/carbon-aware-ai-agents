@@ -148,12 +148,15 @@ inline void calc_single_transition(const int w_prev, const int tot_work,
     const auto prev1V = _mm512_set1_pd(prev1);
     const auto zeros = _mm256_set1_epi32(0);
     const auto ones = _mm256_set1_epi32(1);
+    const auto stepV = _mm256_set1_epi32(VEC_SIZE);
 
     auto transition_impl = [&](const int start_wi, const int end_wi,
                                const double /*prev_val*/, const int state_val,
                                const int penalty = 0) -> void {
         const auto prevxV = (state_val == 0) ? prev0V : prev1V;
         const auto stateV = (state_val == 0) ? zeros : ones;
+
+        auto wiV = _mm256_add_epi32(_mm256_set1_epi32(start_wi), sequence);
 
         for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
             const auto targetRowIndex = w_prev + wi - penalty;
@@ -164,9 +167,6 @@ inline void calc_single_transition(const int w_prev, const int tot_work,
 
             if (mmask) {
                 _mm512_mask_storeu_pd(&row0[targetRowIndex], mmask, new_cost);
-
-                auto wiV = _mm256_set1_epi32(wi);
-                wiV = _mm256_add_epi32(wiV, sequence);
                 _mm256_mask_storeu_epi32(&memo_entry.alloc[targetRowIndex],
                                          mmask, wiV);
                 _mm256_mask_storeu_epi32(&memo_entry.prev_state[targetRowIndex],
@@ -174,6 +174,7 @@ inline void calc_single_transition(const int w_prev, const int tot_work,
                 _mm256_mask_storeu_epi32(&memo_entry.w_prev[targetRowIndex],
                                          mmask, w_prevV);
             }
+            wiV = _mm256_add_epi32(wiV, stepV);
         }
     };
 
@@ -181,11 +182,19 @@ inline void calc_single_transition(const int w_prev, const int tot_work,
 
     const auto prev0V = _mm256_set1_pd(prev0);
     const auto prev1V = _mm256_set1_pd(prev1);
+    const auto w_prevV = _mm_set1_epi32(w_prev);
+    const auto zeros = _mm_set1_epi32(0);
+    const auto ones = _mm_set1_epi32(1);
+    const auto stepV = _mm_set1_epi32(VEC_SIZE);
 
     auto transition_impl = [&](const int start_wi, const int end_wi,
                                const double /*prev_val*/, const int state_val,
                                const int penalty = 0) -> void {
         const auto prevxV = (state_val == 0) ? prev0V : prev1V;
+        const auto stateV = (state_val == 0) ? zeros : ones;
+
+        auto wiV =
+            _mm_add_epi32(_mm_set1_epi32(start_wi), _mm_setr_epi32(0, 1, 2, 3));
 
         for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
             const auto targetRowIndex = w_prev + wi - penalty;
@@ -197,22 +206,25 @@ inline void calc_single_transition(const int w_prev, const int tot_work,
             const int mmask = _mm256_movemask_pd(cmp_mask);
 
             if (mmask) {
-                // maskstore takes an integer mask containing the bits to write.
-                // We directly cast our double comparisons for the PD store.
                 _mm256_maskstore_pd(&row0[targetRowIndex],
                                     _mm256_castpd_si256(cmp_mask), new_cost);
 
-                // AVX2 integer masking stores are restrictive across
-                // boundaries... hopefully branch prediction saves us here
-                for (int lane = 0; lane < VEC_SIZE; ++lane) {
-                    if ((mmask >> lane) & 1) {
-                        memo_entry.alloc[targetRowIndex + lane] = wi + lane;
-                        memo_entry.prev_state[targetRowIndex + lane] =
-                            state_val;
-                        memo_entry.w_prev[targetRowIndex + lane] = w_prev;
-                    }
-                }
+                // convert 256-bit 64x4 double mask down into a 128-bit 32x4 int
+                // mask by shuffling the low 32 bits of each 64-bit pair
+                auto cmp_ps = _mm256_castpd_ps(cmp_mask);
+                auto low = _mm256_castps256_ps128(cmp_ps);
+                auto high = _mm256_extractf128_ps(cmp_ps, 1);
+                auto imask = _mm_castps_si128(
+                    _mm_shuffle_ps(low, high, _MM_SHUFFLE(2, 0, 2, 0)));
+
+                _mm_maskstore_epi32(&memo_entry.alloc[targetRowIndex], imask,
+                                    wiV);
+                _mm_maskstore_epi32(&memo_entry.prev_state[targetRowIndex],
+                                    imask, stateV);
+                _mm_maskstore_epi32(&memo_entry.w_prev[targetRowIndex], imask,
+                                    w_prevV);
             }
+            wiV = _mm_add_epi32(wiV, stepV);
         }
     };
 
