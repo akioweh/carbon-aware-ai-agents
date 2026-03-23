@@ -87,11 +87,7 @@ struct LocationCost {
 };
 
 // SIMD alignment
-#ifdef __AVX512F__
 constexpr int padding = sizeof(double);
-#else
-constexpr int padding = 0;
-#endif
 
 /*
  * Algorithmic Analysis:
@@ -136,7 +132,6 @@ inline void vectorizeDpTransition(const int w_prev, const int tot_work,
                                   std::vector<double> &row0, auto &memo_entry,
                                   const int max_wi, const int penalty) {
 
-#ifdef __AVX512F__
     const auto sequence = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
     const auto zeros = _mm256_set1_epi32(0);
     const auto ones = _mm256_set1_epi32(1);
@@ -179,30 +174,6 @@ inline void vectorizeDpTransition(const int w_prev, const int tot_work,
     const int start_wi_new_run = std::max(1, penalty - w_prev);
     const int end_wi_new_run = std::min(max_wi, tot_work + penalty - w_prev);
     transitionAVX(start_wi_new_run, end_wi_new_run, prev1V, ones, penalty);
-#else
-    auto transitionFallback = [&](const int start_wi, const int end_wi,
-                                  const double prevx, const int state,
-                                  const int penalty = 0) -> void {
-        for (auto wi = start_wi; wi <= end_wi; ++wi) {
-            const auto targetRowIndex = w_prev + wi - penalty;
-            const auto new_cost = prevx + cost_table[wi];
-            if (new_cost < row0[targetRowIndex]) {
-                row0[targetRowIndex] = new_cost;
-                memo_entry.alloc[targetRowIndex] = wi;
-                memo_entry.prev_state[targetRowIndex] = state;
-                memo_entry.w_prev[targetRowIndex] = w_prev;
-            }
-        }
-    };
-
-    constexpr int start_wi_extend = 1;
-    const int end_wi_extend = std::min(max_wi, tot_work - w_prev);
-    transitionFallback(start_wi_extend, end_wi_extend, prev0, 0);
-
-    const int start_wi_new_run = std::max(1, penalty - w_prev);
-    const int end_wi_new_run = std::min(max_wi, tot_work + penalty - w_prev);
-    transitionFallback(start_wi_new_run, end_wi_new_run, prev1, 1, penalty);
-#endif
 }
 
 inline auto get_e_work(const double tot_work_f, const int resolution)
