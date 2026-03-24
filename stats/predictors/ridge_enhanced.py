@@ -494,7 +494,7 @@ def _predict_ci(series_df, dc_name=None, now=None):
         rid, _, lat, lon = DC_REGION_MAP[dc_name]
         s_date = df['timestamp'].iloc[0].strftime('%Y-%m-%d')
         e_date = df['timestamp'].iloc[-1].strftime('%Y-%m-%d')
-        archive = get_weather(lat, lon, s_date, e_date, cache_key=f'{rid}_archive')
+        archive = get_weather(lat, lon, s_date, e_date, cache_key=f'{rid}_archive_{s_date}_{e_date}')
         forecast = _fetch_forecast_weather(lat, lon)
         if not forecast.empty:
             forecast = _engineer_weather_features(forecast)
