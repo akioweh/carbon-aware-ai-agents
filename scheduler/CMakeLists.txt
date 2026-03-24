@@ -3,6 +3,7 @@ project(scheduler)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE INTERNAL "") # force c++23 in cache
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF) # disable modules to use ccache
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
