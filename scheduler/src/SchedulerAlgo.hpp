@@ -5,6 +5,7 @@
 #include "exceptions/SchedulingException.hpp"
 #include <algorithm>
 #include <array>
+#include <boost/align/aligned_allocator.hpp>
 #include <cassert>
 #include <cmath>
 #include <execution>
@@ -22,14 +23,21 @@
 #endif
 
 #if defined(__AVX512F__)
-constexpr int VEC_SIZE = 64 / sizeof(double);
+constexpr auto VEC_SIZE = 64 / static_cast<int>(sizeof(double));
+constexpr auto ALIGN_SIZE = 64;
 #elif defined(__AVX2__)
-constexpr int VEC_SIZE = 32 / sizeof(double);
+constexpr auto VEC_SIZE = 32 / static_cast<int>(sizeof(double));
+constexpr auto ALIGN_SIZE = 32;
 #else
-constexpr int VEC_SIZE = 1;
+constexpr auto VEC_SIZE = 1;
+constexpr auto ALIGN_SIZE = alignof(std::max_align_t);
 #endif
 
 namespace scheduler {
+
+template <typename T>
+using AlignedVector =
+    std::vector<T, boost::alignment::aligned_allocator<T, ALIGN_SIZE>>;
 
 template <typename Self, typename T>
 concept CostFunction = requires(Self &f, int i, T load) {
@@ -54,7 +62,7 @@ struct MemoEntry {
 };
 
 struct MemoEntryVector {
-    std::vector<int> alloc, prev_state, w_prev;
+    AlignedVector<int> alloc, prev_state, w_prev;
 
     MemoEntryVector(size_t size)
         : alloc(size, 0), prev_state(size, 0), w_prev(size, 0) {}
@@ -136,10 +144,11 @@ struct LocationCost {
  *
  */
 inline void calc_single_transition(const int w_prev, const int row_size,
-                                   const std::vector<double> &cost_table,
+                                   const AlignedVector<double> &cost_table,
                                    const double prev0, const double prev1,
-                                   std::vector<double> &row0, auto &memo_entry,
-                                   const int max_wi, const int penalty) {
+                                   AlignedVector<double> &row0,
+                                   auto &memo_entry, const int max_wi,
+                                   const int penalty) {
 #if defined(__AVX512F__)
 
     const auto sequence = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
@@ -206,23 +215,29 @@ inline void calc_single_transition(const int w_prev, const int row_size,
             const int mmask = _mm256_movemask_pd(cmp_mask);
 
             if (mmask) {
-                _mm256_maskstore_pd(&row0[targetRowIndex],
-                                    _mm256_castpd_si256(cmp_mask), new_cost);
+                // blend + unaligned store.
+                const auto blended_cost =
+                    _mm256_blendv_pd(row0V, new_cost, cmp_mask);
+                _mm256_storeu_pd(&row0[targetRowIndex], blended_cost);
 
-                // convert 256-bit 64x4 double mask down into a 128-bit 32x4 int
-                // mask by shuffling the low 32 bits of each 64-bit pair
+                // convert 64-bit (double) masks to 32-bit (int) masks
                 auto cmp_ps = _mm256_castpd_ps(cmp_mask);
                 auto low = _mm256_castps256_ps128(cmp_ps);
                 auto high = _mm256_extractf128_ps(cmp_ps, 1);
                 auto imask = _mm_castps_si128(
                     _mm_shuffle_ps(low, high, _MM_SHUFFLE(2, 0, 2, 0)));
 
-                _mm_maskstore_epi32(&memo_entry.alloc[targetRowIndex], imask,
-                                    wiV);
-                _mm_maskstore_epi32(&memo_entry.prev_state[targetRowIndex],
-                                    imask, stateV);
-                _mm_maskstore_epi32(&memo_entry.w_prev[targetRowIndex], imask,
-                                    w_prevV);
+                const auto blend_int = [&](auto &vec,
+                                           __m128i new_vals) -> auto {
+                    auto current =
+                        _mm_loadu_si128((__m128i *)&vec[targetRowIndex]);
+                    auto blended = _mm_blendv_epi8(current, new_vals, imask);
+                    _mm_storeu_si128((__m128i *)&vec[targetRowIndex], blended);
+                };
+
+                blend_int(memo_entry.alloc, wiV);
+                blend_int(memo_entry.prev_state, stateV);
+                blend_int(memo_entry.w_prev, w_prevV);
             }
             wiV = _mm_add_epi32(wiV, stepV);
         }
@@ -306,8 +321,8 @@ inline auto calc_single(const std::vector<double> &load_f,
     // p = dp[i][w] = minimum cost to allocate w effective work in the first
     // i blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
-    auto row =
-        array{vector(row_size_padded, INF), vector(row_size_padded, INF)};
+    auto row = array{AlignedVector<double>(row_size_padded, INF),
+                     AlignedVector<double>(row_size_padded, INF)};
     auto prev_row = row;
     // 0 cost for 0 work.
     row[1][row_offset] = 0.;
