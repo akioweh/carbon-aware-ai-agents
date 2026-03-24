@@ -2,7 +2,7 @@ FROM archlinux:latest AS deps
 RUN pacman-key --init && pacman-key --populate archlinux
 RUN --mount=type=cache,target=/var/cache/pacman \
     pacman -Syu --noconfirm && \
-    pacman -S --noconfirm base-devel cmake ninja git boost onetbb postgresql-libs jsoncpp c-ares brotli zlib util-linux-libs
+    pacman -S --noconfirm base-devel cmake ninja git boost onetbb postgresql-libs jsoncpp c-ares brotli zlib util-linux-libs ccache
 
 # Build Drogon
 WORKDIR /build-deps
@@ -28,9 +28,8 @@ FROM deps AS builder
 WORKDIR /app
 COPY . .
 
-# Use cache mount for the build directory to speed up re-compilation
-# remember to copy the binary out of the cache mount to persist it
-RUN --mount=type=cache,target=/app/build/arch-generic-rel \
+# Use ccache for fast, reliable object-level caching without stale build artifacts
+RUN --mount=type=cache,target=/root/.cache/ccache \
     cmake --preset arch-generic-rel -DBUILD_TESTING=OFF && \
     cmake --build build/arch-generic-rel --target scheduler && \
     mkdir -p /app/dist && \
