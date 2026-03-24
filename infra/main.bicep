@@ -177,6 +177,7 @@ resource schedulerApp 'Microsoft.App/containerApps@2023-05-01' = {
       activeRevisionsMode: 'Single'
       ingress: {
         external: false // Internal only
+        allowInsecure: true
         targetPort: 6969
         transport: 'auto'
       }
@@ -239,6 +240,7 @@ resource uiApp 'Microsoft.App/containerApps@2023-05-01' = {
       activeRevisionsMode: 'Single'
       ingress: {
         external: true // Public
+        allowInsecure: true
         targetPort: 3000
         transport: 'auto'
       }
