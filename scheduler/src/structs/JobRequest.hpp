@@ -1,9 +1,9 @@
 #ifndef SCHEDULER_JOB_REQUEST_HPP
 #define SCHEDULER_JOB_REQUEST_HPP
-#include "utils/HardwareConversion.hpp"
 #pragma once
 
 #include "exceptions/ValidationException.hpp"
+#include "utils/HardwareConversion.hpp"
 #include "utils/Utils.hpp"
 #include <chrono>
 #include <drogon/HttpRequest.h>
