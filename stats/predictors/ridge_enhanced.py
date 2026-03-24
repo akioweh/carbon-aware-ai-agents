@@ -15,6 +15,7 @@ import logging
 import os
 import pickle
 import sqlite3
+import threading
 import warnings
 from pathlib import Path
 
@@ -458,6 +459,15 @@ def predict_ridge(ridge, scaler, X):
     return np.clip(ridge.predict(X_sc), 0, 500)
 
 
+# ── Model Cache ──────────────────────────────────────────────────────────
+
+# Cache trained models per datacenter to avoid rebuilding the ~2M-row
+# training matrix on every prediction cycle.  Keyed by DC name; invalidated
+# when the training data fingerprint (row count + last timestamp) changes.
+_model_cache: dict[str, dict] = {}
+_train_lock = threading.Lock()
+
+
 # ── Production API ───────────────────────────────────────────────────────
 
 
@@ -494,13 +504,46 @@ def _predict_ci(series_df, dc_name=None, now=None):
         if not forecast.empty:
             test_wx = _align_weather(forecast, fc_30)
 
-    X_train, y_train, X_test = build_direct_features(
-        train_ts, train_y, fc_30,
-        train_wx=train_wx, test_wx=test_wx,
-        subsample=3,
-    )
+    # Check model cache — avoids rebuilding the massive training matrix
+    fingerprint = (len(train_y), str(train_ts[-1]))
+    cache_key = dc_name or '__default__'
+    cached = _model_cache.get(cache_key)
 
-    ridge, scaler = train_ridge(X_train, y_train)
+    if cached and cached['fingerprint'] == fingerprint:
+        ridge, scaler = cached['ridge'], cached['scaler']
+        _, _, X_test = build_direct_features(
+            train_ts, train_y, fc_30,
+            train_wx=train_wx, test_wx=test_wx,
+            subsample=3, test_only=True,
+        )
+        logger.info('Model cache hit for %s — skipping training', cache_key)
+    else:
+        with _train_lock:
+            # Re-check after acquiring lock (another thread may have trained)
+            cached = _model_cache.get(cache_key)
+            if cached and cached['fingerprint'] == fingerprint:
+                ridge, scaler = cached['ridge'], cached['scaler']
+                _, _, X_test = build_direct_features(
+                    train_ts, train_y, fc_30,
+                    train_wx=train_wx, test_wx=test_wx,
+                    subsample=3, test_only=True,
+                )
+                logger.info('Model cache hit for %s after lock — skipping training', cache_key)
+            else:
+                logger.info('Training new model for %s (data: %d points)', cache_key, len(train_y))
+                X_train, y_train_arr, X_test = build_direct_features(
+                    train_ts, train_y, fc_30,
+                    train_wx=train_wx, test_wx=test_wx,
+                    subsample=3,
+                )
+                ridge, scaler = train_ridge(X_train, y_train_arr)
+                _model_cache[cache_key] = {
+                    'ridge': ridge,
+                    'scaler': scaler,
+                    'fingerprint': fingerprint,
+                }
+                logger.info('Model cached for %s', cache_key)
+
     preds = predict_ridge(ridge, scaler, X_test)
 
     fc_series = pd.Series(preds, index=fc_30)
