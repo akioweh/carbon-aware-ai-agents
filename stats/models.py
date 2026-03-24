@@ -1,5 +1,7 @@
 """Pydantic request/response models for the Stats API."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -46,7 +48,7 @@ class CarbonIntensityForecastResponse(BaseForecastResponse):
 
 
 class ErrorResponse(BaseModel):
-    detail: str = Field(..., description='Error description')
+    detail: str | list[Any] = Field(..., description='Error description (string for app errors, array for validation errors)')
 
 
 class PredictionWindowModel(BaseModel):
