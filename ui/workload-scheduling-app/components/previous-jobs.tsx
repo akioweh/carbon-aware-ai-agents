@@ -9,7 +9,7 @@ import { JobSummary, ScheduleBlock } from "../types/schedule"
 import { scaleDataByConstantToPFLOP } from "./schedule-result"
 
 interface PreviousJobsProps {
-  onClose: () => void
+  onClose?: () => void
   onSelectJob: (job: JobSummary) => void
 }
 
@@ -99,9 +99,11 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
           </CardTitle>
           <CardDescription>View and manage previously scheduled jobs</CardDescription>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
+        {onClose && (
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </CardHeader>
 
       <CardContent>
@@ -177,7 +179,7 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                         {job.impact?.total_emissions && (
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-muted-foreground">Emissions:</span>
-                            <span className="text-xs font-semibold">{job.impact.total_emissions.toFixed(2)} kg CO₂</span>
+                            <span className="text-xs font-semibold">{job.impact.total_emissions.toFixed(2)} g CO₂</span>
                           </div>
                         )}
 

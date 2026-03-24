@@ -1,7 +1,7 @@
 # Temporary ARM-compatible Dockerfile for local testing on Apple Silicon.
 # Uses Fedora (ships GCC 14+ with full C++23 support). Do NOT commit to main.
 
-FROM fedora:41 AS deps
+FROM fedora:latest AS deps
 RUN dnf install -y \
     gcc-c++ ninja-build git python3-pip \
     boost-devel tbb-devel libpq-devel \
@@ -42,7 +42,7 @@ RUN cmake --preset arch-rel -DUSE_NATIVE_ARCH=ON -DBUILD_TESTING=OFF \
         -DCMAKE_CXX_FLAGS="-O3 -isystem /app/shims -include ranges -include chrono" && \
     cmake --build build/arch-rel --target scheduler
 
-FROM fedora:41
+FROM fedora:latest
 RUN dnf install -y \
     boost tbb libpq postgresql \
     jsoncpp c-ares brotli zlib \
