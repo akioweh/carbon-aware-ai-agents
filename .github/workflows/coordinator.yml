@@ -2,7 +2,7 @@ name: Main Deployment Coordinator
 
 on:
   push:
-    branches: [main, ci/deploy]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
