@@ -459,13 +459,96 @@ def predict_ridge(ridge, scaler, X):
     return np.clip(ridge.predict(X_sc), 0, 500)
 
 
-# ── Model Cache ──────────────────────────────────────────────────────────
+# ── Incremental Ridge ────────────────────────────────────────────────────
+#
+# Instead of rebuilding the full ~2M-row training matrix every cycle, we
+# cache the sufficient statistics (X^T X and X^T y) after the initial cold
+# start, then incrementally update them with only the new rows when fresh
+# data arrives.  Re-solving the 65×65 Ridge system is instant.
+#
+# Cached per datacenter:
+#   XtX          (p, p)   — Gram matrix in scaled space
+#   Xty_raw      (p,)     — X_scaled^T @ y  (uncentered)
+#   X_col_sums   (p,)     — column sums of X_scaled (≈0 initially)
+#   y_sum        float    — sum of all training targets
+#   y_count      int      — number of training rows
+#   scaler       StandardScaler  — frozen after cold start
+#   alpha        float    — regularisation strength from initial RidgeCV
+#   coef         (p,)     — current Ridge coefficients
+#   intercept    float    — current intercept (≈ mean(y))
+#   n_train      int      — len(train_y) at last update
 
-# Cache trained models per datacenter to avoid rebuilding the ~2M-row
-# training matrix on every prediction cycle.  Keyed by DC name; invalidated
-# when the training data fingerprint (row count + last timestamp) changes.
-_model_cache: dict[str, dict] = {}
+_model_state: dict[str, dict] = {}
 _train_lock = threading.Lock()
+
+
+def _solve_ridge_from_stats(XtX, Xty_raw, X_col_sums, y_sum, y_count, alpha):
+    """Solve Ridge from cached sufficient statistics.  O(p^3) ≈ instant for p=65."""
+    y_mean = y_sum / y_count
+    Xty = Xty_raw - y_mean * X_col_sums
+    coef = np.linalg.solve(XtX + alpha * np.eye(XtX.shape[0]), Xty)
+    return coef, y_mean
+
+
+def _build_delta_rows(train_ts, train_y, n_old, train_wx=None, subsample=3):
+    """Build feature rows only for data that arrived since index n_old.
+
+    For 1 new 30-min reading this produces ~112 rows × 65 cols ≈ 58 KB,
+    versus ~1 GB for the full matrix.
+    """
+    n_new = len(train_y)
+    if n_new <= n_old:
+        return None, None
+
+    origin_stats = build_origin_stats(train_y)
+    origin_arr = _concat_origin_array(origin_stats)
+    all_temporal = build_temporal_features(train_ts)
+
+    min_hist = 48
+    max_h = min(n_new, 336)
+    has_wx = train_wx is not None
+
+    X_parts, y_parts = [], []
+    for h in range(1, max_h + 1):
+        # Previously included origins: [min_hist, n_old - h)
+        # Now included origins:        [min_hist, n_new - h)
+        # Delta origins:               [n_old - h, n_new - h)  ∩  [min_hist, ∞)
+        new_start = max(min_hist, n_old - h)
+        new_end = n_new - h
+        if new_end <= new_start:
+            continue
+
+        all_new_origins = np.arange(new_start, new_end)
+        # Keep subsampling aligned with the original grid
+        if subsample > 1:
+            mask = (all_new_origins - min_hist) % subsample == 0
+            all_new_origins = all_new_origins[mask]
+        if len(all_new_origins) == 0:
+            continue
+
+        targets = all_new_origins + h
+        temporal = all_temporal[targets]
+        h_norm = h / 336.0
+        h_feat = np.column_stack([
+            np.full(len(all_new_origins), h_norm),
+            np.full(len(all_new_origins), h_norm ** 2),
+            np.full(len(all_new_origins), h_norm ** 3),
+            np.full(len(all_new_origins), np.log1p(h) / np.log(337)),
+        ])
+        of = origin_arr[all_new_origins]
+
+        x = np.column_stack([temporal, h_feat, of])
+        wx_slice = train_wx[targets] if has_wx else None
+        if has_wx:
+            x = np.column_stack([x, wx_slice])
+        x = np.column_stack([x, _interactions(temporal, h_feat, of, wx_slice)])
+
+        X_parts.append(x)
+        y_parts.append(train_y[targets])
+
+    if not X_parts:
+        return None, None
+    return np.vstack(X_parts), np.concatenate(y_parts)
 
 
 # ── Production API ───────────────────────────────────────────────────────
@@ -504,47 +587,71 @@ def _predict_ci(series_df, dc_name=None, now=None):
         if not forecast.empty:
             test_wx = _align_weather(forecast, fc_30)
 
-    # Check model cache — avoids rebuilding the massive training matrix
-    fingerprint = (len(train_y), str(train_ts[-1]))
     cache_key = dc_name or '__default__'
-    cached = _model_cache.get(cache_key)
+    state = _model_state.get(cache_key)
+    n_train = len(train_y)
 
-    if cached and cached['fingerprint'] == fingerprint:
-        ridge, scaler = cached['ridge'], cached['scaler']
-        _, _, X_test = build_direct_features(
-            train_ts, train_y, fc_30,
-            train_wx=train_wx, test_wx=test_wx,
-            subsample=3, test_only=True,
+    if state is not None and n_train > state['n_train']:
+        # ── Warm update: new data arrived ────────────────────────────
+        n_old = state['n_train']
+        X_delta, y_delta = _build_delta_rows(
+            train_ts, train_y, n_old,
+            train_wx=train_wx, subsample=3,
         )
-        logger.info('Model cache hit for %s — skipping training', cache_key)
-    else:
+        if X_delta is not None:
+            X_delta_sc = state['scaler'].transform(X_delta)
+            state['XtX'] += X_delta_sc.T @ X_delta_sc
+            state['Xty_raw'] += X_delta_sc.T @ y_delta
+            state['X_col_sums'] += X_delta_sc.sum(axis=0)
+            state['y_sum'] += float(y_delta.sum())
+            state['y_count'] += len(y_delta)
+            state['coef'], state['intercept'] = _solve_ridge_from_stats(
+                state['XtX'], state['Xty_raw'], state['X_col_sums'],
+                state['y_sum'], state['y_count'], state['alpha'],
+            )
+            state['n_train'] = n_train
+            logger.info('Warm update for %s: %d → %d points (%d new rows)',
+                        cache_key, n_old, n_train, len(y_delta))
+
+    if state is None:
+        # ── Cold start: full training (once per DC) ──────────────────
         with _train_lock:
-            # Re-check after acquiring lock (another thread may have trained)
-            cached = _model_cache.get(cache_key)
-            if cached and cached['fingerprint'] == fingerprint:
-                ridge, scaler = cached['ridge'], cached['scaler']
-                _, _, X_test = build_direct_features(
-                    train_ts, train_y, fc_30,
-                    train_wx=train_wx, test_wx=test_wx,
-                    subsample=3, test_only=True,
-                )
-                logger.info('Model cache hit for %s after lock — skipping training', cache_key)
-            else:
-                logger.info('Training new model for %s (data: %d points)', cache_key, len(train_y))
-                X_train, y_train_arr, X_test = build_direct_features(
+            state = _model_state.get(cache_key)
+            if state is None:
+                logger.info('Cold start for %s: training on %d points', cache_key, n_train)
+                X_train, y_train_arr, _ = build_direct_features(
                     train_ts, train_y, fc_30,
                     train_wx=train_wx, test_wx=test_wx,
                     subsample=3,
                 )
-                ridge, scaler = train_ridge(X_train, y_train_arr)
-                _model_cache[cache_key] = {
-                    'ridge': ridge,
-                    'scaler': scaler,
-                    'fingerprint': fingerprint,
-                }
-                logger.info('Model cached for %s', cache_key)
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X_train)
+                ridge_cv = RidgeCV(alphas=[0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0])
+                ridge_cv.fit(X_scaled, y_train_arr)
 
-    preds = predict_ridge(ridge, scaler, X_test)
+                state = {
+                    'scaler': scaler,
+                    'alpha': float(ridge_cv.alpha_),
+                    'XtX': X_scaled.T @ X_scaled,
+                    'Xty_raw': X_scaled.T @ y_train_arr,
+                    'X_col_sums': X_scaled.sum(axis=0),
+                    'y_sum': float(y_train_arr.sum()),
+                    'y_count': len(y_train_arr),
+                    'coef': ridge_cv.coef_,
+                    'intercept': float(ridge_cv.intercept_),
+                    'n_train': n_train,
+                }
+                _model_state[cache_key] = state
+                logger.info('Model initialized for %s (alpha=%.3f)', cache_key, state['alpha'])
+
+    # Build test features (always cheap — ~338 rows)
+    _, _, X_test = build_direct_features(
+        train_ts, train_y, fc_30,
+        train_wx=train_wx, test_wx=test_wx,
+        subsample=3, test_only=True,
+    )
+    X_test_sc = state['scaler'].transform(X_test)
+    preds = np.clip(X_test_sc @ state['coef'] + state['intercept'], 0, 500)
 
     fc_series = pd.Series(preds, index=fc_30)
     fc_5 = fc_series.resample('5min').interpolate('linear').bfill()
