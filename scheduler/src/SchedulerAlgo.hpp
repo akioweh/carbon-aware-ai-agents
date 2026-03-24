@@ -409,9 +409,10 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     assert(capacities_f.size() == m);
     assert(costs_f.size() == m);
     assert(penalties_f.size() == m);
-    assert(ranges::all_of(
-        loads_f, [n](const auto &load_f) { return load_f.size() == n; }));
-    assert(ranges::all_of(capacities_f, [n](const auto &capacity_f) {
+    assert(ranges::all_of(loads_f, [n](const auto &load_f) -> auto {
+        return load_f.size() == n;
+    }));
+    assert(ranges::all_of(capacities_f, [n](const auto &capacity_f) -> auto {
         return capacity_f.size() == n;
     }));
 
@@ -436,12 +437,13 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
 
     // result validation
-    assert(ranges::all_of(locations_memo, [n](const auto &vec) {
+    assert(ranges::all_of(locations_memo, [n](const auto &vec) -> auto {
         return vec.size() == n + 1UZ;
     }));
-    assert(ranges::all_of(locations_cost_vector, [tot_work](const auto &vec) {
-        return vec.size() == tot_work + 1UZ;
-    }));
+    assert(ranges::all_of(locations_cost_vector,
+                          [tot_work](const auto &vec) -> auto {
+                              return vec.size() == tot_work + 1UZ;
+                          }));
 
     // multiple choice knapsack
     constexpr auto inf = numeric_limits<double>::max() / 2;
