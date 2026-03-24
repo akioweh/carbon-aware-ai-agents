@@ -253,7 +253,7 @@ inline void calc_single_transition(const int w_prev, const int row_size,
     if (start_wi_extend <= end_wi_extend)
         transition_impl(start_wi_extend, end_wi_extend, prev0, 0, 0);
 
-    const int start_wi_new_run = 1;
+    const int start_wi_new_run = std::max(1, penalty - w_prev);
     const int end_wi_new_run = std::min(max_wi, row_size + penalty - w_prev);
     if (start_wi_new_run <= end_wi_new_run)
         transition_impl(start_wi_new_run, end_wi_new_run, prev1, 1, penalty);
@@ -301,7 +301,7 @@ inline auto calc_single(const std::vector<double> &load_f,
     // length of DP rows: indices for the range (-max_penalty, tot_work]
     const int row_size = tot_work + row_offset;
 
-    const auto row_size_padded = row_size + 1 + VEC_SIZE;
+    const auto row_size_padded = row_size + 1 + (VEC_SIZE * 2);
     constexpr auto INF = numeric_limits<double>::max() / 2;
     // p = dp[i][w] = minimum cost to allocate w effective work in the first
     // i blocks. p[0] is when the last block is allocated, p[1] is when the
@@ -322,7 +322,8 @@ inline auto calc_single(const std::vector<double> &load_f,
     for (auto i : capacity)
         max_wi_precomputed = max(max_wi_precomputed, i);
 
-    auto cost_table = vector(max_wi_precomputed + 1 + VEC_SIZE, INF);
+    auto cost_table =
+        AlignedVector<double>(max_wi_precomputed + 1 + (VEC_SIZE * 2), INF);
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
