@@ -1,0 +1,9 @@
+go to configure datacentre
+homepage test
+go to previous jobs
+go to calendar
+toggle a datacentre
+schedule
+schedule with specific datacentre
+verify the schedule, clicking on cards
+unoptimized, optimized
