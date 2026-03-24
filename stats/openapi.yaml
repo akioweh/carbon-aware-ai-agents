@@ -382,9 +382,13 @@ components:
     ErrorResponse:
       properties:
         detail:
-          type: string
+          anyOf:
+          - type: string
+          - items: {}
+            type: array
           title: Detail
-          description: Error description
+          description: Error description (string for app errors, array for validation
+            errors)
       type: object
       required:
       - detail

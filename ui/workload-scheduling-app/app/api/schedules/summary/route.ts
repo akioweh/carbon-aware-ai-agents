@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
+import { SCHEDULER_API_URL } from "@/app/api/apiConfig"
 
-const BASE_URL = "http://localhost:6969/api/schedules/summary"
+const BASE_URL = `${SCHEDULER_API_URL}/api/schedules/summary`
 
 export async function GET() {
   try {

@@ -68,9 +68,9 @@ To run the tests:
    ```
 
    > [!TIP]  
-   > By default, tests targeting the `StatsAPIClient` assume the python backend is running locally at `http://127.0.0.1:5000`. You can override this using the `STATS_API_HOST` environment variable if you want to run tests against a deployed backend:
+   > By default, tests targeting the `StatsAPIClient` assume the python backend is running locally at `http://127.0.0.1:5000`. You can override this using the `STATS_API_URL` environment variable if you want to run tests against a deployed backend:
    > ```bash
-   > STATS_API_HOST="http://140.238.79.139:5000" ctest --test-dir build/arch -R api_client_test
+   > STATS_API_URL="http://140.238.79.139:5000" ctest --test-dir build/arch -R api_client_test
    > ```
    > use the `-N` flag to list available tests, and use `-R <regex>` to run a
    > subset matching the regex.

@@ -1,0 +1,11 @@
+**/build/
+**/node_modules/
+**/.next/
+**/.git/
+**/.vscode/
+**/.idea/
+**/dist/
+**/out/
+.env
+.env.local
+docker-compose.override.yml
