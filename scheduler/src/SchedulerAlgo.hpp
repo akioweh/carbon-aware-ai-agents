@@ -135,7 +135,7 @@ struct LocationCost {
  * Now, we minimize the cost over E instead of sum(w_i).
  *
  */
-inline void calc_single_transition(const int w_prev, const int tot_work,
+inline void calc_single_transition(const int w_prev, const int row_size,
                                    const std::vector<double> &cost_table,
                                    const double prev0, const double prev1,
                                    std::vector<double> &row0, auto &memo_entry,
@@ -249,12 +249,14 @@ inline void calc_single_transition(const int w_prev, const int tot_work,
 #endif
 
     const int start_wi_extend = 1;
-    const int end_wi_extend = std::min(max_wi, tot_work - w_prev);
-    transition_impl(start_wi_extend, end_wi_extend, prev0, 0);
+    const int end_wi_extend = std::min(max_wi, row_size - w_prev);
+    if (start_wi_extend <= end_wi_extend)
+        transition_impl(start_wi_extend, end_wi_extend, prev0, 0, 0);
 
-    const int start_wi_new_run = std::max(1, penalty - w_prev);
-    const int end_wi_new_run = std::min(max_wi, tot_work + penalty - w_prev);
-    transition_impl(start_wi_new_run, end_wi_new_run, prev1, 1, penalty);
+    const int start_wi_new_run = 1;
+    const int end_wi_new_run = std::min(max_wi, row_size + penalty - w_prev);
+    if (start_wi_new_run <= end_wi_new_run)
+        transition_impl(start_wi_new_run, end_wi_new_run, prev1, 1, penalty);
 }
 
 inline auto get_e_work(const double tot_work_f, const int resolution)
@@ -294,31 +296,39 @@ inline auto calc_single(const std::vector<double> &load_f,
     } cost{.cost_f_ = cost_f, .e_work = e_work};
     const auto penalty = static_cast<int>(round(penalty_f / e_work));
 
+    // physical indices are shifted by offset to allow negative indices
+    const int row_offset = penalty;
+    // length of DP rows: indices for the range (-max_penalty, tot_work]
+    const int row_size = tot_work + row_offset;
+
+    const auto row_size_padded = row_size + 1 + VEC_SIZE;
+    constexpr auto INF = numeric_limits<double>::max() / 2;
     // p = dp[i][w] = minimum cost to allocate w effective work in the first
     // i blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
-    const auto sizeOfDpWithPadding = tot_work + 1 + VEC_SIZE;
-    constexpr auto inf = numeric_limits<double>::max() / 2;
-    auto row = array{vector(sizeOfDpWithPadding, inf),
-                     vector(sizeOfDpWithPadding, inf)};
-
+    auto row =
+        array{vector(row_size_padded, INF), vector(row_size_padded, INF)};
     auto prev_row = row;
-    row[1][0] = 0.; // 0 cost for 0 work
-    // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
-    auto memo = vector(n + 1, array{MemoEntryVector(sizeOfDpWithPadding),
-                                    MemoEntryVector(sizeOfDpWithPadding)});
+    // 0 cost for 0 work.
+    row[1][row_offset] = 0.;
+
+    // to reconstruct {w_i} later. memo[i][state][w] = choices made (work
+    // allocated) at block i to have final effective work w.
+    // state represents whether we actually allocated in the block
+    auto memo = vector(n + 1, array{MemoEntryVector(row_size_padded),
+                                    MemoEntryVector(row_size_padded)});
 
     auto max_wi_precomputed = 0;
     for (auto i : capacity)
         max_wi_precomputed = max(max_wi_precomputed, i);
 
-    auto cost_table = vector(max_wi_precomputed + 1 + VEC_SIZE, inf);
+    auto cost_table = vector(max_wi_precomputed + 1 + VEC_SIZE, INF);
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
 
-        ranges::fill(row[0], inf);
-        ranges::fill(row[1], inf);
+        ranges::fill(row[0], INF);
+        ranges::fill(row[1], INF);
 
         const auto cost_func = cost[i - 1];
         const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
@@ -326,9 +336,9 @@ inline auto calc_single(const std::vector<double> &load_f,
 
         for (int wi = 0; wi <= max_wi; wi++)
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
-        ranges::fill(cost_table | views::drop(max_wi + 1), inf);
+        ranges::fill(cost_table | views::drop(max_wi + 1), INF);
 
-        for (const auto w_prev : views::iota(0, tot_work + 1)) {
+        for (const auto w_prev : views::iota(0, row_size + 1)) {
             const auto &[prev0, prev1] =
                 array{prev_row[0][w_prev], prev_row[1][w_prev]};
             // do no work (propagate to same w)
@@ -342,7 +352,7 @@ inline auto calc_single(const std::vector<double> &load_f,
                 }
             }
             // do some work
-            calc_single_transition(w_prev, tot_work, cost_table, prev0, prev1,
+            calc_single_transition(w_prev, row_size, cost_table, prev0, prev1,
                                    row[0], memo[i][0], max_wi, penalty);
         }
     }
@@ -350,27 +360,19 @@ inline auto calc_single(const std::vector<double> &load_f,
     auto res = vector<double>{};
     res.reserve(tot_work + 1);
     for (const auto w : views::iota(0, tot_work + 1)) {
-        const auto c0 = row[0][w];
-        const auto c1 = row[1][w];
+        const int idx = w + row_offset;
+        const auto c0 = row[0][idx];
+        const auto c1 = row[1][idx];
         if (c0 < c1) {
             res.push_back(c0);
         } else {
             res.push_back(c1);
-            memo[n][0][w] = memo[n][1][w];
+            memo[n][0][idx] = memo[n][1][idx];
         }
     }
     return {std::move(res), std::move(memo)};
 }
 
-/*
- * Runs calc_single for each location in parallel, then merges results using
- * a multiple-choice knapsack DP.
- *
- * Currently uses std::async(std::launch::async, ...) for expressive
- * threading control.
- *
- * Throws SchedulingException if the problem is infeasible.
- */
 template <typename CostFunc>
     requires CostFunction<CostFunc, double>
 auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
@@ -397,7 +399,6 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         return capacity_f.size() == n;
     }));
 
-    // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
     futures.reserve(m);
     for (const auto i : views::iota(0UZ, m))
@@ -492,10 +493,11 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         auto &loc_res = res[i];
         loc_res.resize(n);
 
-        int cur_w = location_w[i];
-        // index 0 always holds the best path info at the end (see bottom of
-        // calc_single)
-        int cur_state = 0;
+        // using penalty as offset as in calc_single
+        const auto offset = static_cast<int>(round(penalties_f[i] / e_work));
+        int cur_w = location_w[i] + offset;
+
+        auto cur_state = 0;
         for (auto j = n; j--;) {
             const auto &entry = loc_memo[j + 1][cur_state][cur_w];
             loc_res[j] = static_cast<double>(entry.alloc) * e_work;
@@ -503,7 +505,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
             cur_w = entry.w_prev;
             cur_state = entry.prev_state;
         }
-        assert(cur_w == 0);
+        assert(cur_w == offset);
     }
 
     return {final_cost, res};
