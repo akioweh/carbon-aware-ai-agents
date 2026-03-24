@@ -3,23 +3,26 @@ project(scheduler)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE INTERNAL "") # force c++23 in cache
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF) # disable modules to use ccache
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_compile_options(-Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
+# machine arch control: defaults to native for auto-optimization on dev machines
+# Can be overridden via presets or -DSCHEDULER_ARCH=x86-64|x86-64-v3|x86-64-v4|native
+set(SCHEDULER_ARCH "native" CACHE STRING "Target microarchitecture level")
 
-option(USE_NATIVE_ARCH "Optimize for this specific machine" ON)
+add_library(scheduler_options INTERFACE)
+target_compile_options(scheduler_options INTERFACE
+  -Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  if(USE_NATIVE_ARCH)
-    add_compile_options(-march=native)
-  else()
-    # cloud environments often do not support AVX-512.
-    # x86-64-v3 (AVX2) is a safe baseline for modern cloud.
-    add_compile_options(-march=x86-64-v3)
-  endif()
+  target_compile_options(scheduler_options INTERFACE -march=${SCHEDULER_ARCH})
 elseif(MSVC)
-  add_compile_options(/arch:AVX2)
+  if(SCHEDULER_ARCH STREQUAL "x86-64-v4")
+    target_compile_options(scheduler_options INTERFACE /arch:AVX512)
+  elseif(SCHEDULER_ARCH STREQUAL "x86-64-v3")
+    target_compile_options(scheduler_options INTERFACE /arch:AVX2)
+  endif()
 endif()
 
 find_package(Drogon CONFIG REQUIRED)
@@ -27,7 +30,7 @@ find_package(Drogon CONFIG REQUIRED)
 add_subdirectory(src)
 
 add_executable(scheduler main.cpp)
-target_link_libraries(scheduler PRIVATE scheduler_core)
+target_link_libraries(scheduler PRIVATE scheduler_core scheduler_options)
 
 configure_file(config.json ${CMAKE_CURRENT_BINARY_DIR}/config.json COPYONLY)
 

@@ -5,17 +5,39 @@
 #include "exceptions/SchedulingException.hpp"
 #include <algorithm>
 #include <array>
+#include <boost/align/aligned_allocator.hpp>
 #include <cassert>
 #include <cmath>
 #include <execution>
 #include <future>
-#include <immintrin.h>
 #include <limits>
 #include <ranges>
 #include <utility>
 #include <vector>
 
+#if defined(__AVX512F__) || defined(__AVX2__)
+#include <immintrin.h>
+#else
+#warning                                                                       \
+    "AVX2/AVX512 not detected, falling back to slower scalar implementation."
+#endif
+
+#if defined(__AVX512F__)
+constexpr auto VEC_SIZE = 64 / static_cast<int>(sizeof(double));
+constexpr auto ALIGN_SIZE = 64;
+#elif defined(__AVX2__)
+constexpr auto VEC_SIZE = 32 / static_cast<int>(sizeof(double));
+constexpr auto ALIGN_SIZE = 32;
+#else
+constexpr auto VEC_SIZE = 1;
+constexpr auto ALIGN_SIZE = alignof(std::max_align_t);
+#endif
+
 namespace scheduler {
+
+template <typename T>
+using AlignedVector =
+    std::vector<T, boost::alignment::aligned_allocator<T, ALIGN_SIZE>>;
 
 template <typename Self, typename T>
 concept CostFunction = requires(Self &f, int i, T load) {
@@ -40,7 +62,7 @@ struct MemoEntry {
 };
 
 struct MemoEntryVector {
-    std::vector<int> alloc, prev_state, w_prev;
+    AlignedVector<int> alloc, prev_state, w_prev;
 
     MemoEntryVector(size_t size)
         : alloc(size, 0), prev_state(size, 0), w_prev(size, 0) {}
@@ -86,13 +108,6 @@ struct LocationCost {
     }
 };
 
-// SIMD alignment
-#ifdef __AVX512F__
-constexpr int padding = sizeof(double);
-#else
-constexpr int padding = 0;
-#endif
-
 /*
  * Algorithmic Analysis:
  *
@@ -128,81 +143,135 @@ constexpr int padding = 0;
  * Now, we minimize the cost over E instead of sum(w_i).
  *
  */
+inline void calc_single_transition(const int w_prev, const int row_size,
+                                   const AlignedVector<double> &cost_table,
+                                   const double prev0, const double prev1,
+                                   AlignedVector<double> &row0,
+                                   auto &memo_entry, const int max_wi,
+                                   const int penalty) {
+#if defined(__AVX512F__)
 
-// depending on whether we are using floats, or doubles.
-inline void vectorizeDpTransition(const int w_prev, const int tot_work,
-                                  const std::vector<double> &cost_table,
-                                  const double prev0, const double prev1,
-                                  std::vector<double> &row0, auto &memo_entry,
-                                  const int max_wi, const int penalty) {
-
-#ifdef __AVX512F__
     const auto sequence = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-    const auto zeros = _mm256_set1_epi32(0);
-    const auto ones = _mm256_set1_epi32(1);
     const auto w_prevV = _mm256_set1_epi32(w_prev);
-
     const auto prev0V = _mm512_set1_pd(prev0);
     const auto prev1V = _mm512_set1_pd(prev1);
+    const auto zeros = _mm256_set1_epi32(0);
+    const auto ones = _mm256_set1_epi32(1);
+    const auto stepV = _mm256_set1_epi32(VEC_SIZE);
 
-    auto transitionAVX = [&](const int start_wi, const int end_wi,
-                             auto &&prevxV, auto &&stateV,
-                             const int penalty = 0) -> void {
-        for (auto wi = start_wi; wi <= end_wi; wi += padding) {
+    auto transition_impl = [&](const int start_wi, const int end_wi,
+                               const double /*prev_val*/, const int state_val,
+                               const int penalty = 0) -> void {
+        const auto prevxV = (state_val == 0) ? prev0V : prev1V;
+        const auto stateV = (state_val == 0) ? zeros : ones;
+
+        auto wiV = _mm256_add_epi32(_mm256_set1_epi32(start_wi), sequence);
+
+        for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
             const auto targetRowIndex = w_prev + wi - penalty;
             const auto add_cost = _mm512_loadu_pd(&cost_table[wi]);
             const auto new_cost = _mm512_add_pd(prevxV, add_cost);
             const auto row0V = _mm512_loadu_pd(&row0[targetRowIndex]);
-            const __mmask8 maskForMemo =
-                _mm512_cmp_pd_mask(new_cost, row0V, _CMP_LT_OS);
+            const auto mmask = _mm512_cmp_pd_mask(new_cost, row0V, _CMP_LT_OS);
 
-            if (maskForMemo) {
-                _mm512_mask_storeu_pd(&row0[targetRowIndex], maskForMemo,
-                                      new_cost);
-
-                auto wiV = _mm256_set1_epi32(wi);
-                wiV = _mm256_add_epi32(wiV, sequence);
+            if (mmask) {
+                _mm512_mask_storeu_pd(&row0[targetRowIndex], mmask, new_cost);
                 _mm256_mask_storeu_epi32(&memo_entry.alloc[targetRowIndex],
-                                         maskForMemo, wiV);
+                                         mmask, wiV);
                 _mm256_mask_storeu_epi32(&memo_entry.prev_state[targetRowIndex],
-                                         maskForMemo, stateV);
+                                         mmask, stateV);
                 _mm256_mask_storeu_epi32(&memo_entry.w_prev[targetRowIndex],
-                                         maskForMemo, w_prevV);
+                                         mmask, w_prevV);
             }
+            wiV = _mm256_add_epi32(wiV, stepV);
         }
     };
 
-    constexpr int start_wi_extend = 1;
-    const int end_wi_extend = std::min(max_wi, tot_work - w_prev);
-    transitionAVX(start_wi_extend, end_wi_extend, prev0V, zeros);
+#elif defined(__AVX2__)
 
-    const int start_wi_new_run = std::max(1, penalty - w_prev);
-    const int end_wi_new_run = std::min(max_wi, tot_work + penalty - w_prev);
-    transitionAVX(start_wi_new_run, end_wi_new_run, prev1V, ones, penalty);
-#else
-    auto transitionFallback = [&](const int start_wi, const int end_wi,
-                                  const double prevx, const int state,
-                                  const int penalty = 0) -> void {
-        for (auto wi = start_wi; wi <= end_wi; ++wi) {
+    const auto prev0V = _mm256_set1_pd(prev0);
+    const auto prev1V = _mm256_set1_pd(prev1);
+    const auto w_prevV = _mm_set1_epi32(w_prev);
+    const auto zeros = _mm_set1_epi32(0);
+    const auto ones = _mm_set1_epi32(1);
+    const auto stepV = _mm_set1_epi32(VEC_SIZE);
+
+    auto transition_impl = [&](const int start_wi, const int end_wi,
+                               const double /*prev_val*/, const int state_val,
+                               const int penalty = 0) -> void {
+        const auto prevxV = (state_val == 0) ? prev0V : prev1V;
+        const auto stateV = (state_val == 0) ? zeros : ones;
+
+        auto wiV =
+            _mm_add_epi32(_mm_set1_epi32(start_wi), _mm_setr_epi32(0, 1, 2, 3));
+
+        for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
             const auto targetRowIndex = w_prev + wi - penalty;
-            const auto new_cost = prevx + cost_table[wi];
+            const auto add_cost = _mm256_loadu_pd(&cost_table[wi]);
+            const auto new_cost = _mm256_add_pd(prevxV, add_cost);
+            const auto row0V = _mm256_loadu_pd(&row0[targetRowIndex]);
+
+            const auto cmp_mask = _mm256_cmp_pd(new_cost, row0V, _CMP_LT_OS);
+            const int mmask = _mm256_movemask_pd(cmp_mask);
+
+            if (mmask) {
+                // blend + unaligned store.
+                const auto blended_cost =
+                    _mm256_blendv_pd(row0V, new_cost, cmp_mask);
+                _mm256_storeu_pd(&row0[targetRowIndex], blended_cost);
+
+                // convert 64-bit (double) masks to 32-bit (int) masks
+                auto cmp_ps = _mm256_castpd_ps(cmp_mask);
+                auto low = _mm256_castps256_ps128(cmp_ps);
+                auto high = _mm256_extractf128_ps(cmp_ps, 1);
+                auto imask = _mm_castps_si128(
+                    _mm_shuffle_ps(low, high, _MM_SHUFFLE(2, 0, 2, 0)));
+
+                const auto blend_int = [&](auto &vec,
+                                           __m128i new_vals) -> auto {
+                    auto current =
+                        _mm_loadu_si128((__m128i *)&vec[targetRowIndex]);
+                    auto blended = _mm_blendv_epi8(current, new_vals, imask);
+                    _mm_storeu_si128((__m128i *)&vec[targetRowIndex], blended);
+                };
+
+                blend_int(memo_entry.alloc, wiV);
+                blend_int(memo_entry.prev_state, stateV);
+                blend_int(memo_entry.w_prev, w_prevV);
+            }
+            wiV = _mm_add_epi32(wiV, stepV);
+        }
+    };
+
+#else
+
+    auto transition_impl = [&](const int start_wi, const int end_wi,
+                               const double prev_val, const int state_val,
+                               const int penalty = 0) -> void {
+        for (auto wi = start_wi; wi <= end_wi; wi += VEC_SIZE) {
+            const auto targetRowIndex = w_prev + wi - penalty;
+            const double new_cost = prev_val + cost_table[wi];
+
             if (new_cost < row0[targetRowIndex]) {
                 row0[targetRowIndex] = new_cost;
                 memo_entry.alloc[targetRowIndex] = wi;
-                memo_entry.prev_state[targetRowIndex] = state;
+                memo_entry.prev_state[targetRowIndex] = state_val;
                 memo_entry.w_prev[targetRowIndex] = w_prev;
             }
         }
     };
 
-    constexpr int start_wi_extend = 1;
-    const int end_wi_extend = std::min(max_wi, tot_work - w_prev);
-    transitionFallback(start_wi_extend, end_wi_extend, prev0, 0);
+#endif
+
+    const int start_wi_extend = 1;
+    const int end_wi_extend = std::min(max_wi, row_size - w_prev);
+    if (start_wi_extend <= end_wi_extend)
+        transition_impl(start_wi_extend, end_wi_extend, prev0, 0, 0);
 
     const int start_wi_new_run = std::max(1, penalty - w_prev);
-    const int end_wi_new_run = std::min(max_wi, tot_work + penalty - w_prev);
-    transitionFallback(start_wi_new_run, end_wi_new_run, prev1, 1, penalty);
-#endif
+    const int end_wi_new_run = std::min(max_wi, row_size + penalty - w_prev);
+    if (start_wi_new_run <= end_wi_new_run)
+        transition_impl(start_wi_new_run, end_wi_new_run, prev1, 1, penalty);
 }
 
 inline auto get_e_work(const double tot_work_f, const int resolution)
@@ -242,43 +311,50 @@ inline auto calc_single(const std::vector<double> &load_f,
     } cost{.cost_f_ = cost_f, .e_work = e_work};
     const auto penalty = static_cast<int>(round(penalty_f / e_work));
 
+    // physical indices are shifted by offset to allow negative indices
+    const int row_offset = penalty;
+    // length of DP rows: indices for the range (-max_penalty, tot_work]
+    const int row_size = tot_work + row_offset;
+
+    const auto row_size_padded = row_size + 1 + (VEC_SIZE * 2);
+    constexpr auto INF = numeric_limits<double>::max() / 2;
     // p = dp[i][w] = minimum cost to allocate w effective work in the first
     // i blocks. p[0] is when the last block is allocated, p[1] is when the
     // last block is not
-    const int sizeOfDpWithPadding = tot_work + 1 + padding;
-    constexpr auto inf = numeric_limits<double>::max() / 2;
-    auto row = array{vector(sizeOfDpWithPadding, inf),
-                     vector(sizeOfDpWithPadding, inf)};
-
+    auto row = array{AlignedVector<double>(row_size_padded, INF),
+                     AlignedVector<double>(row_size_padded, INF)};
     auto prev_row = row;
-    row[1][0] = 0.; // 0 cost for 0 work
-    // for {w_i} reconstruction; for W = w, w_i = memo[i][w]
-    auto memo = vector(n + 1, array{MemoEntryVector(sizeOfDpWithPadding),
-                                    MemoEntryVector(sizeOfDpWithPadding)});
+    // 0 cost for 0 work.
+    row[1][row_offset] = 0.;
 
-    int max_wi_precomputed{0};
+    // to reconstruct {w_i} later. memo[i][state][w] = choices made (work
+    // allocated) at block i to have final effective work w.
+    // state represents whether we actually allocated in the block
+    auto memo = vector(n + 1, array{MemoEntryVector(row_size_padded),
+                                    MemoEntryVector(row_size_padded)});
+
+    auto max_wi_precomputed = 0;
     for (auto i : capacity)
         max_wi_precomputed = max(max_wi_precomputed, i);
 
-    auto cost_table = vector(max_wi_precomputed + 1 + padding, inf);
+    auto cost_table =
+        AlignedVector<double>(max_wi_precomputed + 1 + (VEC_SIZE * 2), INF);
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
 
-        ranges::fill(row[0], inf);
-        ranges::fill(row[1], inf);
+        ranges::fill(row[0], INF);
+        ranges::fill(row[1], INF);
 
         const auto cost_func = cost[i - 1];
         const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
         const auto base_cost = cost_func(load[i - 1]);
 
-        for (int wi = 0; wi <= max_wi; wi++) {
+        for (int wi = 0; wi <= max_wi; wi++)
             cost_table[wi] = cost_func(wi + load[i - 1]) - base_cost;
-        }
-        for (int wi = max_wi; wi <= max_wi + padding; wi++)
-            cost_table[wi] = inf;
+        ranges::fill(cost_table | views::drop(max_wi + 1), INF);
 
-        for (const auto w_prev : views::iota(0, tot_work + 1)) {
+        for (const auto w_prev : views::iota(0, row_size + 1)) {
             const auto &[prev0, prev1] =
                 array{prev_row[0][w_prev], prev_row[1][w_prev]};
             // do no work (propagate to same w)
@@ -292,42 +368,27 @@ inline auto calc_single(const std::vector<double> &load_f,
                 }
             }
             // do some work
-            vectorizeDpTransition(w_prev, tot_work, cost_table, prev0, prev1,
-                                  row[0], memo[i][0], max_wi, penalty);
+            calc_single_transition(w_prev, row_size, cost_table, prev0, prev1,
+                                   row[0], memo[i][0], max_wi, penalty);
         }
     }
 
-    // we made it cache friendly, now back to previous structure
-    auto help_row = vector(tot_work + 1, array{inf, inf});
-    for (int i = 0; i <= tot_work; i++)
-        help_row[i] = {row[0][i], row[1][i]};
-
     auto res = vector<double>{};
     res.reserve(tot_work + 1);
-    for (const auto &[w, costs] : views::enumerate(help_row)) {
-        // other than condensing the dp cost results,
-        // we also want to set the last memo entry based on our choices here
-        // (costs[0] vs costs[1]) for easier reconstruction later
-        if (costs[0] < costs[1]) {
-            res.push_back(costs[0]);
-            memo[n][1][w] = memo[n][0][w];
+    for (const auto w : views::iota(0, tot_work + 1)) {
+        const int idx = w + row_offset;
+        const auto c0 = row[0][idx];
+        const auto c1 = row[1][idx];
+        if (c0 < c1) {
+            res.push_back(c0);
         } else {
-            res.push_back(costs[1]);
-            memo[n][0][w] = memo[n][1][w];
+            res.push_back(c1);
+            memo[n][0][idx] = memo[n][1][idx];
         }
     }
     return {std::move(res), std::move(memo)};
 }
 
-/*
- * Runs calc_single for each location in parallel, then merges results using
- * a multiple-choice knapsack DP.
- *
- * Currently uses std::async(std::launch::async, ...) for expressive
- * threading control.
- *
- * Throws SchedulingException if the problem is infeasible.
- */
 template <typename CostFunc>
     requires CostFunction<CostFunc, double>
 auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
@@ -348,20 +409,19 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     assert(capacities_f.size() == m);
     assert(costs_f.size() == m);
     assert(penalties_f.size() == m);
-    assert(ranges::all_of(
-        loads_f, [n](const auto &load_f) { return load_f.size() == n; }));
-    assert(ranges::all_of(capacities_f, [n](const auto &capacity_f) {
+    assert(ranges::all_of(loads_f, [n](const auto &load_f) -> auto {
+        return load_f.size() == n;
+    }));
+    assert(ranges::all_of(capacities_f, [n](const auto &capacity_f) -> auto {
         return capacity_f.size() == n;
     }));
 
-    // thread-parallism using std::async(std::launch::async, ...)
     auto futures = vector<future<SingleResult>>{};
     futures.reserve(m);
     for (const auto i : views::iota(0UZ, m))
         futures.push_back(async(
             launch::async,
-            // wrapped in lambda due to template
-            // instantiation issues with CostFunc
+            // wrapped in lambda as calc_single is a template
             [i, &loads_f, &capacities_f, &costs_f, &penalties_f, tot_work_f,
              resolution]() -> auto {
                 return calc_single(loads_f[i], capacities_f[i], costs_f[i],
@@ -377,12 +437,13 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
 
     // result validation
-    assert(ranges::all_of(locations_memo, [n](const auto &vec) {
+    assert(ranges::all_of(locations_memo, [n](const auto &vec) -> auto {
         return vec.size() == n + 1UZ;
     }));
-    assert(ranges::all_of(locations_cost_vector, [tot_work](const auto &vec) {
-        return vec.size() == tot_work + 1UZ;
-    }));
+    assert(ranges::all_of(locations_cost_vector,
+                          [tot_work](const auto &vec) -> auto {
+                              return vec.size() == tot_work + 1UZ;
+                          }));
 
     // multiple choice knapsack
     constexpr auto inf = numeric_limits<double>::max() / 2;
@@ -450,10 +511,11 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
         auto &loc_res = res[i];
         loc_res.resize(n);
 
-        int cur_w = location_w[i];
-        // index 0 always holds the best path info at the end (see bottom of
-        // calc_single)
-        int cur_state = 0;
+        // using penalty as offset as in calc_single
+        const auto offset = static_cast<int>(round(penalties_f[i] / e_work));
+        int cur_w = location_w[i] + offset;
+
+        auto cur_state = 0;
         for (auto j = n; j--;) {
             const auto &entry = loc_memo[j + 1][cur_state][cur_w];
             loc_res[j] = static_cast<double>(entry.alloc) * e_work;
@@ -461,7 +523,7 @@ auto calc_multiple(const std::vector<std::vector<double>> &loads_f,
             cur_w = entry.w_prev;
             cur_state = entry.prev_state;
         }
-        assert(cur_w == 0);
+        assert(cur_w == offset);
     }
 
     return {final_cost, res};

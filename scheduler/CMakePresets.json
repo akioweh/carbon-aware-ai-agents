@@ -2,18 +2,48 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "ci-base",
+      "name": "base",
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_COLOR_DIAGNOSTICS": "ON"
+      }
+    },
+    {
+      "name": "ccache-base",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "generic-arch",
+      "hidden": true,
+      "cacheVariables": {
+        "SCHEDULER_ARCH": "x86-64"
+      }
+    },
+    {
+      "name": "native-arch",
+      "hidden": true,
+      "cacheVariables": {
+        "SCHEDULER_ARCH": "native"
+      }
+    },
+    {
+      "name": "v3-arch",
+      "hidden": true,
+      "cacheVariables": {
+        "SCHEDULER_ARCH": "x86-64-v3"
       }
     },
     {
       "name": "vcpkg-base",
       "hidden": true,
-      "inherits": "ci-base",
+      "inherits": "base",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
@@ -54,10 +84,9 @@
     {
       "name": "windows-mingw",
       "displayName": "Windows (MinGW/MSYS2) - Debug",
-      "inherits": "vcpkg-base",
+      "inherits": ["vcpkg-base", "debug-base", "ccache-base", "native-arch"],
       "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic",
-        "CMAKE_BUILD_TYPE": "Debug"
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
       },
       "condition": {
         "type": "equals",
@@ -68,7 +97,7 @@
     {
       "name": "windows-mingw-rel",
       "displayName": "Windows (MinGW/MSYS2) - Release",
-      "inherits": ["vcpkg-base", "release-base"],
+      "inherits": ["vcpkg-base", "release-base", "ccache-base", "native-arch"],
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
       },
@@ -80,9 +109,9 @@
     },
     {
       "name": "arch",
-      "displayName": "Linux - Debug",
-      "description": "Uses system libraries",
-      "inherits": ["ci-base", "debug-base"],
+      "displayName": "Linux - Debug (Native)",
+      "description": "Uses system libraries, optimized for local CPU",
+      "inherits": ["base", "debug-base", "ccache-base", "native-arch"],
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -96,9 +125,25 @@
     },
     {
       "name": "arch-rel",
-      "displayName": "Linux - Release",
-      "description": "Uses system libraries",
-      "inherits": ["ci-base", "release-base"],
+      "displayName": "Linux - Release (Native)",
+      "description": "Uses system libraries, optimized for local CPU",
+      "inherits": ["base", "release-base", "ccache-base", "native-arch"],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_EXE_LINKER_FLAGS": "-ltbb",
+        "CMAKE_SHARED_LINKER_FLAGS": "-ltbb",
+        "CMAKE_MODULE_LINKER_FLAGS": "-ltbb"
+      }
+    },
+    {
+      "name": "arch-generic-rel",
+      "displayName": "Linux - Release (Generic x86-64)",
+      "description": "Portable release build",
+      "inherits": ["base", "release-base", "ccache-base", "generic-arch"],
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -114,7 +159,7 @@
       "name": "arch-tsan",
       "displayName": "Linux - ThreadSanitizer",
       "description": "Uses system libraries",
-      "inherits": ["ci-base", "tsan-base"],
+      "inherits": ["base", "tsan-base", "ccache-base", "native-arch"],
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",

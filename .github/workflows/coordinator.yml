@@ -2,7 +2,7 @@ name: Main Deployment Coordinator
 
 on:
   push:
-    branches: [main, ci/deploy]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,25 +21,30 @@ jobs:
       apps: ${{ steps.filter.outputs.apps }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
             infra:
               - 'infra/**'
+              - '.github/workflows/deploy-infra.yml'
+              - 'scheduler/sql/init.sql'
             apps:
               - 'scheduler/**'
               - 'ui/**'
-              - 'stats/**'
+              - '.github/workflows/deploy-apps.yml'
+              - '.github/workflows/coordinator.yml'
 
   deploy-infra:
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.infra == 'true' }}
+    if: needs.detect-changes.outputs.infra == 'true'
     uses: ./.github/workflows/deploy-infra.yml
     secrets: inherit
 
   deploy-apps:
     needs: [detect-changes, deploy-infra]
-    if: ${{ always() && needs.detect-changes.outputs.apps == 'true' && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') }}
+    if: always() && needs.detect-changes.outputs.apps == 'true' && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
     uses: ./.github/workflows/deploy-apps.yml
     secrets: inherit
