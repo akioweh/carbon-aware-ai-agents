@@ -7,24 +7,21 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF) # disable modules to use ccache
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_compile_options(-Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
+# machine arch control: defaults to native for auto-optimization on dev machines
+# Can be overridden via presets or -DSCHEDULER_ARCH=x86-64|x86-64-v3|x86-64-v4|native
+set(SCHEDULER_ARCH "native" CACHE STRING "Target microarchitecture level")
 
-option(USE_NATIVE_ARCH "Optimize for this specific machine" ON)
-set(MICROARCH_LEVEL "x86-64" CACHE STRING "Microarchitecture level to use when USE_NATIVE_ARCH is OFF")
+add_library(scheduler_options INTERFACE)
+target_compile_options(scheduler_options INTERFACE
+  -Wall -Wextra -Wpedantic -Wno-unknown-pragmas)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  if(USE_NATIVE_ARCH)
-    add_compile_options(-march=native)
-  else()
-    add_compile_options(-march=${MICROARCH_LEVEL})
-  endif()
+  target_compile_options(scheduler_options INTERFACE -march=${SCHEDULER_ARCH})
 elseif(MSVC)
-  if(MICROARCH_LEVEL STREQUAL "x86-64-v4")
-    add_compile_options(/arch:AVX512)
-  elseif(MICROARCH_LEVEL STREQUAL "x86-64-v3")
-    add_compile_options(/arch:AVX2)
-  else()
-    # No AVX flag for baseline x86-64
+  if(SCHEDULER_ARCH STREQUAL "x86-64-v4")
+    target_compile_options(scheduler_options INTERFACE /arch:AVX512)
+  elseif(SCHEDULER_ARCH STREQUAL "x86-64-v3")
+    target_compile_options(scheduler_options INTERFACE /arch:AVX2)
   endif()
 endif()
 
@@ -33,7 +30,7 @@ find_package(Drogon CONFIG REQUIRED)
 add_subdirectory(src)
 
 add_executable(scheduler main.cpp)
-target_link_libraries(scheduler PRIVATE scheduler_core)
+target_link_libraries(scheduler PRIVATE scheduler_core scheduler_options)
 
 configure_file(config.json ${CMAKE_CURRENT_BINARY_DIR}/config.json COPYONLY)
 

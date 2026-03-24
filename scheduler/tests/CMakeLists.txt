@@ -42,6 +42,7 @@ target_link_libraries(queue_test PRIVATE
     Drogon::Drogon 
     Boost::unit_test_framework 
     stdc++exp
+    scheduler_options
 )
 add_test(NAME queue_test COMMAND queue_test)
 # scheduling queue test end
@@ -57,6 +58,7 @@ target_link_libraries(time_gridder PRIVATE
     Drogon::Drogon 
     Boost::unit_test_framework 
     stdc++exp
+    scheduler_options
 )
 add_test(NAME time_gridder COMMAND time_gridder)
 # time gridder end
@@ -76,6 +78,7 @@ target_link_libraries(scheduler_integration_test PRIVATE
     Drogon::Drogon
     Boost::unit_test_framework
     stdc++exp
+    scheduler_options
 )
 
 add_test(NAME scheduler_integration_test COMMAND scheduler_integration_test)

@@ -30,11 +30,11 @@ COPY . .
 
 # Use cache mount for the build directory to speed up re-compilation
 # remember to copy the binary out of the cache mount to persist it
-RUN --mount=type=cache,target=/app/build/arch-rel \
-    cmake --preset arch-rel -DUSE_NATIVE_ARCH=OFF -DMICROARCH_LEVEL=x86-64 -DBUILD_TESTING=OFF && \
-    cmake --build build/arch-rel --target scheduler && \
+RUN --mount=type=cache,target=/app/build/arch-generic-rel \
+    cmake --preset arch-generic-rel -DBUILD_TESTING=OFF && \
+    cmake --build build/arch-generic-rel --target scheduler && \
     mkdir -p /app/dist && \
-    cp build/arch-rel/scheduler /app/dist/
+    cp build/arch-generic-rel/scheduler /app/dist/
 
 FROM archlinux:latest
 RUN pacman-key --init && pacman-key --populate archlinux
