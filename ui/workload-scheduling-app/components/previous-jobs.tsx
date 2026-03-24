@@ -176,14 +176,14 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                           <span className="text-xs font-medium">{scaleDataByConstantToPFLOP((job as any).total_load || getTotalLoad(job.scheduled_blocks)).toFixed(2)} PFLO</span>
                         </div>
 
-                        {job.impact?.total_emissions && (
+                        {job.impact?.total_emissions !== undefined && job.impact?.total_emissions !== null && (
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-muted-foreground">Emissions:</span>
                             <span className="text-xs font-semibold">{job.impact.total_emissions.toFixed(2)} g CO₂</span>
                           </div>
                         )}
 
-                        {job.impact?.total_emissions && job.unoptimizedResult?.impact?.total_emissions && job.unoptimizedResult.impact.total_emissions > job.impact.total_emissions && (
+                        {job.impact?.total_emissions !== undefined && job.unoptimizedResult?.impact?.total_emissions !== undefined && job.impact?.total_emissions !== null && job.unoptimizedResult?.impact?.total_emissions !== null && (
                           <div className="flex items-center">
                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
                               -{(((job.unoptimizedResult.impact.total_emissions - job.impact.total_emissions) / job.unoptimizedResult.impact.total_emissions) * 100).toFixed(1)}% savings
