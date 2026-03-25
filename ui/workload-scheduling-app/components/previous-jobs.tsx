@@ -183,10 +183,13 @@ export function PreviousJobs({ onClose, onSelectJob }: PreviousJobsProps) {
                           </div>
                         )}
 
-                        {job.impact?.total_emissions !== undefined && job.unoptimizedResult?.impact?.total_emissions !== undefined && job.impact?.total_emissions !== null && job.unoptimizedResult?.impact?.total_emissions !== null && (
+                        {job.impact?.total_emissions != null && job.unoptimizedResult?.impact?.total_emissions != null && (
                           <div className="flex items-center">
                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                              -{(((job.unoptimizedResult.impact.total_emissions - job.impact.total_emissions) / job.unoptimizedResult.impact.total_emissions) * 100).toFixed(1)}% savings
+                              -{(job.unoptimizedResult.impact.total_emissions > 0
+                                ? ((job.unoptimizedResult.impact.total_emissions - job.impact.total_emissions) / job.unoptimizedResult.impact.total_emissions) * 100
+                                : 0
+                              ).toFixed(1)}% savings
                             </span>
                           </div>
                         )}
