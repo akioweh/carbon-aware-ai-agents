@@ -1,6 +1,5 @@
 #define BOOST_TEST_MODULE CoroTest
 
-#include "TestFixture.hpp"
 #include "utils/Coro.hpp"
 #include <boost/test/unit_test.hpp>
 #include <drogon/HttpController.h>
@@ -16,8 +15,6 @@ auto failingTask() -> drogon::Task<int> {
     throw std::runtime_error("Task Failed");
     co_return 0;
 }
-
-BOOST_TEST_GLOBAL_FIXTURE(SchedulerGlobalFixture);
 
 BOOST_AUTO_TEST_SUITE(CoroLogicTests)
 
