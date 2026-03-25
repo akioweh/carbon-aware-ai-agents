@@ -56,15 +56,15 @@ auto Scheduler::doScheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
         }
     }
 
-    co_return {
-        .blocks = std::move(blocks),
-        .impact = {
-            // TODO: does this way of averaging even make sense?
-            .carbon_intensity =
-                blocks_count > 0 ? carbon_intensity_sum / blocks_count : 0.,
-            .total_emissions = total_emissions,
-            .sci = total_energy > 0.0 ? total_emissions / total_energy : 0.,
-        }};
+    co_return {.blocks = std::move(blocks),
+               .impact = {
+                   // TODO: does this way of averaging even make sense?
+                   .carbon_intensity = blocks_count > 0
+                                           ? carbon_intensity_sum / blocks_count
+                                           : 0.,
+                   .total_emissions = total_emissions,
+                   .total_electricity = total_energy,
+               }};
 }
 
 } // namespace scheduler
