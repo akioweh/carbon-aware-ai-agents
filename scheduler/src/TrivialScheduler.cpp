@@ -29,15 +29,6 @@ auto TrivialScheduler::doScheduleJob(JobRequest job)
     // Reorder indices based on preferred_datacenter if it exists
     auto location_indices = vector<size_t>(n_locations);
     ranges::iota(location_indices, 0);
-    if (job.preferred_datacenter.has_value()) {
-        const auto &pref = job.preferred_datacenter.value();
-        auto it = ranges::find(data.location_ids, pref);
-        if (it != data.location_ids.end()) {
-            const auto pref_idx = distance(data.location_ids.begin(), it);
-            if (pref_idx)
-                swap(location_indices[0], location_indices[pref_idx]);
-        }
-    }
 
     auto res = vector(n_locations, vector(n_intervals, 0.0));
     auto rem_work = job.workload_amount;
