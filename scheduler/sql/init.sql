@@ -2,7 +2,7 @@ create table if not exists impacts(
     id serial primary key,
     carbon_intensity double precision,
     total_emissions double precision,
-    sci double precision
+    total_electricity double precision
 );
 
 create table if not exists jobs(
@@ -23,7 +23,7 @@ create table if not exists trivial_impacts(
     impact_id integer not null unique,
     carbon_intensity double precision,
     total_emissions double precision,
-    sci double precision,
+    total_electricity double precision,
 
     constraint fk_impact
         foreign key(impact_id)
