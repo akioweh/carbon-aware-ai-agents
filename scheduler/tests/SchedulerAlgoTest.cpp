@@ -12,15 +12,15 @@ using namespace scheduler::exceptions;
 // Helpers
 // =============================================================================
 
-/// A simple cost function where cost[i](load) = load / capacity / sci.
-/// Mirrors LocationCost but owns its data so tests don't need dangling-ref
-/// gymnastics.
+/// A simple cost function where cost[i](load) = load / capacity *
+/// carbon_intensity. Mirrors LocationCost but owns its data so tests don't need
+/// dangling-ref gymnastics.
 struct TestCost {
     std::vector<double> capacities;
-    std::vector<double> sci;
+    std::vector<double> carbon_intensity;
 
     auto operator[](int i) const {
-        const auto g = sci.at(i);
+        const auto g = carbon_intensity.at(i);
         const auto c = capacities.at(i);
         return [g, c](double load) -> double {
             return (load / c) * std::max(g, 0.01);
@@ -53,12 +53,12 @@ constexpr int TEST_RES = 500;
 BOOST_AUTO_TEST_SUITE(CalcSingle)
 
 BOOST_AUTO_TEST_CASE(zero_work_produces_zero_cost) {
-    // 4 blocks, no existing load, uniform capacity & sci
+    // 4 blocks, no existing load, uniform capacity & carbon_intensity
     const auto n = 4;
     auto load = std::vector<double>(n, 0.0);
     auto cap = std::vector<double>(n, 10.0);
     auto green = std::vector<double>(n, 50.0);
-    auto cost = TestCost{.capacities = cap, .sci = green};
+    auto cost = TestCost{.capacities = cap, .carbon_intensity = green};
 
     // ask for 0 work — tot_work_f must be >0 for the discretization (e_work),
     // but the cost vector should have cost[0] == 0
@@ -73,7 +73,7 @@ BOOST_AUTO_TEST_CASE(allocates_at_least_requested_work) {
     auto load = std::vector<double>(n, 2.0);
     auto cap = std::vector<double>(n, 10.0);
     auto green = std::vector<double>(n, 50.0);
-    auto cost = TestCost{.capacities = cap, .sci = green};
+    auto cost = TestCost{.capacities = cap, .carbon_intensity = green};
 
     const auto requested = 20.0;
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(cost_is_monotonically_non_decreasing) {
     auto load = std::vector<double>(n, 1.0);
     auto cap = std::vector<double>(n, 10.0);
     auto green = std::vector<double>(n, 40.0);
-    auto cost = TestCost{.capacities = cap, .sci = green};
+    auto cost = TestCost{.capacities = cap, .carbon_intensity = green};
 
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, 30.0, TEST_RES);
 
@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE(infeasible_returns_inf_cost) {
     auto load = std::vector<double>(n, 9.0);
     auto cap = std::vector<double>(n, 10.0); // only 1 unit free per block
     auto green = std::vector<double>(n, 50.0);
-    auto cost = TestCost{.capacities = cap, .sci = green};
+    auto cost = TestCost{.capacities = cap, .carbon_intensity = green};
 
     const auto requested = 100.0;
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
@@ -119,11 +119,12 @@ BOOST_AUTO_TEST_CASE(infeasible_returns_inf_cost) {
 }
 
 BOOST_AUTO_TEST_CASE(prefers_greener_blocks) {
-    // 2 blocks: block 0 has low sci, block 1 has high sci
+    // 2 blocks: block 0 has low carbon_intensity, block 1 has high
+    // carbon_intensity
     auto load = std::vector<double>{0.0, 0.0};
     auto cap = std::vector<double>{10.0, 10.0};
     auto green = std::vector<double>{1.0, 100.0};
-    auto cost = TestCost{.capacities = cap, .sci = green};
+    auto cost = TestCost{.capacities = cap, .carbon_intensity = green};
 
     const auto requested = 5.0;
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
@@ -143,9 +144,11 @@ BOOST_AUTO_TEST_CASE(prefers_greener_blocks) {
         cur_state = entry.prev_state;
     }
 
-    // Block 1 (sci=100) should get less work than block 0 (sci=1)
-    BOOST_TEST_MESSAGE("Alloc to low-sci block: "
-                       << alloc[0] << ", high-sci block: " << alloc[1]);
+    // Block 1 (carbon_intensity=100) should get less work than block 0
+    // (carbon_intensity=1)
+    BOOST_TEST_MESSAGE("Alloc to low-carbon_intensity block: "
+                       << alloc[0]
+                       << ", high-carbon_intensity block: " << alloc[1]);
     BOOST_CHECK_LT(alloc[1], alloc[0]);
     std::cout << "COSTS: " << costs.back() << "\n";
 }
@@ -159,12 +162,12 @@ BOOST_AUTO_TEST_SUITE_END()
 BOOST_AUTO_TEST_SUITE(CalcSinglePenalty)
 
 BOOST_AUTO_TEST_CASE(penalty_increases_cost_for_fragmented_allocation) {
-    // 4 blocks with alternating sci: forces fragmentation
+    // 4 blocks with alternating carbon_intensity: forces fragmentation
     auto load = std::vector<double>{0, 0, 0, 0};
     auto cap = std::vector<double>{10, 10, 10, 10};
     // block 0,2 are green, 1,3 are not — optimizer might skip 1,3
     auto green = std::vector<double>{80, 1, 80, 1};
-    auto cost_obj = TestCost{.capacities = cap, .sci = green};
+    auto cost_obj = TestCost{.capacities = cap, .carbon_intensity = green};
 
     const auto work = 10.0;
 
@@ -193,7 +196,8 @@ BOOST_AUTO_TEST_CASE(single_location_matches_single) {
     auto caps = std::vector<std::vector<double>>{std::vector<double>(n, 10.0)};
     auto greens_vec =
         std::vector<std::vector<double>>{std::vector<double>(n, 50.0)};
-    auto cost_obj = TestCost{.capacities = caps[0], .sci = greens_vec[0]};
+    auto cost_obj =
+        TestCost{.capacities = caps[0], .carbon_intensity = greens_vec[0]};
     auto costs_vec = std::vector{cost_obj};
     auto penalties = std::vector{0.0};
 
@@ -222,8 +226,8 @@ BOOST_AUTO_TEST_CASE(total_allocation_meets_demand) {
     auto greens1 = std::vector<double>(n, 60.0);
     auto greens2 = std::vector<double>(n, 40.0);
     auto greens = std::vector{greens1, greens2};
-    auto cost1 = TestCost{.capacities = caps[0], .sci = greens[0]};
-    auto cost2 = TestCost{.capacities = caps[1], .sci = greens[1]};
+    auto cost1 = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
+    auto cost2 = TestCost{.capacities = caps[1], .carbon_intensity = greens[1]};
     auto costs = std::vector{cost1, cost2};
     auto penalties = std::vector{0.0, 0.0};
 
@@ -243,8 +247,8 @@ BOOST_AUTO_TEST_CASE(respects_capacity_constraints) {
     auto greens1 = std::vector<double>(n, 50.0);
     auto greens2 = std::vector<double>(n, 50.0);
     auto greens = std::vector{greens1, greens2};
-    auto cost1 = TestCost{.capacities = caps[0], .sci = greens[0]};
-    auto cost2 = TestCost{.capacities = caps[1], .sci = greens[1]};
+    auto cost1 = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
+    auto cost2 = TestCost{.capacities = caps[1], .carbon_intensity = greens[1]};
     auto costs = std::vector{cost1, cost2};
     auto penalties = std::vector{0.0, 0.0};
 
@@ -273,9 +277,9 @@ BOOST_AUTO_TEST_CASE(allocations_are_non_negative) {
     auto greens2 = std::vector<double>(n, 60.0);
     auto greens3 = std::vector<double>(n, 90.0);
     auto greens = std::vector{greens1, greens2, greens3};
-    auto cost1 = TestCost{.capacities = caps[0], .sci = greens[0]};
-    auto cost2 = TestCost{.capacities = caps[1], .sci = greens[1]};
-    auto cost3 = TestCost{.capacities = caps[2], .sci = greens[2]};
+    auto cost1 = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
+    auto cost2 = TestCost{.capacities = caps[1], .carbon_intensity = greens[1]};
+    auto cost3 = TestCost{.capacities = caps[2], .carbon_intensity = greens[2]};
     auto costs = std::vector{cost1, cost2, cost3};
     auto penalties = std::vector{0.0, 0.0, 0.0};
 
@@ -289,17 +293,17 @@ BOOST_AUTO_TEST_CASE(allocations_are_non_negative) {
 }
 
 BOOST_AUTO_TEST_CASE(prefers_greener_location) {
-    // Two locations with same capacity and load, but different sci
+    // Two locations with same capacity and load, but different carbon_intensity
     const auto n = 4;
     auto loads =
         std::vector{std::vector<double>(n, 0.0), std::vector<double>(n, 0.0)};
     auto caps =
         std::vector{std::vector<double>(n, 20.0), std::vector<double>(n, 20.0)};
-    auto greens1 = std::vector<double>(n, 5.0);  // low sci
-    auto greens2 = std::vector<double>(n, 95.0); // high sci
+    auto greens1 = std::vector<double>(n, 5.0);  // low carbon_intensity
+    auto greens2 = std::vector<double>(n, 95.0); // high carbon_intensity
     auto greens = std::vector{greens1, greens2};
-    auto cost1 = TestCost{.capacities = caps[0], .sci = greens[0]};
-    auto cost2 = TestCost{.capacities = caps[1], .sci = greens[1]};
+    auto cost1 = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
+    auto cost2 = TestCost{.capacities = caps[1], .carbon_intensity = greens[1]};
     auto costs = std::vector{cost1, cost2};
     auto penalties = std::vector{0.0, 0.0};
 
@@ -312,7 +316,7 @@ BOOST_AUTO_TEST_CASE(prefers_greener_location) {
     BOOST_TEST_MESSAGE("Low-green location: " << loc0_total
                                               << ", high-green location: "
                                               << loc1_total);
-    // High sci location should receive less work
+    // High carbon_intensity location should receive less work
     BOOST_CHECK_LT(loc1_total, loc0_total);
 }
 
@@ -323,7 +327,7 @@ BOOST_AUTO_TEST_CASE(throws_on_infeasible_workload) {
     auto caps = std::vector<std::vector<double>>{std::vector<double>(n, 10.0)};
     auto greens =
         std::vector<std::vector<double>>{std::vector<double>(n, 50.0)};
-    auto cost = TestCost{.capacities = caps[0], .sci = greens[0]};
+    auto cost = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
     auto costs = std::vector{cost};
     auto penalties = std::vector{0.0};
 
@@ -340,7 +344,8 @@ BOOST_AUTO_TEST_CASE(cost_decreases_with_more_locations) {
     auto caps1 = std::vector<std::vector<double>>{std::vector<double>(n, 10.0)};
     auto greens1_vec =
         std::vector<std::vector<double>>{std::vector<double>(n, 50.0)};
-    auto cost1 = TestCost{.capacities = caps1[0], .sci = greens1_vec[0]};
+    auto cost1 =
+        TestCost{.capacities = caps1[0], .carbon_intensity = greens1_vec[0]};
     auto costs1 = std::vector{cost1};
     auto penalties1 = std::vector{0.0};
 
@@ -350,8 +355,10 @@ BOOST_AUTO_TEST_CASE(cost_decreases_with_more_locations) {
         std::vector{std::vector<double>(n, 10.0), std::vector<double>(n, 10.0)};
     auto greens2_vec =
         std::vector{std::vector<double>(n, 50.0), std::vector<double>(n, 50.0)};
-    auto cost2a = TestCost{.capacities = caps2[0], .sci = greens2_vec[0]};
-    auto cost2b = TestCost{.capacities = caps2[1], .sci = greens2_vec[1]};
+    auto cost2a =
+        TestCost{.capacities = caps2[0], .carbon_intensity = greens2_vec[0]};
+    auto cost2b =
+        TestCost{.capacities = caps2[1], .carbon_intensity = greens2_vec[1]};
     auto costs2 = std::vector{cost2a, cost2b};
     auto penalties2 = std::vector{0.0, 0.0};
 
@@ -398,7 +405,7 @@ BOOST_AUTO_TEST_CASE(works_with_LocationCost) {
     BOOST_CHECK_GT(cost, 0.0);
     BOOST_CHECK_LT(cost, std::numeric_limits<double>::max() / 4);
 
-    // Location with lower sci should get more work
+    // Location with lower carbon_intensity should get more work
     BOOST_CHECK_GT(sum_alloc(allocs[0]), sum_alloc(allocs[1]));
 }
 
@@ -415,7 +422,7 @@ BOOST_AUTO_TEST_CASE(single_block_single_location) {
     auto loads = std::vector<std::vector<double>>{{0.0}};
     auto caps = std::vector<std::vector<double>>{{10.0}};
     auto greens = std::vector<std::vector<double>>{{50.0}};
-    auto cost = TestCost{.capacities = caps[0], .sci = greens[0]};
+    auto cost = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
     auto costs = std::vector{cost};
     auto penalties = std::vector{0.0};
 
@@ -440,8 +447,8 @@ BOOST_AUTO_TEST_CASE(fully_loaded_blocks_get_zero_allocation) {
         std::vector{std::vector<double>(n, 10.0), std::vector<double>(n, 10.0)};
     auto greens =
         std::vector{std::vector<double>(n, 50.0), std::vector<double>(n, 50.0)};
-    auto cost1 = TestCost{.capacities = caps[0], .sci = greens[0]};
-    auto cost2 = TestCost{.capacities = caps[1], .sci = greens[1]};
+    auto cost1 = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
+    auto cost2 = TestCost{.capacities = caps[1], .carbon_intensity = greens[1]};
     auto costs = std::vector{cost1, cost2};
     auto penalties = std::vector{0.0, 0.0};
 
@@ -464,7 +471,7 @@ BOOST_AUTO_TEST_CASE(varying_capacity_across_time_slots) {
     auto caps = std::vector<std::vector<double>>{{20, 20, 6, 6}};
     auto greens =
         std::vector<std::vector<double>>{std::vector<double>(n, 50.0)};
-    auto cost = TestCost{.capacities = caps[0], .sci = greens[0]};
+    auto cost = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
     auto costs = std::vector{cost};
     auto penalties = std::vector{0.0};
 
@@ -488,18 +495,18 @@ BOOST_AUTO_TEST_SUITE_END()
 BOOST_AUTO_TEST_SUITE(ExtendedScenarios)
 
 // 1. Different Cost Function: Quadratic
-// Cost = (load^2) / capacity / sci
+// Cost = (load^2) / capacity / carbon_intensity
 // This penalizes high loads more aggressively than linear cost.
 struct QuadraticCost {
     std::vector<double> capacities;
-    std::vector<double> sci;
+    std::vector<double> carbon_intensity;
 
     auto operator[](int i) const {
-        const auto g = sci.at(i);
+        const auto g = carbon_intensity.at(i);
         const auto c = capacities.at(i);
         return [g, c](double load) -> double {
             // Quadratic cost: load^2
-            // Multiplying by sci
+            // Multiplying by carbon_intensity
             return (load * load) / c * std::max(g, 0.01);
         };
     }
@@ -510,12 +517,12 @@ BOOST_AUTO_TEST_CASE(quadratic_cost_spreads_load) {
     // With quadratic cost, spreading load is often better to avoid the steep
     // slope.
 
-    // 2 blocks: identical capacity and sci
+    // 2 blocks: identical capacity and carbon_intensity
     const auto n = 2;
     auto load = std::vector<double>(n, 0.0);
     auto cap = std::vector<double>(n, 10.0);
     auto green = std::vector<double>(n, 10.0);
-    auto cost = QuadraticCost{.capacities = cap, .sci = green};
+    auto cost = QuadraticCost{.capacities = cap, .carbon_intensity = green};
 
     const auto requested = 10.0;
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
@@ -539,7 +546,7 @@ BOOST_AUTO_TEST_CASE(quadratic_cost_spreads_load) {
     BOOST_CHECK_CLOSE(alloc[1], 5.0, 1.0);
 }
 
-// 2. Non-constant values (Sinusoidal Load/Sci)
+// 2. Non-constant values (Sinusoidal Load/carbon_intensity)
 BOOST_AUTO_TEST_CASE(sinusoidal_inputs) {
     const int n = 24; // 24 hours
     auto load = std::vector<double>(n);
@@ -550,11 +557,11 @@ BOOST_AUTO_TEST_CASE(sinusoidal_inputs) {
     for (int i = 0; i < n; ++i) {
         // Load peaks at noon (i=12)
         load[i] = 20.0 + 10.0 * std::sin((i - 6.0) * 3.14159 / 12.0);
-        // Sci peaks at noon (solar)
+        // carbon_intensity peaks at noon (solar)
         green[i] = 50.0 + 40.0 * std::sin((i - 6.0) * 3.14159 / 12.0);
     }
 
-    auto cost = TestCost{.capacities = cap, .sci = green};
+    auto cost = TestCost{.capacities = cap, .carbon_intensity = green};
 
     const auto requested = 100.0;
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
@@ -573,7 +580,7 @@ BOOST_AUTO_TEST_CASE(sinusoidal_inputs) {
         cur_state = entry.prev_state;
     }
 
-    // Check that we allocated mostly during night (low sci)
+    // Check that we allocated mostly during night (low carbon_intensity)
     double day_alloc = 0;
     double night_alloc = 0;
     for (int i = 0; i < n; ++i) {
@@ -594,7 +601,7 @@ BOOST_AUTO_TEST_CASE(resolution_sensitivity) {
     auto load = std::vector<double>(n, 0.0);
     auto cap = std::vector<double>(n, 10.0);
     auto green = std::vector<double>(n, 50.0);
-    auto cost = TestCost{.capacities = cap, .sci = green};
+    auto cost = TestCost{.capacities = cap, .carbon_intensity = green};
     const auto requested = 15.0; // Needs 1.5 blocks fully used
 
     // Low resolution (coarse grains)
@@ -616,25 +623,25 @@ BOOST_AUTO_TEST_CASE(complex_multi_location_strategy) {
     const int n = 10;
 
     // Location 1: "Stable Coal" - High constant capacity, Low constant
-    // sci
+    // carbon_intensity
     auto cap1 = std::vector<double>(n, 50.0);
     auto green1 = std::vector<double>(n, 10.0); // Dirty
 
     // Location 2: "Volatile Solar" - Variable capacity (weather), High variable
-    // sci
+    // carbon_intensity
     auto cap2 = std::vector<double>(n);
     auto green2 = std::vector<double>(n);
     for (int i = 0; i < n; ++i) {
         cap2[i] = (i % 2 == 0) ? 20.0 : 5.0;    // Flaky availability
-        green2[i] = (i % 2 == 0) ? 90.0 : 20.0; // Flaky sci
+        green2[i] = (i % 2 == 0) ? 90.0 : 20.0; // Flaky carbon_intensity
     }
 
     auto loads =
         std::vector{std::vector<double>(n, 0.0), std::vector<double>(n, 0.0)};
     auto caps = std::vector{cap1, cap2};
 
-    auto cost1 = TestCost{.capacities = cap1, .sci = green1};
-    auto cost2 = TestCost{.capacities = cap2, .sci = green2};
+    auto cost1 = TestCost{.capacities = cap1, .carbon_intensity = green1};
+    auto cost2 = TestCost{.capacities = cap2, .carbon_intensity = green2};
     // Use pointers or reference wrappers in real code, but copies here for
     // TestCost is fine as it's just a struct of vectors.
     auto costs = std::vector{cost1, cost2};
@@ -655,9 +662,9 @@ BOOST_AUTO_TEST_CASE(complex_multi_location_strategy) {
                        << loc1_work << ", Volatile/Green Work: " << loc2_work);
 
     // It should prioritize Loc 1 (Stable/Dirty) as much as possible because
-    // sci is low, reducing cost. Loc 2 Sci avg is ~55, Loc 1
-    // is 10. Cost ~ (load / cap) * sci. Loc 1 is roughly 5x cheaper per unit
-    // of load until it hits capacity constraints.
+    // carbon_intensity is low, reducing cost. Loc 2 carbon_intensity avg is
+    // ~55, Loc 1 is 10. Cost ~ (load / cap) * carbon_intensity. Loc 1 is
+    // roughly 5x cheaper per unit of load until it hits capacity constraints.
 
     BOOST_CHECK_LT(loc2_work, loc1_work);
 }
