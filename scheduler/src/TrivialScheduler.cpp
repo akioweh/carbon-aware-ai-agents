@@ -29,15 +29,6 @@ auto TrivialScheduler::doScheduleJob(JobRequest job)
     // Reorder indices based on preferred_datacenter if it exists
     auto location_indices = vector<size_t>(n_locations);
     ranges::iota(location_indices, 0);
-    if (job.preferred_datacenter.has_value()) {
-        const auto &pref = job.preferred_datacenter.value();
-        auto it = ranges::find(data.location_ids, pref);
-        if (it != data.location_ids.end()) {
-            const auto pref_idx = distance(data.location_ids.begin(), it);
-            if (pref_idx)
-                swap(location_indices[0], location_indices[pref_idx]);
-        }
-    }
 
     auto res = vector(n_locations, vector(n_intervals, 0.0));
     auto rem_work = job.workload_amount;
@@ -127,8 +118,7 @@ auto TrivialScheduler::doScheduleJob(JobRequest job)
 
     auto total_emissions = 0.0;
     auto total_carbon_intensity_sum = 0.0;
-    auto total_sci = 0.0;
-    auto total_kwh = 0.0;
+    auto total_electricity = 0.0;
     auto blocks = vector<InternalBlock>{};
     auto blocks_count = 0;
 
@@ -140,7 +130,7 @@ auto TrivialScheduler::doScheduleJob(JobRequest job)
     for (size_t i = 0; i < n_locations; ++i) {
         const auto &loc_id = data.location_ids[i];
         const auto &schedule_vec = res[i];
-        const auto &sci_vec = data.carbon_intensities_f[i];
+        const auto &ci_vec = data.carbon_intensities_f[i];
         const auto kwh = data.kwh_per_flo[i];
 
         for (const auto j : views::iota(int64_t{}, n_intervals)) {
@@ -151,12 +141,10 @@ auto TrivialScheduler::doScheduleJob(JobRequest job)
             blocks.emplace_back(index_to_time(j), loc_id, load);
             ++blocks_count;
 
-            const auto current_sci = sci_vec[j];
-            total_emissions += load * kwh * current_sci;
-            total_carbon_intensity_sum += current_sci;
-            total_kwh += load * kwh;
-            total_sci += costs_f[i][j](data.loads_f[i][j] + load) -
-                         costs_f[i][j](data.loads_f[i][j]);
+            const auto current_ci = ci_vec[j];
+            total_emissions += load * kwh * current_ci;
+            total_carbon_intensity_sum += current_ci;
+            total_electricity += load * kwh;
         }
     }
 
@@ -167,7 +155,7 @@ auto TrivialScheduler::doScheduleJob(JobRequest job)
                                               static_cast<double>(blocks_count)
                                         : 0.0,
                    .total_emissions = total_emissions,
-                   .sci = (total_kwh > 0.0 ? total_sci / total_kwh : 0.0),
+                   .total_electricity = total_electricity,
                }};
 }
 

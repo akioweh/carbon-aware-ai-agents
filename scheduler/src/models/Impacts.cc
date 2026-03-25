@@ -16,755 +16,607 @@ using namespace drogon_model::calendar_db;
 const std::string Impacts::Cols::_id = "\"id\"";
 const std::string Impacts::Cols::_carbon_intensity = "\"carbon_intensity\"";
 const std::string Impacts::Cols::_total_emissions = "\"total_emissions\"";
-const std::string Impacts::Cols::_sci = "\"sci\"";
+const std::string Impacts::Cols::_total_electricity = "\"total_electricity\"";
 const std::string Impacts::primaryKeyName = "id";
 const bool Impacts::hasPrimaryKey = true;
 const std::string Impacts::tableName = "\"impacts\"";
 
-const std::vector<typename Impacts::MetaData> Impacts::metaData_={
-{"id","int32_t","integer",4,1,1,1},
-{"carbon_intensity","double","double precision",8,0,0,0},
-{"total_emissions","double","double precision",8,0,0,0},
-{"sci","double","double precision",8,0,0,0}
-};
-const std::string &Impacts::getColumnName(size_t index) noexcept(false)
-{
+const std::vector<typename Impacts::MetaData> Impacts::metaData_ = {
+    {"id", "int32_t", "integer", 4, 1, 1, 1},
+    {"carbon_intensity", "double", "double precision", 8, 0, 0, 0},
+    {"total_emissions", "double", "double precision", 8, 0, 0, 0},
+    {"total_electricity", "double", "double precision", 8, 0, 0, 0}};
+const std::string &Impacts::getColumnName(size_t index) noexcept(false) {
     assert(index < metaData_.size());
     return metaData_[index].colName_;
 }
-Impacts::Impacts(const Row &r, const ssize_t indexOffset) noexcept
-{
-    if(indexOffset < 0)
-    {
-        if(!r["id"].isNull())
-        {
-            id_=std::make_shared<int32_t>(r["id"].as<int32_t>());
+Impacts::Impacts(const Row &r, const ssize_t indexOffset) noexcept {
+    if (indexOffset < 0) {
+        if (!r["id"].isNull()) {
+            id_ = std::make_shared<int32_t>(r["id"].as<int32_t>());
         }
-        if(!r["carbon_intensity"].isNull())
-        {
-            carbonIntensity_=std::make_shared<double>(r["carbon_intensity"].as<double>());
+        if (!r["carbon_intensity"].isNull()) {
+            carbonIntensity_ =
+                std::make_shared<double>(r["carbon_intensity"].as<double>());
         }
-        if(!r["total_emissions"].isNull())
-        {
-            totalEmissions_=std::make_shared<double>(r["total_emissions"].as<double>());
+        if (!r["total_emissions"].isNull()) {
+            totalEmissions_ =
+                std::make_shared<double>(r["total_emissions"].as<double>());
         }
-        if(!r["sci"].isNull())
-        {
-            sci_=std::make_shared<double>(r["sci"].as<double>());
+        if (!r["total_electricity"].isNull()) {
+            totalElectricity_ =
+                std::make_shared<double>(r["total_electricity"].as<double>());
         }
-    }
-    else
-    {
+    } else {
         size_t offset = (size_t)indexOffset;
-        if(offset + 4 > r.size())
-        {
+        if (offset + 4 > r.size()) {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
         }
         size_t index;
         index = offset + 0;
-        if(!r[index].isNull())
-        {
-            id_=std::make_shared<int32_t>(r[index].as<int32_t>());
+        if (!r[index].isNull()) {
+            id_ = std::make_shared<int32_t>(r[index].as<int32_t>());
         }
         index = offset + 1;
-        if(!r[index].isNull())
-        {
-            carbonIntensity_=std::make_shared<double>(r[index].as<double>());
+        if (!r[index].isNull()) {
+            carbonIntensity_ = std::make_shared<double>(r[index].as<double>());
         }
         index = offset + 2;
-        if(!r[index].isNull())
-        {
-            totalEmissions_=std::make_shared<double>(r[index].as<double>());
+        if (!r[index].isNull()) {
+            totalEmissions_ = std::make_shared<double>(r[index].as<double>());
         }
         index = offset + 3;
-        if(!r[index].isNull())
-        {
-            sci_=std::make_shared<double>(r[index].as<double>());
+        if (!r[index].isNull()) {
+            totalElectricity_ = std::make_shared<double>(r[index].as<double>());
         }
     }
-
 }
 
-Impacts::Impacts(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
-{
-    if(pMasqueradingVector.size() != 4)
-    {
+Impacts::Impacts(
+    const Json::Value &pJson,
+    const std::vector<std::string> &pMasqueradingVector) noexcept(false) {
+    if (pMasqueradingVector.size() != 4) {
         LOG_ERROR << "Bad masquerading vector";
         return;
     }
-    if(!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0]))
-    {
+    if (!pMasqueradingVector[0].empty() &&
+        pJson.isMember(pMasqueradingVector[0])) {
         dirtyFlag_[0] = true;
-        if(!pJson[pMasqueradingVector[0]].isNull())
-        {
-            id_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[0]].asInt64());
+        if (!pJson[pMasqueradingVector[0]].isNull()) {
+            id_ = std::make_shared<int32_t>(
+                (int32_t)pJson[pMasqueradingVector[0]].asInt64());
         }
     }
-    if(!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1]))
-    {
+    if (!pMasqueradingVector[1].empty() &&
+        pJson.isMember(pMasqueradingVector[1])) {
         dirtyFlag_[1] = true;
-        if(!pJson[pMasqueradingVector[1]].isNull())
-        {
-            carbonIntensity_=std::make_shared<double>(pJson[pMasqueradingVector[1]].asDouble());
+        if (!pJson[pMasqueradingVector[1]].isNull()) {
+            carbonIntensity_ = std::make_shared<double>(
+                pJson[pMasqueradingVector[1]].asDouble());
         }
     }
-    if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
-    {
+    if (!pMasqueradingVector[2].empty() &&
+        pJson.isMember(pMasqueradingVector[2])) {
         dirtyFlag_[2] = true;
-        if(!pJson[pMasqueradingVector[2]].isNull())
-        {
-            totalEmissions_=std::make_shared<double>(pJson[pMasqueradingVector[2]].asDouble());
+        if (!pJson[pMasqueradingVector[2]].isNull()) {
+            totalEmissions_ = std::make_shared<double>(
+                pJson[pMasqueradingVector[2]].asDouble());
         }
     }
-    if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-    {
+    if (!pMasqueradingVector[3].empty() &&
+        pJson.isMember(pMasqueradingVector[3])) {
         dirtyFlag_[3] = true;
-        if(!pJson[pMasqueradingVector[3]].isNull())
-        {
-            sci_=std::make_shared<double>(pJson[pMasqueradingVector[3]].asDouble());
+        if (!pJson[pMasqueradingVector[3]].isNull()) {
+            totalElectricity_ = std::make_shared<double>(
+                pJson[pMasqueradingVector[3]].asDouble());
         }
     }
 }
 
-Impacts::Impacts(const Json::Value &pJson) noexcept(false)
-{
-    if(pJson.isMember("id"))
-    {
-        dirtyFlag_[0]=true;
-        if(!pJson["id"].isNull())
-        {
-            id_=std::make_shared<int32_t>((int32_t)pJson["id"].asInt64());
+Impacts::Impacts(const Json::Value &pJson) noexcept(false) {
+    if (pJson.isMember("id")) {
+        dirtyFlag_[0] = true;
+        if (!pJson["id"].isNull()) {
+            id_ = std::make_shared<int32_t>((int32_t)pJson["id"].asInt64());
         }
     }
-    if(pJson.isMember("carbon_intensity"))
-    {
-        dirtyFlag_[1]=true;
-        if(!pJson["carbon_intensity"].isNull())
-        {
-            carbonIntensity_=std::make_shared<double>(pJson["carbon_intensity"].asDouble());
+    if (pJson.isMember("carbon_intensity")) {
+        dirtyFlag_[1] = true;
+        if (!pJson["carbon_intensity"].isNull()) {
+            carbonIntensity_ =
+                std::make_shared<double>(pJson["carbon_intensity"].asDouble());
         }
     }
-    if(pJson.isMember("total_emissions"))
-    {
-        dirtyFlag_[2]=true;
-        if(!pJson["total_emissions"].isNull())
-        {
-            totalEmissions_=std::make_shared<double>(pJson["total_emissions"].asDouble());
+    if (pJson.isMember("total_emissions")) {
+        dirtyFlag_[2] = true;
+        if (!pJson["total_emissions"].isNull()) {
+            totalEmissions_ =
+                std::make_shared<double>(pJson["total_emissions"].asDouble());
         }
     }
-    if(pJson.isMember("sci"))
-    {
-        dirtyFlag_[3]=true;
-        if(!pJson["sci"].isNull())
-        {
-            sci_=std::make_shared<double>(pJson["sci"].asDouble());
+    if (pJson.isMember("total_electricity")) {
+        dirtyFlag_[3] = true;
+        if (!pJson["total_electricity"].isNull()) {
+            totalElectricity_ =
+                std::make_shared<double>(pJson["total_electricity"].asDouble());
         }
     }
 }
 
-void Impacts::updateByMasqueradedJson(const Json::Value &pJson,
-                                            const std::vector<std::string> &pMasqueradingVector) noexcept(false)
-{
-    if(pMasqueradingVector.size() != 4)
-    {
+void Impacts::updateByMasqueradedJson(
+    const Json::Value &pJson,
+    const std::vector<std::string> &pMasqueradingVector) noexcept(false) {
+    if (pMasqueradingVector.size() != 4) {
         LOG_ERROR << "Bad masquerading vector";
         return;
     }
-    if(!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0]))
-    {
-        if(!pJson[pMasqueradingVector[0]].isNull())
-        {
-            id_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[0]].asInt64());
+    if (!pMasqueradingVector[0].empty() &&
+        pJson.isMember(pMasqueradingVector[0])) {
+        if (!pJson[pMasqueradingVector[0]].isNull()) {
+            id_ = std::make_shared<int32_t>(
+                (int32_t)pJson[pMasqueradingVector[0]].asInt64());
         }
     }
-    if(!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1]))
-    {
+    if (!pMasqueradingVector[1].empty() &&
+        pJson.isMember(pMasqueradingVector[1])) {
         dirtyFlag_[1] = true;
-        if(!pJson[pMasqueradingVector[1]].isNull())
-        {
-            carbonIntensity_=std::make_shared<double>(pJson[pMasqueradingVector[1]].asDouble());
+        if (!pJson[pMasqueradingVector[1]].isNull()) {
+            carbonIntensity_ = std::make_shared<double>(
+                pJson[pMasqueradingVector[1]].asDouble());
         }
     }
-    if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
-    {
+    if (!pMasqueradingVector[2].empty() &&
+        pJson.isMember(pMasqueradingVector[2])) {
         dirtyFlag_[2] = true;
-        if(!pJson[pMasqueradingVector[2]].isNull())
-        {
-            totalEmissions_=std::make_shared<double>(pJson[pMasqueradingVector[2]].asDouble());
+        if (!pJson[pMasqueradingVector[2]].isNull()) {
+            totalEmissions_ = std::make_shared<double>(
+                pJson[pMasqueradingVector[2]].asDouble());
         }
     }
-    if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-    {
+    if (!pMasqueradingVector[3].empty() &&
+        pJson.isMember(pMasqueradingVector[3])) {
         dirtyFlag_[3] = true;
-        if(!pJson[pMasqueradingVector[3]].isNull())
-        {
-            sci_=std::make_shared<double>(pJson[pMasqueradingVector[3]].asDouble());
+        if (!pJson[pMasqueradingVector[3]].isNull()) {
+            totalElectricity_ = std::make_shared<double>(
+                pJson[pMasqueradingVector[3]].asDouble());
         }
     }
 }
 
-void Impacts::updateByJson(const Json::Value &pJson) noexcept(false)
-{
-    if(pJson.isMember("id"))
-    {
-        if(!pJson["id"].isNull())
-        {
-            id_=std::make_shared<int32_t>((int32_t)pJson["id"].asInt64());
+void Impacts::updateByJson(const Json::Value &pJson) noexcept(false) {
+    if (pJson.isMember("id")) {
+        if (!pJson["id"].isNull()) {
+            id_ = std::make_shared<int32_t>((int32_t)pJson["id"].asInt64());
         }
     }
-    if(pJson.isMember("carbon_intensity"))
-    {
+    if (pJson.isMember("carbon_intensity")) {
         dirtyFlag_[1] = true;
-        if(!pJson["carbon_intensity"].isNull())
-        {
-            carbonIntensity_=std::make_shared<double>(pJson["carbon_intensity"].asDouble());
+        if (!pJson["carbon_intensity"].isNull()) {
+            carbonIntensity_ =
+                std::make_shared<double>(pJson["carbon_intensity"].asDouble());
         }
     }
-    if(pJson.isMember("total_emissions"))
-    {
+    if (pJson.isMember("total_emissions")) {
         dirtyFlag_[2] = true;
-        if(!pJson["total_emissions"].isNull())
-        {
-            totalEmissions_=std::make_shared<double>(pJson["total_emissions"].asDouble());
+        if (!pJson["total_emissions"].isNull()) {
+            totalEmissions_ =
+                std::make_shared<double>(pJson["total_emissions"].asDouble());
         }
     }
-    if(pJson.isMember("sci"))
-    {
+    if (pJson.isMember("total_electricity")) {
         dirtyFlag_[3] = true;
-        if(!pJson["sci"].isNull())
-        {
-            sci_=std::make_shared<double>(pJson["sci"].asDouble());
+        if (!pJson["total_electricity"].isNull()) {
+            totalElectricity_ =
+                std::make_shared<double>(pJson["total_electricity"].asDouble());
         }
     }
 }
 
-const int32_t &Impacts::getValueOfId() const noexcept
-{
+const int32_t &Impacts::getValueOfId() const noexcept {
     static const int32_t defaultValue = int32_t();
-    if(id_)
+    if (id_)
         return *id_;
     return defaultValue;
 }
-const std::shared_ptr<int32_t> &Impacts::getId() const noexcept
-{
-    return id_;
-}
-void Impacts::setId(const int32_t &pId) noexcept
-{
+const std::shared_ptr<int32_t> &Impacts::getId() const noexcept { return id_; }
+void Impacts::setId(const int32_t &pId) noexcept {
     id_ = std::make_shared<int32_t>(pId);
     dirtyFlag_[0] = true;
 }
-const typename Impacts::PrimaryKeyType & Impacts::getPrimaryKey() const
-{
+const typename Impacts::PrimaryKeyType &Impacts::getPrimaryKey() const {
     assert(id_);
     return *id_;
 }
 
-const double &Impacts::getValueOfCarbonIntensity() const noexcept
-{
+const double &Impacts::getValueOfCarbonIntensity() const noexcept {
     static const double defaultValue = double();
-    if(carbonIntensity_)
+    if (carbonIntensity_)
         return *carbonIntensity_;
     return defaultValue;
 }
-const std::shared_ptr<double> &Impacts::getCarbonIntensity() const noexcept
-{
+const std::shared_ptr<double> &Impacts::getCarbonIntensity() const noexcept {
     return carbonIntensity_;
 }
-void Impacts::setCarbonIntensity(const double &pCarbonIntensity) noexcept
-{
+void Impacts::setCarbonIntensity(const double &pCarbonIntensity) noexcept {
     carbonIntensity_ = std::make_shared<double>(pCarbonIntensity);
     dirtyFlag_[1] = true;
 }
-void Impacts::setCarbonIntensityToNull() noexcept
-{
+void Impacts::setCarbonIntensityToNull() noexcept {
     carbonIntensity_.reset();
     dirtyFlag_[1] = true;
 }
 
-const double &Impacts::getValueOfTotalEmissions() const noexcept
-{
+const double &Impacts::getValueOfTotalEmissions() const noexcept {
     static const double defaultValue = double();
-    if(totalEmissions_)
+    if (totalEmissions_)
         return *totalEmissions_;
     return defaultValue;
 }
-const std::shared_ptr<double> &Impacts::getTotalEmissions() const noexcept
-{
+const std::shared_ptr<double> &Impacts::getTotalEmissions() const noexcept {
     return totalEmissions_;
 }
-void Impacts::setTotalEmissions(const double &pTotalEmissions) noexcept
-{
+void Impacts::setTotalEmissions(const double &pTotalEmissions) noexcept {
     totalEmissions_ = std::make_shared<double>(pTotalEmissions);
     dirtyFlag_[2] = true;
 }
-void Impacts::setTotalEmissionsToNull() noexcept
-{
+void Impacts::setTotalEmissionsToNull() noexcept {
     totalEmissions_.reset();
     dirtyFlag_[2] = true;
 }
 
-const double &Impacts::getValueOfSci() const noexcept
-{
+const double &Impacts::getValueOfTotalElectricity() const noexcept {
     static const double defaultValue = double();
-    if(sci_)
-        return *sci_;
+    if (totalElectricity_)
+        return *totalElectricity_;
     return defaultValue;
 }
-const std::shared_ptr<double> &Impacts::getSci() const noexcept
-{
-    return sci_;
+const std::shared_ptr<double> &Impacts::getTotalElectricity() const noexcept {
+    return totalElectricity_;
 }
-void Impacts::setSci(const double &pSci) noexcept
-{
-    sci_ = std::make_shared<double>(pSci);
+void Impacts::setTotalElectricity(const double &pTotalElectricity) noexcept {
+    totalElectricity_ = std::make_shared<double>(pTotalElectricity);
     dirtyFlag_[3] = true;
 }
-void Impacts::setSciToNull() noexcept
-{
-    sci_.reset();
+void Impacts::setTotalElectricityToNull() noexcept {
+    totalElectricity_.reset();
     dirtyFlag_[3] = true;
 }
 
-void Impacts::updateId(const uint64_t id)
-{
-}
+void Impacts::updateId(const uint64_t id) {}
 
-const std::vector<std::string> &Impacts::insertColumns() noexcept
-{
-    static const std::vector<std::string> inCols={
-        "carbon_intensity",
-        "total_emissions",
-        "sci"
-    };
+const std::vector<std::string> &Impacts::insertColumns() noexcept {
+    static const std::vector<std::string> inCols = {
+        "carbon_intensity", "total_emissions", "total_electricity"};
     return inCols;
 }
 
-void Impacts::outputArgs(drogon::orm::internal::SqlBinder &binder) const
-{
-    if(dirtyFlag_[1])
-    {
-        if(getCarbonIntensity())
-        {
+void Impacts::outputArgs(drogon::orm::internal::SqlBinder &binder) const {
+    if (dirtyFlag_[1]) {
+        if (getCarbonIntensity()) {
             binder << getValueOfCarbonIntensity();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[2])
-    {
-        if(getTotalEmissions())
-        {
+    if (dirtyFlag_[2]) {
+        if (getTotalEmissions()) {
             binder << getValueOfTotalEmissions();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[3])
-    {
-        if(getSci())
-        {
-            binder << getValueOfSci();
-        }
-        else
-        {
+    if (dirtyFlag_[3]) {
+        if (getTotalElectricity()) {
+            binder << getValueOfTotalElectricity();
+        } else {
             binder << nullptr;
         }
     }
 }
 
-const std::vector<std::string> Impacts::updateColumns() const
-{
+const std::vector<std::string> Impacts::updateColumns() const {
     std::vector<std::string> ret;
-    if(dirtyFlag_[1])
-    {
+    if (dirtyFlag_[1]) {
         ret.push_back(getColumnName(1));
     }
-    if(dirtyFlag_[2])
-    {
+    if (dirtyFlag_[2]) {
         ret.push_back(getColumnName(2));
     }
-    if(dirtyFlag_[3])
-    {
+    if (dirtyFlag_[3]) {
         ret.push_back(getColumnName(3));
     }
     return ret;
 }
 
-void Impacts::updateArgs(drogon::orm::internal::SqlBinder &binder) const
-{
-    if(dirtyFlag_[1])
-    {
-        if(getCarbonIntensity())
-        {
+void Impacts::updateArgs(drogon::orm::internal::SqlBinder &binder) const {
+    if (dirtyFlag_[1]) {
+        if (getCarbonIntensity()) {
             binder << getValueOfCarbonIntensity();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[2])
-    {
-        if(getTotalEmissions())
-        {
+    if (dirtyFlag_[2]) {
+        if (getTotalEmissions()) {
             binder << getValueOfTotalEmissions();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[3])
-    {
-        if(getSci())
-        {
-            binder << getValueOfSci();
-        }
-        else
-        {
+    if (dirtyFlag_[3]) {
+        if (getTotalElectricity()) {
+            binder << getValueOfTotalElectricity();
+        } else {
             binder << nullptr;
         }
     }
 }
-Json::Value Impacts::toJson() const
-{
+Json::Value Impacts::toJson() const {
     Json::Value ret;
-    if(getId())
-    {
-        ret["id"]=getValueOfId();
+    if (getId()) {
+        ret["id"] = getValueOfId();
+    } else {
+        ret["id"] = Json::Value();
     }
-    else
-    {
-        ret["id"]=Json::Value();
+    if (getCarbonIntensity()) {
+        ret["carbon_intensity"] = getValueOfCarbonIntensity();
+    } else {
+        ret["carbon_intensity"] = Json::Value();
     }
-    if(getCarbonIntensity())
-    {
-        ret["carbon_intensity"]=getValueOfCarbonIntensity();
+    if (getTotalEmissions()) {
+        ret["total_emissions"] = getValueOfTotalEmissions();
+    } else {
+        ret["total_emissions"] = Json::Value();
     }
-    else
-    {
-        ret["carbon_intensity"]=Json::Value();
-    }
-    if(getTotalEmissions())
-    {
-        ret["total_emissions"]=getValueOfTotalEmissions();
-    }
-    else
-    {
-        ret["total_emissions"]=Json::Value();
-    }
-    if(getSci())
-    {
-        ret["sci"]=getValueOfSci();
-    }
-    else
-    {
-        ret["sci"]=Json::Value();
+    if (getTotalElectricity()) {
+        ret["total_electricity"] = getValueOfTotalElectricity();
+    } else {
+        ret["total_electricity"] = Json::Value();
     }
     return ret;
 }
 
 Json::Value Impacts::toMasqueradedJson(
-    const std::vector<std::string> &pMasqueradingVector) const
-{
+    const std::vector<std::string> &pMasqueradingVector) const {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 4)
-    {
-        if(!pMasqueradingVector[0].empty())
-        {
-            if(getId())
-            {
-                ret[pMasqueradingVector[0]]=getValueOfId();
-            }
-            else
-            {
-                ret[pMasqueradingVector[0]]=Json::Value();
+    if (pMasqueradingVector.size() == 4) {
+        if (!pMasqueradingVector[0].empty()) {
+            if (getId()) {
+                ret[pMasqueradingVector[0]] = getValueOfId();
+            } else {
+                ret[pMasqueradingVector[0]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[1].empty())
-        {
-            if(getCarbonIntensity())
-            {
-                ret[pMasqueradingVector[1]]=getValueOfCarbonIntensity();
-            }
-            else
-            {
-                ret[pMasqueradingVector[1]]=Json::Value();
+        if (!pMasqueradingVector[1].empty()) {
+            if (getCarbonIntensity()) {
+                ret[pMasqueradingVector[1]] = getValueOfCarbonIntensity();
+            } else {
+                ret[pMasqueradingVector[1]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[2].empty())
-        {
-            if(getTotalEmissions())
-            {
-                ret[pMasqueradingVector[2]]=getValueOfTotalEmissions();
-            }
-            else
-            {
-                ret[pMasqueradingVector[2]]=Json::Value();
+        if (!pMasqueradingVector[2].empty()) {
+            if (getTotalEmissions()) {
+                ret[pMasqueradingVector[2]] = getValueOfTotalEmissions();
+            } else {
+                ret[pMasqueradingVector[2]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[3].empty())
-        {
-            if(getSci())
-            {
-                ret[pMasqueradingVector[3]]=getValueOfSci();
-            }
-            else
-            {
-                ret[pMasqueradingVector[3]]=Json::Value();
+        if (!pMasqueradingVector[3].empty()) {
+            if (getTotalElectricity()) {
+                ret[pMasqueradingVector[3]] = getValueOfTotalElectricity();
+            } else {
+                ret[pMasqueradingVector[3]] = Json::Value();
             }
         }
         return ret;
     }
     LOG_ERROR << "Masquerade failed";
-    if(getId())
-    {
-        ret["id"]=getValueOfId();
+    if (getId()) {
+        ret["id"] = getValueOfId();
+    } else {
+        ret["id"] = Json::Value();
     }
-    else
-    {
-        ret["id"]=Json::Value();
+    if (getCarbonIntensity()) {
+        ret["carbon_intensity"] = getValueOfCarbonIntensity();
+    } else {
+        ret["carbon_intensity"] = Json::Value();
     }
-    if(getCarbonIntensity())
-    {
-        ret["carbon_intensity"]=getValueOfCarbonIntensity();
+    if (getTotalEmissions()) {
+        ret["total_emissions"] = getValueOfTotalEmissions();
+    } else {
+        ret["total_emissions"] = Json::Value();
     }
-    else
-    {
-        ret["carbon_intensity"]=Json::Value();
-    }
-    if(getTotalEmissions())
-    {
-        ret["total_emissions"]=getValueOfTotalEmissions();
-    }
-    else
-    {
-        ret["total_emissions"]=Json::Value();
-    }
-    if(getSci())
-    {
-        ret["sci"]=getValueOfSci();
-    }
-    else
-    {
-        ret["sci"]=Json::Value();
+    if (getTotalElectricity()) {
+        ret["total_electricity"] = getValueOfTotalElectricity();
+    } else {
+        ret["total_electricity"] = Json::Value();
     }
     return ret;
 }
 
-bool Impacts::validateJsonForCreation(const Json::Value &pJson, std::string &err)
-{
-    if(pJson.isMember("id"))
-    {
-        if(!validJsonOfField(0, "id", pJson["id"], err, true))
+bool Impacts::validateJsonForCreation(const Json::Value &pJson,
+                                      std::string &err) {
+    if (pJson.isMember("id")) {
+        if (!validJsonOfField(0, "id", pJson["id"], err, true))
             return false;
     }
-    if(pJson.isMember("carbon_intensity"))
-    {
-        if(!validJsonOfField(1, "carbon_intensity", pJson["carbon_intensity"], err, true))
+    if (pJson.isMember("carbon_intensity")) {
+        if (!validJsonOfField(1, "carbon_intensity", pJson["carbon_intensity"],
+                              err, true))
             return false;
     }
-    if(pJson.isMember("total_emissions"))
-    {
-        if(!validJsonOfField(2, "total_emissions", pJson["total_emissions"], err, true))
+    if (pJson.isMember("total_emissions")) {
+        if (!validJsonOfField(2, "total_emissions", pJson["total_emissions"],
+                              err, true))
             return false;
     }
-    if(pJson.isMember("sci"))
-    {
-        if(!validJsonOfField(3, "sci", pJson["sci"], err, true))
+    if (pJson.isMember("total_electricity")) {
+        if (!validJsonOfField(3, "total_electricity",
+                              pJson["total_electricity"], err, true))
             return false;
     }
     return true;
 }
-bool Impacts::validateMasqueradedJsonForCreation(const Json::Value &pJson,
-                                                 const std::vector<std::string> &pMasqueradingVector,
-                                                 std::string &err)
-{
-    if(pMasqueradingVector.size() != 4)
-    {
+bool Impacts::validateMasqueradedJsonForCreation(
+    const Json::Value &pJson,
+    const std::vector<std::string> &pMasqueradingVector, std::string &err) {
+    if (pMasqueradingVector.size() != 4) {
         err = "Bad masquerading vector";
         return false;
     }
     try {
-      if(!pMasqueradingVector[0].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[0]))
-          {
-              if(!validJsonOfField(0, pMasqueradingVector[0], pJson[pMasqueradingVector[0]], err, true))
-                  return false;
-          }
-      }
-      if(!pMasqueradingVector[1].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[1]))
-          {
-              if(!validJsonOfField(1, pMasqueradingVector[1], pJson[pMasqueradingVector[1]], err, true))
-                  return false;
-          }
-      }
-      if(!pMasqueradingVector[2].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[2]))
-          {
-              if(!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, true))
-                  return false;
-          }
-      }
-      if(!pMasqueradingVector[3].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[3]))
-          {
-              if(!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, true))
-                  return false;
-          }
-      }
-    }
-    catch(const Json::LogicError &e)
-    {
-      err = e.what();
-      return false;
-    }
-    return true;
-}
-bool Impacts::validateJsonForUpdate(const Json::Value &pJson, std::string &err)
-{
-    if(pJson.isMember("id"))
-    {
-        if(!validJsonOfField(0, "id", pJson["id"], err, false))
-            return false;
-    }
-    else
-    {
-        err = "The value of primary key must be set in the json object for update";
+        if (!pMasqueradingVector[0].empty()) {
+            if (pJson.isMember(pMasqueradingVector[0])) {
+                if (!validJsonOfField(0, pMasqueradingVector[0],
+                                      pJson[pMasqueradingVector[0]], err, true))
+                    return false;
+            }
+        }
+        if (!pMasqueradingVector[1].empty()) {
+            if (pJson.isMember(pMasqueradingVector[1])) {
+                if (!validJsonOfField(1, pMasqueradingVector[1],
+                                      pJson[pMasqueradingVector[1]], err, true))
+                    return false;
+            }
+        }
+        if (!pMasqueradingVector[2].empty()) {
+            if (pJson.isMember(pMasqueradingVector[2])) {
+                if (!validJsonOfField(2, pMasqueradingVector[2],
+                                      pJson[pMasqueradingVector[2]], err, true))
+                    return false;
+            }
+        }
+        if (!pMasqueradingVector[3].empty()) {
+            if (pJson.isMember(pMasqueradingVector[3])) {
+                if (!validJsonOfField(3, pMasqueradingVector[3],
+                                      pJson[pMasqueradingVector[3]], err, true))
+                    return false;
+            }
+        }
+    } catch (const Json::LogicError &e) {
+        err = e.what();
         return false;
     }
-    if(pJson.isMember("carbon_intensity"))
-    {
-        if(!validJsonOfField(1, "carbon_intensity", pJson["carbon_intensity"], err, false))
+    return true;
+}
+bool Impacts::validateJsonForUpdate(const Json::Value &pJson,
+                                    std::string &err) {
+    if (pJson.isMember("id")) {
+        if (!validJsonOfField(0, "id", pJson["id"], err, false))
+            return false;
+    } else {
+        err = "The value of primary key must be set in the json object for "
+              "update";
+        return false;
+    }
+    if (pJson.isMember("carbon_intensity")) {
+        if (!validJsonOfField(1, "carbon_intensity", pJson["carbon_intensity"],
+                              err, false))
             return false;
     }
-    if(pJson.isMember("total_emissions"))
-    {
-        if(!validJsonOfField(2, "total_emissions", pJson["total_emissions"], err, false))
+    if (pJson.isMember("total_emissions")) {
+        if (!validJsonOfField(2, "total_emissions", pJson["total_emissions"],
+                              err, false))
             return false;
     }
-    if(pJson.isMember("sci"))
-    {
-        if(!validJsonOfField(3, "sci", pJson["sci"], err, false))
+    if (pJson.isMember("total_electricity")) {
+        if (!validJsonOfField(3, "total_electricity",
+                              pJson["total_electricity"], err, false))
             return false;
     }
     return true;
 }
-bool Impacts::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
-                                               const std::vector<std::string> &pMasqueradingVector,
-                                               std::string &err)
-{
-    if(pMasqueradingVector.size() != 4)
-    {
+bool Impacts::validateMasqueradedJsonForUpdate(
+    const Json::Value &pJson,
+    const std::vector<std::string> &pMasqueradingVector, std::string &err) {
+    if (pMasqueradingVector.size() != 4) {
         err = "Bad masquerading vector";
         return false;
     }
     try {
-      if(!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0]))
-      {
-          if(!validJsonOfField(0, pMasqueradingVector[0], pJson[pMasqueradingVector[0]], err, false))
-              return false;
-      }
-    else
-    {
-        err = "The value of primary key must be set in the json object for update";
+        if (!pMasqueradingVector[0].empty() &&
+            pJson.isMember(pMasqueradingVector[0])) {
+            if (!validJsonOfField(0, pMasqueradingVector[0],
+                                  pJson[pMasqueradingVector[0]], err, false))
+                return false;
+        } else {
+            err = "The value of primary key must be set in the json object for "
+                  "update";
+            return false;
+        }
+        if (!pMasqueradingVector[1].empty() &&
+            pJson.isMember(pMasqueradingVector[1])) {
+            if (!validJsonOfField(1, pMasqueradingVector[1],
+                                  pJson[pMasqueradingVector[1]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[2].empty() &&
+            pJson.isMember(pMasqueradingVector[2])) {
+            if (!validJsonOfField(2, pMasqueradingVector[2],
+                                  pJson[pMasqueradingVector[2]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[3].empty() &&
+            pJson.isMember(pMasqueradingVector[3])) {
+            if (!validJsonOfField(3, pMasqueradingVector[3],
+                                  pJson[pMasqueradingVector[3]], err, false))
+                return false;
+        }
+    } catch (const Json::LogicError &e) {
+        err = e.what();
         return false;
-    }
-      if(!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1]))
-      {
-          if(!validJsonOfField(1, pMasqueradingVector[1], pJson[pMasqueradingVector[1]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
-      {
-          if(!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-      {
-          if(!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, false))
-              return false;
-      }
-    }
-    catch(const Json::LogicError &e)
-    {
-      err = e.what();
-      return false;
     }
     return true;
 }
-bool Impacts::validJsonOfField(size_t index,
-                               const std::string &fieldName,
-                               const Json::Value &pJson,
-                               std::string &err,
-                               bool isForCreation)
-{
-    switch(index)
-    {
-        case 0:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
-                return false;
-            }
-            if(isForCreation)
-            {
-                err="The automatic primary key cannot be set";
-                return false;
-            }
-            if(!pJson.isInt())
-            {
-                err="Type error in the "+fieldName+" field";
-                return false;
-            }
-            break;
-        case 1:
-            if(pJson.isNull())
-            {
-                return true;
-            }
-            if(!pJson.isNumeric())
-            {
-                err="Type error in the "+fieldName+" field";
-                return false;
-            }
-            break;
-        case 2:
-            if(pJson.isNull())
-            {
-                return true;
-            }
-            if(!pJson.isNumeric())
-            {
-                err="Type error in the "+fieldName+" field";
-                return false;
-            }
-            break;
-        case 3:
-            if(pJson.isNull())
-            {
-                return true;
-            }
-            if(!pJson.isNumeric())
-            {
-                err="Type error in the "+fieldName+" field";
-                return false;
-            }
-            break;
-        default:
-            err="Internal error in the server";
+bool Impacts::validJsonOfField(size_t index, const std::string &fieldName,
+                               const Json::Value &pJson, std::string &err,
+                               bool isForCreation) {
+    switch (index) {
+    case 0:
+        if (pJson.isNull()) {
+            err = "The " + fieldName + " column cannot be null";
             return false;
+        }
+        if (isForCreation) {
+            err = "The automatic primary key cannot be set";
+            return false;
+        }
+        if (!pJson.isInt()) {
+            err = "Type error in the " + fieldName + " field";
+            return false;
+        }
+        break;
+    case 1:
+        if (pJson.isNull()) {
+            return true;
+        }
+        if (!pJson.isNumeric()) {
+            err = "Type error in the " + fieldName + " field";
+            return false;
+        }
+        break;
+    case 2:
+        if (pJson.isNull()) {
+            return true;
+        }
+        if (!pJson.isNumeric()) {
+            err = "Type error in the " + fieldName + " field";
+            return false;
+        }
+        break;
+    case 3:
+        if (pJson.isNull()) {
+            return true;
+        }
+        if (!pJson.isNumeric()) {
+            err = "Type error in the " + fieldName + " field";
+            return false;
+        }
+        break;
+    default:
+        err = "Internal error in the server";
+        return false;
     }
     return true;
 }

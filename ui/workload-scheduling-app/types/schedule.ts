@@ -1,7 +1,7 @@
 export interface ScheduleImpact {
   carbon_intensity: number
   total_emissions: number
-  sci: number
+  total_electricity: number
 }
 
 export interface ScheduleBlock {

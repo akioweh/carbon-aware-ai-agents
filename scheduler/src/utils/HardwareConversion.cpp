@@ -46,7 +46,7 @@ auto get_workload_amount(const int length, double full_power) -> double {
 }
 
 auto calculate_flo_per_kwh(const std::string &gpu_type) -> double {
-    constexpr auto effectiveness = 0.95;
+    constexpr auto effectiveness = 0.99;
     const auto &[gpu_tdp, _, _, _, tflops] =
         hardwareConstants::HW_LIB.at(gpu_type);
     const auto total_flo_per_hour = tflops * 1e12 * 3600.0;

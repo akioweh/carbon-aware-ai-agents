@@ -277,7 +277,7 @@ BOOST_AUTO_TEST_CASE(test_calendar_trivial_operations) {
         scheduler::SchedulerOutput mockOutput;
         mockOutput.impact.carbon_intensity = 50.5;
         mockOutput.impact.total_emissions = 100.0;
-        mockOutput.impact.sci = 10.0;
+        mockOutput.impact.total_electricity = 10.0;
 
         std::string mockScheduleId = "999999";
 

@@ -10,7 +10,7 @@ using namespace scheduler;
 auto f_toDto(const ScheduleImpact &impact) -> ImpactModel {
     ImpactModel impactDB;
     impactDB.setCarbonIntensity(impact.carbon_intensity);
-    impactDB.setSci(impact.sci);
+    impactDB.setTotalElectricity(impact.total_electricity);
     impactDB.setTotalEmissions(impact.total_emissions);
     return impactDB;
 }
@@ -27,7 +27,7 @@ auto f_toDto(const InternalBlock &block, int impactId) -> JobModel {
 auto f_fromDto(const ImpactModel &impactDto) -> ScheduleImpact {
     return {.carbon_intensity = impactDto.getValueOfCarbonIntensity(),
             .total_emissions = impactDto.getValueOfTotalEmissions(),
-            .sci = impactDto.getValueOfSci()};
+            .total_electricity = impactDto.getValueOfTotalElectricity()};
 }
 
 auto f_fromDto(const JobModel &jobDto) -> ScheduleBlock {
@@ -44,7 +44,7 @@ auto f_toTrivialDto(const ScheduleImpact &impact, int impactId)
     TrivialImpactModel impactDB;
     impactDB.setImpactId(impactId);
     impactDB.setCarbonIntensity(impact.carbon_intensity);
-    impactDB.setSci(impact.sci);
+    impactDB.setTotalElectricity(impact.total_electricity);
     impactDB.setTotalEmissions(impact.total_emissions);
     return impactDB;
 }
@@ -62,7 +62,7 @@ auto f_toTrivialDto(const InternalBlock &block, int trivialImpactId)
 auto f_fromDto(const TrivialImpactModel &impactDto) -> ScheduleImpact {
     return {.carbon_intensity = impactDto.getValueOfCarbonIntensity(),
             .total_emissions = impactDto.getValueOfTotalEmissions(),
-            .sci = impactDto.getValueOfSci()};
+            .total_electricity = impactDto.getValueOfTotalElectricity()};
 }
 
 auto f_fromDto(const TrivialJobModel &jobDto, int impactId) -> ScheduleBlock {

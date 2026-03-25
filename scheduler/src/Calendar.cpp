@@ -74,7 +74,7 @@ const auto GET_SUMMARIES_SQL = R"(
         i.id AS impact_id,
         i.carbon_intensity,
         i.total_emissions,
-        i.sci,
+        i.total_electricity,
         MIN(j.time_stamp) AS start_time,
         MAX(j.time_stamp) AS end_time,
         array_agg(DISTINCT j.location_id) AS locations,
@@ -90,7 +90,7 @@ const auto GET_TRIVIAL_IMPACTS_SQL = R"(
         impact_id,
         carbon_intensity,
         total_emissions,
-        sci
+        total_electricity
     FROM trivial_impacts
 )"s;
 
@@ -232,7 +232,7 @@ auto scheduleSummaries() -> drogon::Task<vector<ScheduleSummary>> {
         trivialMap[row["impact_id"].as<int>()] = {
             .carbon_intensity = row["carbon_intensity"].as<double>(),
             .total_emissions = row["total_emissions"].as<double>(),
-            .sci = row["sci"].as<double>()};
+            .total_electricity = row["total_electricity"].as<double>()};
     }
 
     auto scheduleSummaries = vector<ScheduleSummary>{};
@@ -286,7 +286,8 @@ auto scheduleSummaries() -> drogon::Task<vector<ScheduleSummary>> {
             .scheduleId = scheduler::utils::parseIntToStringID(impactId),
             .impact = {.carbon_intensity = row["carbon_intensity"].as<double>(),
                        .total_emissions = row["total_emissions"].as<double>(),
-                       .sci = row["sci"].as<double>()},
+                       .total_electricity =
+                           row["total_electricity"].as<double>()},
             .trivialImpact = {},
             .startTime = startTime,
             .endTime = endTime,
