@@ -415,6 +415,16 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
 
   const { start: rangeStart, end: rangeEnd } = getTimeRange()
 
+  const calculateSavings = (
+    current: number | undefined | null,
+    unoptimized: number | undefined | null
+  ): string => {
+    if (!unoptimized || unoptimized <= 0) return "0.0";
+
+    const savings = ((unoptimized - (current || 0)) / unoptimized) * 100;
+    return Math.max(0, savings).toFixed(0);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -467,9 +477,9 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
           <CardContent className="pt-0">
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
-                {!showTrivial && unoptimizedComparison.carbon_intensity && (
+                {!showTrivial && (
                   <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
-                    {-Math.max(0, ((unoptimizedComparison.carbon_intensity - (carbonIntensity || 0)) / unoptimizedComparison.carbon_intensity) * 100).toFixed(0)}%
+                    -{calculateSavings(sci, unoptimizedComparison.carbon_intensity)}%
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">Carbon Intensity</p>
@@ -478,9 +488,9 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               </div>
 
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
-                {!showTrivial && unoptimizedComparison.total_emissions && (
+                {!showTrivial && (
                   <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
-                    {-Math.max(0, ((unoptimizedComparison.total_emissions - (totalEmissions || 0)) / unoptimizedComparison.total_emissions) * 100).toFixed(0)}%
+                    -{calculateSavings(totalEmissions, unoptimizedComparison.total_emissions)}%
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">Total Emissions</p>
@@ -489,9 +499,9 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
               </div>
 
               <div className="rounded-lg bg-background p-4 space-y-1 relative overflow-hidden">
-                {!showTrivial && unoptimizedComparison.sci && (
+                {!showTrivial && (
                   <div className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
-                    {-Math.max(0, ((unoptimizedComparison.sci - (sci || 0)) / unoptimizedComparison.sci) * 100).toFixed(0)}%
+                    -{calculateSavings(carbonIntensity, unoptimizedComparison.sci)}%
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">SCI per Unit</p>
