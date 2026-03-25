@@ -462,9 +462,9 @@ components:
           type: number
           description: total predicted emissions in gCO2eq
           example: 140.0
-        sci:
+        total_electricity:
           type: number
-          description: Software Carbon Intensity score for the schedule
+          description: total predicted amount of electricity used to complete the workload.
           example: 20
 
     DCInfo:
