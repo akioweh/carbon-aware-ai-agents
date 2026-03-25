@@ -78,6 +78,7 @@ class StatsAPIClient {
   public:
     // overridable via STATS_API_URL environment variable
     static constexpr auto DEFAULT_STATS_API_URL = "http://140.238.79.139:5000";
+    static constexpr auto DEFAULT_TIMEOUT = 10.;
 
     [[nodiscard]] auto getLocations() const
         -> drogon::Task<std::vector<Location>>;
@@ -121,6 +122,7 @@ class StatsAPIClient {
     }
 
     const std::string host;
+    const double timeout;
 
   private:
     static auto
@@ -143,7 +145,7 @@ class StatsAPIClient {
     }
     static auto getLocationsPath() -> std::string { return "/locations"; }
 
-    StatsAPIClient();
+    StatsAPIClient(double timeout = DEFAULT_TIMEOUT);
 };
 
 } // namespace scheduler

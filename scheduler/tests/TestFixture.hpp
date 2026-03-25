@@ -1,5 +1,8 @@
+#ifndef SCHEDULER_TEST_FIXTURE_HPP
+#define SCHEDULER_TEST_FIXTURE_HPP
 #pragma once
 
+#include "TestConstants.hpp"
 #include "exceptions/ExceptionHandler.hpp"
 #include <chrono>
 #include <cstdlib>
@@ -61,14 +64,17 @@ struct SchedulerGlobalFixture {
             req->setBody(body.toStyledString());
             req->setContentTypeCode(drogon::CT_APPLICATION_JSON);
 
-            auto respPair = client->sendRequest(req);
+            auto respPair =
+                client->sendRequest(req, scheduler::test::NETWORK_TIMEOUT);
             if (respPair.first != drogon::ReqResult::Ok ||
                 respPair.second->getStatusCode() != drogon::k200OK) {
-                std::cerr << "Failed to seed Data-Center-" << i << " as active"
-                          << std::endl;
+                std::cerr << "Failed to seed Data-Center-" << i
+                          << " as active\n";
             }
         }
     }
 
     std::jthread t;
 };
+
+#endif // SCHEDULER_TEST_FIXTURE_HPP

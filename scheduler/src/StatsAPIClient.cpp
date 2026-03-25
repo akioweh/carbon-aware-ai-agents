@@ -19,7 +19,8 @@ namespace scheduler {
 using namespace std;
 using namespace drogon;
 
-StatsAPIClient::StatsAPIClient() : host(getHost()) {}
+StatsAPIClient::StatsAPIClient(double timeout)
+    : host(getHost()), timeout(timeout) {}
 
 auto StatsAPIClient::addTimeIntervalPathParams(
     std::optional<TimeIntervalParams> interval) -> std::string {
@@ -38,7 +39,8 @@ auto StatsAPIClient::addTimeIntervalPathParams(
 }
 
 auto StatsAPIClient::getLocations() const -> Task<vector<Location>> {
-    auto jsonPtr = co_await utils::makeGetRequest(host, getLocationsPath());
+    auto jsonPtr =
+        co_await utils::makeGetRequest(host, getLocationsPath(), timeout);
 
     const auto &json = *jsonPtr;
     auto locations = vector<Location>{};
@@ -51,8 +53,8 @@ auto StatsAPIClient::getLocations() const -> Task<vector<Location>> {
 auto StatsAPIClient::getLoadForecast(
     const string &location, std::optional<TimeIntervalParams> interval) const
     -> Task<optional<LoadTimeSeries>> {
-    auto jsonPtr =
-        co_await utils::makeGetRequest(host, getLoadPath(location, interval));
+    auto jsonPtr = co_await utils::makeGetRequest(
+        host, getLoadPath(location, interval), timeout);
     assert(jsonPtr);
     const auto &json = *jsonPtr;
 
@@ -89,7 +91,7 @@ auto StatsAPIClient::getCarbonIntensityForecast(
     const string &location, std::optional<TimeIntervalParams> interval) const
     -> Task<optional<CarbonIntensityTimeSeries>> {
     auto jsonPtr = co_await utils::makeGetRequest(
-        host, getCarbonIntensityPath(location, interval));
+        host, getCarbonIntensityPath(location, interval), timeout);
     assert(jsonPtr);
     const auto &json = *jsonPtr;
 

@@ -1,20 +1,21 @@
 #define BOOST_TEST_MODULE StatsAPIClientTest
 
 #include "DrogonTestUtils.hpp"
+#include "TestConstants.hpp"
 #include "exceptions/NetworkException.hpp"
 #include <StatsAPIClient.hpp>
 #include <boost/test/unit_test.hpp>
+#include <cstdlib>
 #include <drogon/drogon.h>
 #include <structs/Datacenter.hpp>
 
 using namespace scheduler;
 
-#include <cstdlib>
-
 // Helper to get client with configurable host for testing
 auto scheduler::createFreeStatsAPIClient() -> std::shared_ptr<StatsAPIClient> {
     // we're a friend, so we can call the private constructor here.
-    return std::shared_ptr<StatsAPIClient>(new StatsAPIClient());
+    return std::shared_ptr<StatsAPIClient>(
+        new StatsAPIClient(test::NETWORK_TIMEOUT));
 }
 
 // NOTE: By default, tests run against localhost:5000, but this can be

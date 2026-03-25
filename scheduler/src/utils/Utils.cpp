@@ -6,9 +6,8 @@ namespace scheduler::utils {
 using namespace std;
 using namespace drogon;
 
-auto makeGetRequest(const string &host, const string &path)
+auto makeGetRequest(const string &host, const string &path, double timeout)
     -> Task<shared_ptr<Json::Value>> {
-    constexpr int TIMEOUT = 10;
     auto client = HttpClient::newHttpClient(host);
 
     auto request = HttpRequest::newHttpRequest();
@@ -17,7 +16,7 @@ auto makeGetRequest(const string &host, const string &path)
 
     HttpResponsePtr response;
     try {
-        response = co_await client->sendRequestCoro(request, TIMEOUT);
+        response = co_await client->sendRequestCoro(request, timeout);
 
     } catch (const exception &e) {
         LOG_ERROR << "something is not yes, maybe run python API? XD "

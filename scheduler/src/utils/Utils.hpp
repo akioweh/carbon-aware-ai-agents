@@ -48,7 +48,8 @@ auto parseIso8601(const std::string &timestamp)
     return std::unexpected("Failed to parse ISO8601 string: " + timestamp);
 }
 
-auto makeGetRequest(const std::string &host, const std::string &path)
+auto makeGetRequest(const std::string &host, const std::string &path,
+                    double timeout = 10.)
     -> drogon::Task<std::shared_ptr<Json::Value>>;
 
 auto trantorToChrono(const trantor::Date &tDate)
