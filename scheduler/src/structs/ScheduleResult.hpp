@@ -17,14 +17,14 @@ namespace scheduler {
 struct ScheduleImpact {
     double carbon_intensity{};
     double total_emissions{};
-    double sci{};
+    double total_electricity{};
 };
 
 inline auto f_toJson(const ScheduleImpact &obj) -> Json::Value {
     auto res = Json::Value{};
     res["carbon_intensity"] = obj.carbon_intensity;
     res["total_emissions"] = obj.total_emissions;
-    res["sci"] = obj.sci;
+    res["total_electricity"] = obj.total_electricity;
     return res;
 }
 
