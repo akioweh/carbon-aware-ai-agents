@@ -587,6 +587,12 @@ def _predict_ci(series_df, dc_name=None, now=None):
         if not forecast.empty:
             test_wx = _align_weather(forecast, fc_30)
 
+    # Weather is only usable if both archive (train) and forecast (test) are
+    # available.  Using one without the other causes a feature-count mismatch
+    # between cold-start and warm-update paths.
+    if train_wx is None or test_wx is None:
+        train_wx = test_wx = None
+
     cache_key = dc_name or '__default__'
     state = _model_state.get(cache_key)
     n_train = len(train_y)
@@ -596,7 +602,7 @@ def _predict_ci(series_df, dc_name=None, now=None):
         n_old = state['n_train']
         X_delta, y_delta = _build_delta_rows(
             train_ts, train_y, n_old,
-            train_wx=train_wx, subsample=3,
+            train_wx=train_wx, subsample=10,
         )
         if X_delta is not None:
             X_delta_sc = state['scaler'].transform(X_delta)
@@ -622,7 +628,7 @@ def _predict_ci(series_df, dc_name=None, now=None):
                 X_train, y_train_arr, _ = build_direct_features(
                     train_ts, train_y, fc_30,
                     train_wx=train_wx, test_wx=test_wx,
-                    subsample=3,
+                    subsample=10,
                 )
                 scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X_train)
@@ -648,7 +654,7 @@ def _predict_ci(series_df, dc_name=None, now=None):
     _, _, X_test = build_direct_features(
         train_ts, train_y, fc_30,
         train_wx=train_wx, test_wx=test_wx,
-        subsample=3, test_only=True,
+        subsample=10, test_only=True,
     )
     X_test_sc = state['scaler'].transform(X_test)
     preds = np.clip(X_test_sc @ state['coef'] + state['intercept'], 0, 500)
