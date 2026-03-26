@@ -2,9 +2,9 @@
 #define SCHEDULER_STATS_API_CLIENT_HPP
 #pragma once
 
+#include "Constants.hpp"
 #include "structs/Datacenter.hpp"
 #include "structs/TimeIntervalParams.hpp"
-#include "utils/Utils.hpp"
 #include <chrono>
 #include <cstdlib>
 #include <drogon/drogon.h>
@@ -78,7 +78,6 @@ class StatsAPIClient {
   public:
     // overridable via STATS_API_URL environment variable
     static constexpr auto DEFAULT_STATS_API_URL = "http://140.238.79.139:5000";
-    static constexpr auto DEFAULT_TIMEOUT = 10.;
 
     [[nodiscard]] auto getLocations() const
         -> drogon::Task<std::vector<Location>>;
@@ -145,7 +144,7 @@ class StatsAPIClient {
     }
     static auto getLocationsPath() -> std::string { return "/locations"; }
 
-    StatsAPIClient(double timeout = DEFAULT_TIMEOUT);
+    StatsAPIClient(double timeout = constants::DEFAULT_TIMEOUT_SEC);
 };
 
 } // namespace scheduler

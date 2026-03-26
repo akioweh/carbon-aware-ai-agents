@@ -1,8 +1,8 @@
 #define BOOST_TEST_MODULE SchedulerIntegrationTest
 
 #include "Calendar.hpp"
+#include "TestConstants.hpp"
 #include "TestFixture.hpp"
-#include "exceptions/ExceptionHandler.hpp"
 #include "structs/SchedulerOutput.hpp"
 #include "utils/Utils.hpp"
 #include <boost/test/tools/old/interface.hpp>
@@ -10,8 +10,6 @@
 #include <chrono>
 #include <drogon/HttpController.h>
 #include <drogon/drogon.h>
-#include <filesystem>
-#include <thread>
 
 using namespace drogon;
 
@@ -20,12 +18,13 @@ BOOST_TEST_GLOBAL_FIXTURE(SchedulerGlobalFixture);
 BOOST_AUTO_TEST_SUITE(SchedulerIntegration)
 
 BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
 
     // 1. Create a schedule (POST)
     Json::Value job;
-    job["job_type"] = "batch";
-    job["gpu_type"] = "V100_PCIE";
+    job["job_type"] = std::string(scheduler::test::MOCK_JOB_TYPE1);
+    job["gpu_type"] = std::string(scheduler::test::MOCK_GPU1);
     job["gpu_count"] = 1;
     job["model_size"] = 10;
     job["length"] = 5;
@@ -63,7 +62,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // /api/schedules/{id})
     auto getSpecificReq = HttpRequest::newHttpRequest();
     getSpecificReq->setMethod(drogon::Get);
-    getSpecificReq->setPath("/api/schedules/" + jobId);
+    getSpecificReq->setPath(std::string(scheduler::test::API_SCHEDULES) + "/" +
+                            jobId);
 
     auto getSpecificRespPair = client->sendRequest(getSpecificReq);
     BOOST_REQUIRE_EQUAL(getSpecificRespPair.first, ReqResult::Ok);
@@ -81,7 +81,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 3. Retrieve the schedule blocks for calendar (GET /api/schedules)
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
-    getReq->setPath("/api/schedules");
+    getReq->setPath(std::string(scheduler::test::API_SCHEDULES));
     getReq->setParameter("start_time", scheduler::utils::toIso8601(start));
     getReq->setParameter("end_time", scheduler::utils::toIso8601(end));
 
@@ -102,7 +102,8 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 4. Delete Schedule (Delete)
     auto deleteReq = HttpRequest::newHttpRequest();
     deleteReq->setMethod(drogon::Delete);
-    deleteReq->setPath("/api/schedules/" + jobId);
+    deleteReq->setPath(std::string(scheduler::test::API_SCHEDULES) + "/" +
+                       jobId);
 
     auto deleteRespPair = client->sendRequest(deleteReq);
     BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
@@ -113,7 +114,7 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
     // 5. Verify Deletion (GET should not return the deleted blocks)
     auto verifyReq = HttpRequest::newHttpRequest();
     verifyReq->setMethod(drogon::Get);
-    verifyReq->setPath("/api/schedules");
+    verifyReq->setPath(std::string(scheduler::test::API_SCHEDULES));
     verifyReq->setParameter("start_time", scheduler::utils::toIso8601(start));
     verifyReq->setParameter("end_time", scheduler::utils::toIso8601(end));
 
@@ -130,24 +131,16 @@ BOOST_AUTO_TEST_CASE(test_schedule_lifecycle) {
 }
 
 BOOST_AUTO_TEST_CASE(test_invalid_request) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
 
     Json::Value job;
-    job["job_type"] = "batch";
+    job["job_type"] = std::string(scheduler::test::MOCK_JOB_TYPE1);
     // Missing workload_amount
-
-    // Use dynamic dates for invalid request too, to avoid date parsing errors
-    // overshadowing the missing field error if checks are reordered.
-    auto now = std::chrono::system_clock::now();
-    auto tomorrow = now + std::chrono::hours(24);
-    auto day_after = tomorrow + std::chrono::hours(24);
-
-    job["earliest_start"] = scheduler::utils::toIso8601(tomorrow);
-    job["latest_finish"] = scheduler::utils::toIso8601(day_after);
-
+    // ...
     auto req = HttpRequest::newHttpJsonRequest(job);
     req->setMethod(drogon::Post);
-    req->setPath("/api/schedules");
+    req->setPath(std::string(scheduler::test::API_SCHEDULES));
 
     auto respPair = client->sendRequest(req);
     BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
@@ -160,10 +153,12 @@ BOOST_AUTO_TEST_CASE(test_invalid_request) {
 }
 
 BOOST_AUTO_TEST_CASE(test_delete_non_existent) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
     auto deleteReq = HttpRequest::newHttpRequest();
     deleteReq->setMethod(drogon::Delete);
-    deleteReq->setPath("/api/schedules/sched-99999999"); // Non-existent ID
+    deleteReq->setPath(std::string(scheduler::test::API_SCHEDULES) +
+                       "/sched-99999999"); // Non-existent ID
 
     auto deleteRespPair = client->sendRequest(deleteReq);
     BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
@@ -174,10 +169,12 @@ BOOST_AUTO_TEST_CASE(test_delete_non_existent) {
 }
 
 BOOST_AUTO_TEST_CASE(test_delete_invalid_id) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
     auto deleteReq = HttpRequest::newHttpRequest();
     deleteReq->setMethod(drogon::Delete);
-    deleteReq->setPath("/api/schedules/invalidid"); // Invalid format (no dash)
+    deleteReq->setPath(std::string(scheduler::test::API_SCHEDULES) +
+                       "/invalidid"); // Invalid format (no dash)
 
     auto deleteRespPair = client->sendRequest(deleteReq);
     BOOST_REQUIRE_EQUAL(deleteRespPair.first, ReqResult::Ok);
@@ -188,13 +185,14 @@ BOOST_AUTO_TEST_CASE(test_delete_invalid_id) {
 }
 
 BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
 
     // Helper to create a job
     auto createJob = [&](const std::string &type) -> std::string {
         Json::Value job;
         job["job_type"] = type;
-        job["gpu_type"] = "V100_PCIE";
+        job["gpu_type"] = std::string(scheduler::test::MOCK_GPU1);
         job["gpu_count"] = 1;
         job["model_size"] = 10;
         job["length"] = 5;
@@ -206,7 +204,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
 
         auto req = HttpRequest::newHttpJsonRequest(job);
         req->setMethod(drogon::Post);
-        req->setPath("/api/schedules");
+        req->setPath(std::string(scheduler::test::API_SCHEDULES));
 
         auto respPair = client->sendRequest(req);
         BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
@@ -219,15 +217,15 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     };
 
     // 1. Create two jobs
-    std::string id1 = createJob("batch");
-    std::string id2 = createJob("inference");
+    std::string id1 = createJob(std::string(scheduler::test::MOCK_JOB_TYPE1));
+    std::string id2 = createJob(std::string(scheduler::test::MOCK_JOB_TYPE2));
 
     BOOST_TEST_MESSAGE("Created jobs: " << id1 << ", " << id2);
 
     // 2. List Jobs (GET /api/schedule/jobs)
     auto listReq = HttpRequest::newHttpRequest();
     listReq->setMethod(drogon::Get);
-    listReq->setPath("/api/schedules/summary");
+    listReq->setPath(std::string(scheduler::test::API_SCHEDULES_SUMMARY));
 
     auto listRespPair = client->sendRequest(listReq);
     BOOST_REQUIRE_EQUAL(listRespPair.first, ReqResult::Ok);
@@ -255,7 +253,7 @@ BOOST_AUTO_TEST_CASE(test_list_jobs_and_get_specific) {
     // 3. Get Specific Job (GET /api/schedule/{id})
     auto getReq = HttpRequest::newHttpRequest();
     getReq->setMethod(drogon::Get);
-    getReq->setPath("/api/schedules/" + id1);
+    getReq->setPath(std::string(scheduler::test::API_SCHEDULES) + "/" + id1);
 
     auto getRespPair = client->sendRequest(getReq);
     BOOST_REQUIRE_EQUAL(getRespPair.first, ReqResult::Ok);
@@ -306,11 +304,12 @@ BOOST_AUTO_TEST_CASE(test_schedule_summaries_aggregation) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_gpu_types) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
 
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(drogon::Get);
-    req->setPath("/api/hardwareSpecs/gpus");
+    req->setPath(std::string(scheduler::test::API_GPUS));
 
     auto respPair = client->sendRequest(req);
     BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
@@ -325,9 +324,9 @@ BOOST_AUTO_TEST_CASE(test_get_gpu_types) {
     bool foundV100 = false;
     bool foundA100 = false;
     for (const auto &type : *json) {
-        if (type.asString() == "V100_PCIE")
+        if (type.asString() == scheduler::test::MOCK_GPU1)
             foundV100 = true;
-        if (type.asString() == "A100_SXM4")
+        if (type.asString() == scheduler::test::MOCK_GPU2)
             foundA100 = true;
     }
     BOOST_CHECK(foundV100);
@@ -335,13 +334,15 @@ BOOST_AUTO_TEST_CASE(test_get_gpu_types) {
 }
 
 BOOST_AUTO_TEST_CASE(test_forecast_specific_datacenter) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
 
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(drogon::Get);
-    req->setPath("/api/forecast");
+    req->setPath(std::string(scheduler::test::API_FORECAST));
     // "datacenter" key is required by the custom fromRequest template
-    req->setParameter("datacenter", "Data-Center-1");
+    req->setParameter("datacenter",
+                      std::string(scheduler::test::DATACENTER_PREFIX) + "1");
 
     auto respPair = client->sendRequest(req);
     BOOST_REQUIRE_EQUAL(respPair.first, ReqResult::Ok);
@@ -354,19 +355,23 @@ BOOST_AUTO_TEST_CASE(test_forecast_specific_datacenter) {
     // Controller wraps the result in a vector
     if (json->size() > 0) {
         const auto &dc = (*json)[0];
-        // The Datacenter DTO serializes 'id' as "location"[cite: 11]
-        BOOST_CHECK_EQUAL(dc["location"].asString(), "Data-Center-1");
+        // The Datacenter DTO serializes 'id' as "location"
+        BOOST_CHECK_EQUAL(dc["location"].asString(),
+                          std::string(scheduler::test::DATACENTER_PREFIX) +
+                              "1");
         BOOST_CHECK(dc.isMember("timeseries"));
+
         BOOST_CHECK(dc["timeseries"].isArray());
     }
 }
 
 BOOST_AUTO_TEST_CASE(test_forecast_any_datacenter_explicit) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
 
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(drogon::Get);
-    req->setPath("/api/forecast");
+    req->setPath(std::string(scheduler::test::API_FORECAST));
     req->setParameter("datacenter", scheduler::calendar::ANY_DATACENTER);
 
     auto respPair = client->sendRequest(req);
@@ -387,11 +392,12 @@ BOOST_AUTO_TEST_CASE(test_forecast_any_datacenter_explicit) {
 }
 
 BOOST_AUTO_TEST_CASE(test_forecast_any_datacenter_implicit) {
-    auto client = HttpClient::newHttpClient("http://127.0.0.1:6969");
+    auto client = HttpClient::newHttpClient(
+        std::string(scheduler::test::TEST_SERVER_URL));
 
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(drogon::Get);
-    req->setPath("/api/forecast");
+    req->setPath(std::string(scheduler::test::API_FORECAST));
     // No parameters set—tests the 'defaultName' logic in fromRequest
 
     auto respPair = client->sendRequest(req);

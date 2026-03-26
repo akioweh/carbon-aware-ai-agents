@@ -1,4 +1,5 @@
 #include "Scheduler.hpp"
+#include "Constants.hpp"
 #include "SchedulerAlgo.hpp"
 #include "structs/JobRequest.hpp"
 #include "utils/TimeGridder.hpp"
@@ -9,8 +10,6 @@ namespace scheduler {
 using namespace std;
 using namespace drogon;
 using namespace scheduler::exceptions;
-
-constexpr double EPSILON = 1e-6;
 
 auto Scheduler::doScheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
     auto data = co_await fetch_data(job);
@@ -28,9 +27,9 @@ auto Scheduler::doScheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
     auto blocks_count = 0;
     auto blocks = vector<InternalBlock>{};
 
-    const auto index_to_time = [&](const int64_t i)
-        -> decltype(scheduler::TIME_GRIDDER)::time_point_t {
-        return scheduler::TIME_GRIDDER.toTimePoint(i + data.time_index_offset);
+    const auto index_to_time =
+        [&](const int64_t i) -> decltype(TIME_GRIDDER)::time_point_t {
+        return TIME_GRIDDER.toTimePoint(i + data.time_index_offset);
     };
 
     for (size_t i = 0; i < optimal_schedule.size(); ++i) {
@@ -41,7 +40,7 @@ auto Scheduler::doScheduleJob(JobRequest job) -> drogon::Task<SchedulerOutput> {
 
         for (const auto j : views::iota(int64_t{0}, n_intervals)) {
             const auto load = schedule_vec[j];
-            if (load < EPSILON) // filter out negligible loads
+            if (load < constants::EPSILON) // filter out negligible loads
                 continue;
             blocks.push_back({
                 .timestamp = index_to_time(j),

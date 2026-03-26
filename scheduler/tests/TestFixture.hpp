@@ -15,8 +15,8 @@
 struct SchedulerGlobalFixture {
     SchedulerGlobalFixture() {
         // Ensure clean state
-        if (std::filesystem::exists("scheduler_test.db")) {
-            std::filesystem::remove("scheduler_test.db");
+        if (std::filesystem::exists(scheduler::test::TEST_DB_FILENAME)) {
+            std::filesystem::remove(scheduler::test::TEST_DB_FILENAME);
         }
 
         // Load test config
@@ -32,10 +32,13 @@ struct SchedulerGlobalFixture {
         using namespace std::chrono_literals;
         auto start = std::chrono::steady_clock::now();
         while (!drogon::app().isRunning()) {
-            if (std::chrono::steady_clock::now() - start > 10s) {
+            if (std::chrono::steady_clock::now() - start >
+                std::chrono::seconds(
+                    scheduler::test::SERVER_START_TIMEOUT_SEC)) {
                 throw std::runtime_error("Timeout waiting for Drogon to start");
             }
-            std::this_thread::sleep_for(10ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(
+                scheduler::test::SERVER_START_POLL_MS));
         }
 
         // Seed some active datacenters in the stats API
@@ -46,7 +49,7 @@ struct SchedulerGlobalFixture {
 
     static void seedActiveDatacenters() {
         // Find stats host from env or default
-        std::string statsHost = "http://127.0.0.1:5000";
+        std::string statsHost = std::string(scheduler::test::LOCAL_STATS_URL);
         if (const char *envHost = std::getenv("STATS_API_URL")) {
             statsHost = envHost;
         }
@@ -54,10 +57,12 @@ struct SchedulerGlobalFixture {
         auto client = drogon::HttpClient::newHttpClient(statsHost);
 
         // Seed first 3 datacenters as active
-        for (int i = 1; i <= 14; ++i) {
+        for (int i = 1; i <= scheduler::test::NUM_MOCK_DATACENTERS; ++i) {
             auto req = drogon::HttpRequest::newHttpRequest();
             req->setMethod(drogon::Patch);
-            req->setPath("/datacenters/Data-Center-" + std::to_string(i));
+            req->setPath("/datacenters/" +
+                         std::string(scheduler::test::DATACENTER_PREFIX) +
+                         std::to_string(i));
 
             Json::Value body;
             body["active"] = true;

@@ -205,7 +205,7 @@ BOOST_AUTO_TEST_CASE(returns_nullopt_for_invalid_location) {
             []() -> drogon::Task<std::optional<LoadTimeSeries>> {
                 auto client = createFreeStatsAPIClient();
                 co_return co_await client->getLoadForecast(
-                    "nonexistent_location_xyz_12345");
+                    std::string(test::NONEXISTENT_LOCATION));
             }),
         exceptions::NetworkException);
 }
@@ -336,7 +336,7 @@ BOOST_AUTO_TEST_CASE(returns_nullopt_for_invalid_location) {
                 []() -> drogon::Task<std::optional<CarbonIntensityTimeSeries>> {
                     auto client = createFreeStatsAPIClient();
                     co_return co_await client->getCarbonIntensityForecast(
-                        "nonexistent_location_xyz_12345");
+                        std::string(test::NONEXISTENT_LOCATION));
                 }),
         exceptions::NetworkException);
 }
@@ -425,7 +425,7 @@ BOOST_AUTO_TEST_CASE(returns_empty_datacenter_for_invalid_location) {
                           []() -> drogon::Task<Datacenter> {
                               auto client = createFreeStatsAPIClient();
                               co_return co_await client->getDatacenter(
-                                  "nonexistent_location_xyz_12345");
+                                  std::string(test::NONEXISTENT_LOCATION));
                           }),
                       exceptions::NetworkException);
 }

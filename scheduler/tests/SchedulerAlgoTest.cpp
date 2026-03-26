@@ -114,8 +114,7 @@ BOOST_AUTO_TEST_CASE(infeasible_returns_inf_cost) {
     auto [costs, memo] = calc_single(load, cap, cost, 0.0, requested, TEST_RES);
 
     // The cost at the maximum work level should be infinite (infeasible)
-    const auto inf = std::numeric_limits<double>::max() / 2;
-    BOOST_CHECK_GE(costs.back(), inf);
+    BOOST_CHECK_GE(costs.back(), constants::INF);
 }
 
 BOOST_AUTO_TEST_CASE(prefers_greener_blocks) {
