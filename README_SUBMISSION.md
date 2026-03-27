@@ -88,3 +88,9 @@ For production-grade hosting, the following architecture is recommended:
     *   Set `allowInsecure: true` on the internal Azure network configuration to allow internal microservices to communicate seamlessly via HTTP.
     *   By default, the environment should be locked to the Azure WAN (with **no** public internet exposure).
     *   Your Infrastructure-as-Code (Bicep configuration) should explicitly expose *only* the UI image to the public internet for end-user access.
+
+---
+
+## 6. Temporary deployment (On Azure)
+
+For simplicity of testing, our website is currently deployed on this [page](https://carbonaware-ui.purplewave-8746eae9.uksouth.azurecontainerapps.io/). It is worth mentioning, that because of the incompatible hardware, vectorization of the hot-loop was impossible, hence the website is running slower than it would normally.
