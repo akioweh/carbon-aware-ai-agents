@@ -1,91 +1,177 @@
 # Stats Component
 
-This API provides historical and forecasted data on:
+This FastAPI service provides historical observations and high-resolution
+forecasts for data center load and carbon intensity. It serves as the primary
+data source for the [Scheduler](../scheduler), enabling carbon-aware workload
+placement.
 
-- data center load
-- data center capacity
-- grid energy greenness
+## Development Setup
 
-## Getting Started
+### Software
 
-Python 3.14.
+- **Python 3.14+**
+- **uv**: Recommended for fast package management and virtual environments.
 
-You should probably use a virtual environment. Using `uv`:
+### Toolchain
 
-```bash
-uv venv .venv
-```
+1. **Virtual Environment**:
 
-(`uv run` and `uv pip` will auto-activate the venv in the cwd.)
+   ```bash
+   uv venv .venv
+   source .venv/bin/activate  # or use `uv run` for automatic activation
+   ```
 
-### Install dependencies
+2. **Install Dependencies**:
 
-```bash
-uv pip install -r requirements.txt
-```
+   ```bash
+   uv pip install -r requirements.txt
+   ```
 
-### Run the API
+3. **Development Tooling**: The project uses `ruff` for linting and formatting.
 
-```bash
-uv run app.py
-```
+   ```bash
+   ruff check --fix .
+   ruff format .
+   ```
 
-The API will start on `http://localhost:5000` by default.
+### Quickstart
 
-...or directly using `uvicorn`:
+1. Ensure `cache.db` and `carbon_intensity.db` can be initialized in the
+   component root.
+2. Run the API:
 
-```bash
-uv run uvicorn app:app --reload
-```
+   ```bash
+   uv run app.py
+   ```
 
-### Development Tooling
+   The service will start on `http://127.0.0.1:5000` by default.
 
-Use ruff to format and lint (sort imports):
+3. **OpenAPI Docs**: Available at `http://127.0.0.1:5000/docs` or via the
+   auto-generated [`openapi.yaml`](./openapi.yaml).
 
-```bash
-ruff check --select I --fix .
-ruff format .
-```
+### Testing
 
-## API Documentation
-
-An OpenAPI 3.0 specification, [openapi.yaml](./openapi.yaml), is auto-generated
-as per the endpoints every time `app` is ran.
-
-## Testing
-
-The project uses `pytest`.  
-`schemathesis` is used for property-based API testing.
-
-Run all tests:
+The component uses `pytest` for unit/integration tests and `schemathesis` for
+property-based API testing.
 
 ```bash
 uv run pytest tests
 ```
 
-Run a specific test suite:
+Note: API tests require the server to be running locally at
+`http://localhost:5000`.
 
-```bash
-uv run pytest tests/<test_name>.py
+## Implementation Details
+
+### Forecasting Models
+
+#### Carbon Intensity (CI)
+
+The service uses a **Direct Multi-step Ridge Regression** model to forecast
+carbon intensity.
+
+- **Data Source**: Historical 30-minute readings from the
+  [UK Carbon Intensity API](https://carbonintensity.org.uk/).
+- **Features**: Cyclical time features (hour, day, minute) and exogenous weather
+  features (wind speed, temperature, solar radiation) fetched from the
+  [Open-Meteo API](https://open-meteo.com/).
+- **Resolution**: Predicts at 30-minute intervals and upsamples to **5-minute
+  resolution** via linear interpolation for the scheduler.
+
+#### Data Center Load
+
+As no real-time load source is available, the service generates synthetic load
+patterns combined with historical averages to provide a realistic baseline for
+the scheduler.
+
+### Data Collection & Syncing
+
+1. **Backfill**: On startup, the service performs an incremental backfill from
+   the UK Carbon Intensity API for all tracked regions.
+2. **Background Collection**: A dedicated thread (`carbon_collector_loop`)
+   fetches new readings every 5-30 minutes.
+3. **Syncing**: Raw readings from `carbon_intensity.db` are periodically synced
+   into the main `cache.db` historical tables to ensure the predictors have
+   access to the latest ground truth.
+
+## System Design
+
+### Architecture Overview
+
+```
+stats/
+├── app.py                # Entry point & lifespan management
+├── routes.py             # FastAPI endpoint definitions
+├── background.py         # Periodic task loops (predictions, sync)
+├── predictors/           # Forecasting logic & orchestrator
+│   ├── ridge.py          # Direct Ridge CI model
+│   └── load.py           # Load forecasting logic
+├── data/                 # External data collection
+│   ├── carbon_collector.py # UK API client
+│   └── generate_history.py # Synthetic load generator
+├── db_utils.py           # SQLite persistence layer
+├── models.py             # Pydantic DTOs & API schemas
+└── config.py             # Environment & constant configuration
 ```
 
-Note: The tests require the API server to be running on `http://localhost:5000`.
+### Data Flows
 
-## Service Behavior
+#### 1. Startup & Initialization
 
-- On startup, the service initializes the SQLite database (`cache.db`).
-<!-- (TODO: out of date info?) -->
-- If a legacy `history.json` exists and the database is empty, it migrates the
-data.
-<!-- (TODO: out of date info?) -->
-- If the database is empty and no history exists, it generates fresh historical
-  data.
-- The service concurrently (in a background thread) computes new predictions
-  (every 5 minutes).
-- On each request, the service returns the latest data point from the history.
+The service follows a strict initialization sequence:
 
-The background worker writes to the sqlite database that the request handlers
-also read from.
+1. Initialize SQLite databases.
+2. Backfill missing carbon data from the external API.
+3. Sync new data to historical tables.
+4. Launch background threads for prediction updates and carbon collection.
 
-> [!TIP]  
-> This architecture avoids stale data while also maintaining API latency.
+> [!IMPORTANT]  
+> **Cold Start Performance**: On startup, the service initiates the first full
+> training pass for all active datacenters. This process typically takes **~10
+> minutes** to reach stability, during which the service will exhibit **high CPU
+> and RAM usage**. API requests made during this window may return cached
+> (stale) forecasts until the initial models are fit and cached.
+
+#### 2. Forecast Request (`GET /locations/{id}/metrics/forecast_load`)
+
+1. **Request**: Scheduler or UI requests a time window.
+2. **Stitching**: The orchestrator fetches historical observations from
+   `cache.db` and future predictions from the prediction cache.
+3. **Alignment**: Historical data is upsampled to 5-minute intervals. Boundary
+   points are deduplicated to ensure a smooth transition from "actual" to
+   "forecast" data.
+4. **Response**: Returns a unified time series with `is_forecast` flags.
+
+#### 3. Prediction Update Loop
+
+To maintain low API latency, forecasts are not computed on-demand. Instead:
+
+1. Every 30 minutes, `prediction_loop` runs the Ridge model for all active
+   datacenters.
+2. 7-day forecasts (2016 data points) are serialized to JSON and stored in the
+   `predictions` table in `cache.db`.
+3. The API serves these pre-computed results instantly.
+
+## Component Design Notes
+
+### Persistence Layer
+
+The component uses two SQLite databases to separate concerns:
+
+- **`carbon_intensity.db`**: Stores raw, normalized readings from the UK Carbon
+  Intensity API. Used for long-term history and model training.
+- **`cache.db`**: Stores upsampled historical data, pre-computed forecasts, and
+  datacenter configuration. Optimized for fast retrieval by the API.
+
+### Prediction Window
+
+All forecasts are fixed to a **168-hour (7-day)** window at **5-minute
+resolution**. This allows the Scheduler to perform long-term optimizations while
+maintaining high granularity for near-term placement.
+
+### Error Handling & Alerts
+
+Background loops track consecutive failures. If a loop (e.g., prediction
+generation) fails multiple times (default 5), a `CRITICAL` log is issued to
+signal that forecasts may be becoming stale.
+
