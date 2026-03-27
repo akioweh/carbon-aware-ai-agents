@@ -1,3 +1,4 @@
+#include "Constants.hpp"
 #define BOOST_TEST_MODULE SchedulerAlgoTest
 
 #include <SchedulerAlgo.hpp>

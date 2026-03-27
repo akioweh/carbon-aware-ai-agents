@@ -45,7 +45,8 @@ Their configuration files are tracked for consistent linting and formatting
    [`compile_commands.json`](./compile_commands.json) (if it doesn't, build at
    least once)
 4. Build anytime using `cmake --build build/<preset name>`
-5. Output binary is at `./build/<preset name>/scheduler(.exe)`
+5. Run the scripts/setup_db script to initialize the database. 
+6. Output binary is at `./build/<preset name>/scheduler(.exe)`
 
 ### Testing
 
