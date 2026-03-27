@@ -29,6 +29,10 @@ entire project.
 - [Experiment Summary](./experiments/experiment_summary.md): comprehensive
   summary including per-region results and transformer analysis.
 
+**Benchmarking and Comparison**:
+- [Optimization Benchmarks](../benchmarks/README.md): Analysis of hardware optimizations.
+- [Comparison](../comparison/README.md): Comparison of performance of our software with industry standard Greenness Software Foundation SDK.
+
 ## Developer Information
 
 Please amend existing and add new documentation as appropriate throughout
