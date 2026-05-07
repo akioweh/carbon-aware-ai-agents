@@ -274,13 +274,10 @@ export function WorkloadCalendar({ onClose, scheduleId }: WorkloadCalendarProps)
             const forecastData = await forecastsRes.json()
             setForecasts(Array.isArray(forecastData) ? forecastData : [])
           }
-        } else {
-          const forecastsRes = await fetch(`/api/forecast`)
-          if (forecastsRes.ok) {
-            const forecastData = await forecastsRes.json()
-            setForecasts(Array.isArray(forecastData) ? forecastData : [])
-          }
         }
+        // No schedules => no forecast fetch: the chart wouldn't render the data anyway
+        // (intervalsPerDC early-returns empty when blocks is empty), and an unparameterized
+        // /api/forecast call has been observed to take ~10s, blocking page interactivity.
       } catch (err) {
         console.error("Error fetching data:", err)
       } finally {
