@@ -112,6 +112,18 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
   const [fetchedOptData, setFetchedOptData] = useState<any>(null)
   const [fetchedUnoptData, setFetchedUnoptData] = useState<ScheduleData | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setContainerWidth(el.clientWidth)
+    const obs = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width)
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   const locationToDcId = useMemo(() => {
     const map = new Map<string, string>()
@@ -370,6 +382,20 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
     return Math.ceil(max / 10) * 10;
   }, [workloadData]);
 
+  // Auto-scale chart width: fill container when possible, but enforce a minimum
+  // density per 5-min interval so dense ranges remain readable on small screens.
+  // Net effect (typical laptop ~1200px content): up to ~5 days fits without
+  // scrolling; 7 days scrolls modestly; phones scroll sooner (avoiding squish).
+  const MIN_PX_PER_INTERVAL = 0.9
+  const chartInnerWidth = useMemo<string>(() => {
+    if (workloadData.length === 0 || containerWidth === 0) return "100%"
+    const pxPerInterval = Math.max(
+      MIN_PX_PER_INTERVAL,
+      containerWidth / workloadData.length,
+    )
+    return `${workloadData.length * pxPerInterval}px`
+  }, [containerWidth, workloadData.length])
+
   const nowLineValue = useMemo(() => {
     const now = Date.now()
     let closest: string | null = null
@@ -571,7 +597,7 @@ export function ScheduleResult({ result, unoptimizedResult, earliestStart, lates
             <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
             <div ref={scrollRef} className="h-[250px] w-full mt-4 overflow-x-auto custom-scrollbar" style={{ scrollBehavior: 'smooth' }}>
-              <div style={{ width: `${Math.max(workloadData.length * 10, 800)}px`, height: "100%" }}>
+              <div style={{ width: chartInnerWidth, height: "100%" }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={workloadData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>
