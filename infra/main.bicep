@@ -18,7 +18,7 @@ param schedulerImage string = 'ealen/echo-server:latest'
 param uiImage string = 'ealen/echo-server:latest'
 
 @description('The Stats API URL')
-param statsApiUrl string = 'http://140.238.79.139:5000'
+param statsApiUrl string = 'http://143.47.252.249:5000'
 
 var sqlContent = loadTextContent('../scheduler/sql/init.sql')
 
