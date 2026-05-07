@@ -66,7 +66,7 @@ The important environmental variables:
 | name                | what it does             | default value                |
 | ------------------- | ------------------------ | ---------------------------- |
 | `UI_HOST_PORT`      | Port to access the UI    | `8080`                       |
-| `STATS_API_URL`     | URL of the Stats API     | `http://140.238.79.139:5000` |
+| `STATS_API_URL`     | URL of the Stats API     | `http://143.47.252.249:5000` |
 | `SCHEDULER_API_URL` | URL of the Scheduler API | `http://scheduler:6969`      |
 | `PGHOST`            | Scheduler DB Host        | `db`                         |
 | `DB_HOST_PORT`      | Scheduler DB Port        | `5433`                       |

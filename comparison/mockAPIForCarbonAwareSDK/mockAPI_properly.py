@@ -23,7 +23,7 @@ def transformFromGramToPounds(obj: ForecastPoint) -> ForecastPoint:
 
 def getForecastDataForLocation(location: str):
     statsAPICIEndpoint = (
-        f"http://140.238.79.139:5000//locations/{location}/metrics/forecast_greenness"
+        f"http://143.47.252.249:5000//locations/{location}/metrics/forecast_greenness"
     )
 
     try:

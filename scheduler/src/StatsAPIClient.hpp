@@ -77,7 +77,7 @@ class StatsAPIClient {
 
   public:
     // overridable via STATS_API_URL environment variable
-    static constexpr auto DEFAULT_STATS_API_URL = "http://140.238.79.139:5000";
+    static constexpr auto DEFAULT_STATS_API_URL = "http://143.47.252.249:5000";
 
     [[nodiscard]] auto getLocations() const
         -> drogon::Task<std::vector<Location>>;

@@ -1,4 +1,4 @@
-const DEFAULT_STATS_API_URL = 'http://140.238.79.139:5000';
+const DEFAULT_STATS_API_URL = 'http://143.47.252.249:5000';
 export const STATS_API_URL = process.env.STATS_API_URL || DEFAULT_STATS_API_URL;
 
 const DEFAULT_SCHEDULER_API_URL = 'http://localhost:6969';
