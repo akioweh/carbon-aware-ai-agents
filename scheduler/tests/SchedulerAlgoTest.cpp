@@ -485,6 +485,67 @@ BOOST_AUTO_TEST_CASE(varying_capacity_across_time_slots) {
     BOOST_CHECK_GT(headroom_alloc, tight_alloc);
 }
 
+// Regression test: SchedulerBase::fetch_data caps each block's effective
+// headroom at min(remaining, max_load) via the load-preserving transform
+// `capacity := min(capacity, load + max_load)`. When max_load >
+// original_capacity (large jobs vs. per-DC capacity), a previous
+// formulation under-provisioned every block by (max_load -
+// original_capacity), wrongly reporting infeasibility for jobs that easily
+// fit. This test mirrors the post-preprocessing inputs for that regime
+// (with a non-zero existing load to exercise the load-preserving path) and
+// asserts the workload is scheduled successfully and respects the
+// per-block headroom.
+BOOST_AUTO_TEST_CASE(per_block_max_load_exceeds_capacity_still_feasible) {
+    // Raw (pre-transform) scenario: 2 locations, 6 intervals.
+    // - original_capacity per block = 10 (the DC's per-block capacity)
+    // - original_load per block     = 2  (some prior schedule eating
+    //                                     headroom; remaining = 8)
+    // - max_load                    = 100 (job's per-block parallelism
+    //                                     limit, 10x the DC capacity)
+    // - workload                    = 40  (well within total available
+    //                                     2 * 6 * 8 = 96 across the grid)
+    //
+    // Post-fix transform yields load'=2, capacity'=min(10, 2+100)=10
+    // per block, so headroom = capacity' - load' = 8 = min(remaining,
+    // max_load). Pre-fix would have produced load'=100-min(8,100)=92,
+    // capacity'=min(10,100)=10, headroom = 10-92 < 0 → clamped to zero
+    // per block → infeasible.
+    constexpr auto n_locations = 2;
+    constexpr auto n_intervals = 6;
+    constexpr auto orig_capacity = 10.0;
+    constexpr auto orig_load = 2.0;
+    constexpr auto max_load = 100.0;
+    constexpr auto workload = 40.0;
+
+    const auto eff_headroom =
+        std::max(0.0, std::min(orig_capacity - orig_load, max_load));
+    const auto post_capacity = std::min(orig_capacity, orig_load + max_load);
+
+    auto loads =
+        std::vector(n_locations, std::vector<double>(n_intervals, orig_load));
+    auto caps = std::vector(n_locations,
+                            std::vector<double>(n_intervals, post_capacity));
+    auto greens =
+        std::vector(n_locations, std::vector<double>(n_intervals, 50.0));
+    auto cost1 = TestCost{.capacities = caps[0], .carbon_intensity = greens[0]};
+    auto cost2 = TestCost{.capacities = caps[1], .carbon_intensity = greens[1]};
+    auto costs = std::vector{cost1, cost2};
+    auto penalties = std::vector{0.0, 0.0};
+
+    auto [total_cost, allocs] =
+        calc_multiple(loads, caps, costs, penalties, workload, TEST_RES);
+
+    // total allocated work meets demand
+    BOOST_CHECK_GE(total_work(allocs), workload - 1e-3);
+
+    // each block respects the effective headroom (= min(remaining, max_load))
+    for (const auto &loc_alloc : allocs)
+        for (const auto a : loc_alloc)
+            BOOST_CHECK_LE(a, eff_headroom + 1e-9);
+
+    BOOST_CHECK_LT(total_cost, std::numeric_limits<double>::max() / 4);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 // =============================================================================

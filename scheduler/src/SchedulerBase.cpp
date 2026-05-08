@@ -85,15 +85,17 @@ auto SchedulerBase::fetch_data(const JobRequest &job)
         }
     }
 
-    // HACK: we're hijacking the load and capacity vectors to enforce the
-    // max_load constraint from the job request... as existing loads are
-    // "discarded", we effectively schedule on a "clean" calendar
+    // For each (location, interval), the effective headroom for this job is
+    // min(capacity - load, job.max_load).
+    // We clamp capacity down to load + job.max_load so the optimizer's
+    // (capacity - load) headroom equals min(remaining, job.max_load), while
+    // the existing load is preserved so marginal cost c(load + w) - c(load)
+    // is computed against the real baseline (correct for any cost function,
+    // not just linear).
     for (const auto i : std::views::iota(0UZ, n_locations)) {
         for (const auto j : std::views::iota(int64_t{}, n_intervals)) {
-            const auto remaining = data.capacities_f[i][j] - data.loads_f[i][j];
-            data.loads_f[i][j] = job.max_load - min(remaining, job.max_load);
-            data.capacities_f[i][j] =
-                min(data.capacities_f[i][j], job.max_load);
+            data.capacities_f[i][j] = std::min(
+                data.capacities_f[i][j], data.loads_f[i][j] + job.max_load);
         }
     }
 

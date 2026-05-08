@@ -290,22 +290,22 @@ inline auto calc_single(const std::vector<double> &load_f,
     // discretization
     const auto e_work = get_e_work(tot_work_f, resolution);
     const auto tot_work = static_cast<int>(ceil(tot_work_f / e_work));
-    auto load = vector<int>(n);
+    auto load = vector<int64_t>(n);
     transform(execution::unseq, load_f.begin(), load_f.end(), load.begin(),
-              [e_work](double x) -> int {
-                  return static_cast<int>(ceil(x / e_work));
+              [e_work](double x) -> int64_t {
+                  return static_cast<int64_t>(ceil(x / e_work));
               });
-    auto capacity = vector<int>(n);
+    auto capacity = vector<int64_t>(n);
     transform(execution::unseq, capacity_f.begin(), capacity_f.end(),
-              capacity.begin(), [e_work](double x) -> int {
-                  return static_cast<int>(floor(x / e_work));
+              capacity.begin(), [e_work](double x) -> int64_t {
+                  return static_cast<int64_t>(floor(x / e_work));
               });
     const struct {
         decltype(cost_f) &cost_f_;
         double e_work;
         auto operator[](size_t i) const {
-            return [&, i](int load) -> double {
-                return cost_f_[i](load * e_work);
+            return [&, i](int64_t load) -> double {
+                return cost_f_[i](static_cast<double>(load) * e_work);
             };
         }
     } cost{.cost_f_ = cost_f, .e_work = e_work};
@@ -315,6 +315,9 @@ inline auto calc_single(const std::vector<double> &load_f,
     const int row_offset = penalty;
     // length of DP rows: indices for the range (-max_penalty, tot_work]
     const int row_size = tot_work + row_offset;
+    // a wi larger than this is unreachable in the DP regardless of
+    // physical headroom (target row index would fall outside [0, row_size])
+    const int max_wi_global = row_size + penalty;
 
     const auto row_size_padded = row_size + 1 + (VEC_SIZE * 2);
     constexpr auto INF = numeric_limits<double>::max() / 2;
@@ -333,12 +336,14 @@ inline auto calc_single(const std::vector<double> &load_f,
     auto memo = vector(n + 1, array{MemoEntryVector(row_size_padded),
                                     MemoEntryVector(row_size_padded)});
 
-    auto max_wi_precomputed = 0;
-    for (auto i : capacity)
-        max_wi_precomputed = max(max_wi_precomputed, i);
+    const auto max_avail = max(
+        int64_t{}, ranges::max(views::zip_transform(minus{}, capacity, load)));
+    // min(max available capacity across blocks, max wi reachable in DP)
+    const auto max_cost_idx =
+        static_cast<int>(min(max_avail, static_cast<int64_t>(max_wi_global)));
 
     auto cost_table =
-        AlignedVector<double>(max_wi_precomputed + 1 + (VEC_SIZE * 2), INF);
+        AlignedVector<double>(max_cost_idx + 1 + (VEC_SIZE * 2), INF);
 
     for (const auto i : views::iota(1, n + 1)) {
         swap(row, prev_row);
@@ -347,7 +352,9 @@ inline auto calc_single(const std::vector<double> &load_f,
         ranges::fill(row[1], INF);
 
         const auto cost_func = cost[i - 1];
-        const auto max_wi = max(0, capacity[i - 1] - load[i - 1]);
+        const auto max_wi = static_cast<int>(
+            min(static_cast<int64_t>(max_wi_global),
+                max(int64_t{}, capacity[i - 1] - load[i - 1])));
         const auto base_cost = cost_func(load[i - 1]);
 
         for (int wi = 0; wi <= max_wi; wi++)
